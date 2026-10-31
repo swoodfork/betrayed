@@ -46,6 +46,9 @@ describe("welcome messages", () => {
     });
 
     expect(message).toContain("Apply to the Raid Team");
+    expect(message).toContain(
+      "Interested in raiding on one of Betrayed's raid teams?",
+    );
     expect(message).toContain("Move Me to PUG Voice");
     expect(message).toContain("Explore Forever Discussion");
     expect(message).not.toContain("https://discord.com/users/");
