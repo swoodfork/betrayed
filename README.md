@@ -73,9 +73,10 @@ npm run dev
 ```
 
 The bot always registers `/zors` in Betrayed Test. Joining with a non-bot test
-account posts in `👋welcome` and sends an interactive DM. Discord's native
-member-join notices use the same channel. Closed DMs are reported but do not
-stop the public welcome.
+account posts one of 20 shuffled greetings in `👋welcome` and sends an
+interactive DM. The three action buttons are sent before a separate Zors
+profile-card DM. Discord's native member-join notices use the same channel.
+Closed DMs are reported but do not stop the public welcome.
 
 NSFW access is handled by Discord onboarding rather than Zors Bot. When bound,
 the welcome DM links to the raid application channel and can move a connected

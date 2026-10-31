@@ -43,7 +43,11 @@ import {
   buildWelcomeActionComponents,
   handleWelcomeActionButton,
 } from "./welcome-actions.js";
-import { buildDirectWelcome, buildPublicWelcome } from "./welcome.js";
+import {
+  buildDirectWelcome,
+  buildZorsProfileMessage,
+  createPublicWelcomePicker,
+} from "./welcome.js";
 
 function isAllowedCommandGuild(
   guildId: string | null,
@@ -235,6 +239,10 @@ async function welcomeMember(
   config: BotConfig,
   onboarding: MemberOnboardingConfig,
   raidApplications: RaidApplicationConfig,
+  publicWelcome: (member: {
+    displayName: string;
+    memberMention: string;
+  }) => string,
 ): Promise<void> {
   if (member.user.bot) {
     return;
@@ -264,7 +272,7 @@ async function welcomeMember(
       );
     }
 
-    await channel.send(buildPublicWelcome(welcomeMember));
+    await channel.send(publicWelcome(welcomeMember));
   } catch (error) {
     console.error("Failed to send the public welcome message.", error);
   }
@@ -288,17 +296,16 @@ async function welcomeMember(
       discussionChannelId,
     );
     await member.send({
-      content: buildDirectWelcome(
-        welcomeMember,
-        {
-          raidApplication: applicationChannelId !== null,
-          pugVoice: pugVoiceChannelId !== null,
-          communityDiscussion: discussionChannelId !== null,
-        },
-        config.DISCORD_OWNER_USER_ID,
-      ),
+      content: buildDirectWelcome(welcomeMember, {
+        raidApplication: applicationChannelId !== null,
+        pugVoice: pugVoiceChannelId !== null,
+        communityDiscussion: discussionChannelId !== null,
+      }),
       components,
     });
+    await member.send(
+      buildZorsProfileMessage(config.DISCORD_OWNER_USER_ID),
+    );
     const actionCount = components[0]?.components.length ?? 0;
     console.info(
       `Sent ${scope} welcome DM with ${actionCount} action button(s).`,
@@ -327,6 +334,7 @@ export function createBot(config: BotConfig): Client {
   const onboarding = loadMemberOnboardingConfig(config);
   const staffCommands = loadStaffCommandConfig(config);
   const raidApplications = loadRaidApplicationConfig(config);
+  const publicWelcome = createPublicWelcomePicker();
 
   const getInventory = (guild: Guild): Promise<GuildInventory> => {
     const now = Date.now();
@@ -513,6 +521,7 @@ export function createBot(config: BotConfig): Client {
       config,
       await onboarding,
       await raidApplications,
+      publicWelcome,
     );
   });
 
