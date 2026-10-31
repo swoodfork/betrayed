@@ -159,7 +159,7 @@ async function handleZorsCommand(
       "**Zors Bot commands**",
       "`/zors status` — Check whether the bot is online.",
       "`/zors help` — Show this command list.",
-      "`/zors roles` — Choose optional Controversial and NSFW access.",
+      "`/zors roles` — Choose optional 18+ NSFW access.",
       "`/zors audit-channels` — Owner-only read-only channel inventory.",
       "`/zors audit-roles` — Owner-only read-only role inventory.",
       "`/zors audit-permissions` — Owner-only permission review.",

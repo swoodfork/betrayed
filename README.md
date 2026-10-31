@@ -8,7 +8,7 @@ Zors Bot is being developed test-guild-first. The current milestone provides:
 - Owner-only sanitized JSON inventory export
 - A concise public welcome for new test-guild members
 - An interactive welcome DM with allowlisted self-service roles
-- `/zors roles` for Controversial and explicitly confirmed 18+ NSFW access
+- `/zors roles` for explicitly confirmed 18+ NSFW access
 - Guarded desired-state planning and explicitly approved production reconstruction
 
 Production inventory commands remain disabled unless
@@ -69,10 +69,11 @@ account posts in `👋welcome` and sends an interactive DM. Discord's native
 member-join notices use the same channel. Closed DMs are reported but do not
 stop the public welcome.
 
-The DM and `/zors roles` can add or remove only the immutable Controversial and
-NSFW role bindings in `config/member-onboarding.yaml`. NSFW addition requires a
-button explicitly labeled as an 18+ confirmation. Staff, raid, team, and other
-privileged roles are never available through self-service.
+The DM and `/zors roles` can add or remove only the immutable NSFW role binding
+in `config/member-onboarding.yaml`. NSFW addition requires a button explicitly
+labeled as an 18+ confirmation. Controversial access is assigned manually by
+staff. Staff, raid, team, and other privileged roles are never available
+through self-service.
 
 Stop the bot with `Ctrl+C`.
 

@@ -12,7 +12,6 @@ const guildOnboardingSchema = z.object({
   guildId: snowflake,
   welcomeChannelId: snowflake.nullable(),
   roles: z.object({
-    controversial: snowflake,
     nsfw: snowflake,
   }),
 });

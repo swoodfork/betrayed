@@ -22,7 +22,6 @@ describe("member onboarding bindings", () => {
       "1565925042389516410",
     );
     expect(onboarding.test.roles).toEqual({
-      controversial: "1565924731494862888",
       nsfw: "1565924732333850708",
     });
     expect(onboarding.production.welcomeChannelId).toBe(

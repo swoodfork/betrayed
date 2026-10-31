@@ -4,12 +4,10 @@ test:
   guildId: "1565530049229234268"
   welcomeChannelId: "1565925042389516410"
   roles:
-    controversial: "1565924731494862888"
     nsfw: "1565924732333850708"
 
 production:
   guildId: "705235406974615603"
   welcomeChannelId: "1565926670559355040"
   roles:
-    controversial: "1565846234873331742"
     nsfw: "1565846235993350165"

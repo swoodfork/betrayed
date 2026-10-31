@@ -24,7 +24,6 @@ Zors Bot can help you choose optional channel access below. We're happy to have 
 
 ## Optional access questions
 
-- Would you like access to the Controversial discussion channel?
 - If you are at least 18 years old, would you like to opt into the NSFW channel?
 
-Members can change either choice later with `/zors roles`.
+Members can change this choice later with `/zors roles`. Controversial access is assigned manually by staff.

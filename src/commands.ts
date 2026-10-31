@@ -19,7 +19,7 @@ export const zorsCommand = new SlashCommandBuilder()
   .addSubcommand((command) =>
     command
       .setName("roles")
-      .setDescription("Choose optional Controversial and NSFW channel access"),
+      .setDescription("Choose optional 18+ NSFW channel access"),
   )
   .addSubcommand((command) =>
     command
