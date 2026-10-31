@@ -524,6 +524,12 @@ categories:
         type: text
         permissionProfile: public-read
         preserveHistory: false
+      - key: welcome
+        name: "👋welcome"
+        aliases: [welcome, new-arrivals]
+        type: text
+        permissionProfile: welcome-feed
+        preserveHistory: false
   - key: staff
     name: "🔒 Officer 🔒"
     aliases:
@@ -716,12 +722,6 @@ categories:
       - Community Chat
     permissionProfile: member-chat
     channels:
-      - key: welcome
-        name: "👋welcome"
-        aliases: [welcome, new-arrivals]
-        type: text
-        permissionProfile: welcome-feed
-        preserveHistory: false
       - key: general
         name: "👋general"
         aliases: [general]

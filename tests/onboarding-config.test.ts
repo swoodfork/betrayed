@@ -25,6 +25,8 @@ describe("member onboarding bindings", () => {
       controversial: "1565924731494862888",
       nsfw: "1565924732333850708",
     });
-    expect(onboarding.production.welcomeChannelId).toBeNull();
+    expect(onboarding.production.welcomeChannelId).toBe(
+      "1565926670559355040",
+    );
   });
 });

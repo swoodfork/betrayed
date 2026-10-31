@@ -6,9 +6,9 @@ guild:
   name: Betrayed
 
 inventory:
-  file: betrayed-complete-inventory-channel-access.json
-  generatedAt: "2026-10-30T23:22:15.865Z"
-  sha256: "1b3a2d781519b05316093d0fd3e794f4bc7a6e51eb431306fe1f4a91aa80776a"
+  file: betrayed-complete-inventory-welcome-enabled.json
+  generatedAt: "2026-10-31T03:13:51.469Z"
+  sha256: "e979d0e06546ac158827e4a98cbc81630fa3f017a80642e46cd5cc4fe640da1e"
 
 roleBindings:
   guild-master: "705314740330561587"
@@ -76,6 +76,7 @@ categoryBindings:
 channelBindings:
   announcements: "813866893798146080"
   server-guide: "1565838663466754069"
+  welcome: "1565926670559355040"
   internal-affairs: "706535819028201512"
   officer-voice: "842327436749176832"
   coordinator-chat: "1182447751942918194"

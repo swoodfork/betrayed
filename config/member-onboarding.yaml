@@ -9,7 +9,7 @@ test:
 
 production:
   guildId: "705235406974615603"
-  welcomeChannelId: null
+  welcomeChannelId: "1565926670559355040"
   roles:
     controversial: "1565846234873331742"
     nsfw: "1565846235993350165"
