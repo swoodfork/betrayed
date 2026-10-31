@@ -14,9 +14,7 @@ Welcome to **Betrayed**, {{displayName}}!
 
 We're glad you're here.
 
-Take a look through the available channels and choose the game and community sections that interest you. You'll find dedicated RuneScape areas and general community conversations.
-
-If you are joining a guild, coalition, group, or raid that needs private access, contact a member of the staff team.
+If you have any questions regarding Betrayed as a whole, please message [Zors](https://discord.com/users/{{ownerUserId}}) or any of the **@Officers** online in Discord and one will happily assist you.
 
 Interested in joining the Betrayed raid team? Use **Apply to the Raid Team** below to open the application page.
 

@@ -12,7 +12,7 @@ Discord modal with four required written answers.
    - Wednesday
    - Thursday
    - Sunday
-2. How likely are you to miss raid due to an emergent issue?
+2. Likelihood of having to call out of raid on a given week
    - Very likely
    - Somewhat likely
    - Almost never
@@ -30,8 +30,7 @@ Discord modal with four required written answers.
 
 ## Required written questions
 
-1. If you are coming from a different guild, what makes you want to change to
-   Betrayed? Enter `N/A` when not changing guilds.
+1. Why change guilds and join Betrayed? Enter `N/A` when not changing guilds.
 2. What is the biggest strength you bring to a raid team?
 3. Link your Warcraft Logs.
 4. Anything you would like us to know?

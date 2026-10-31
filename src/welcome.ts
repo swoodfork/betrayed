@@ -24,15 +24,17 @@ export function buildDirectWelcome(
     pugVoice: false,
     communityDiscussion: false,
   },
+  ownerUserId: string | null = null,
 ): string {
+  const zorsContact = ownerUserId
+    ? `[Zors](https://discord.com/users/${ownerUserId})`
+    : "Zors";
   const message = [
     `Welcome to **Betrayed**, ${member.displayName}!`,
     "",
     "We're glad you're here.",
     "",
-    "Take a look through the available channels and choose the game and community sections that interest you. You'll find dedicated RuneScape areas and general community conversations.",
-    "",
-    "If you are joining a guild, coalition, group, or raid that needs private access, contact a member of the staff team.",
+    `If you have any questions regarding Betrayed as a whole, please message ${zorsContact} or any of the **@Officers** online in Discord and one will happily assist you.`,
   ];
   if (actions.raidApplication) {
     message.push(

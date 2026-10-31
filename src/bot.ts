@@ -288,11 +288,15 @@ async function welcomeMember(
       discussionChannelId,
     );
     await member.send({
-      content: buildDirectWelcome(welcomeMember, {
-        raidApplication: applicationChannelId !== null,
-        pugVoice: pugVoiceChannelId !== null,
-        communityDiscussion: discussionChannelId !== null,
-      }),
+      content: buildDirectWelcome(
+        welcomeMember,
+        {
+          raidApplication: applicationChannelId !== null,
+          pugVoice: pugVoiceChannelId !== null,
+          communityDiscussion: discussionChannelId !== null,
+        },
+        config.DISCORD_OWNER_USER_ID,
+      ),
       components,
     });
     const actionCount = components[0]?.components.length ?? 0;

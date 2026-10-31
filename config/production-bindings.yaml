@@ -6,9 +6,9 @@ guild:
   name: Betrayed
 
 inventory:
-  file: betrayed-complete-inventory-welcome-enabled.json
-  generatedAt: "2026-10-31T03:13:51.469Z"
-  sha256: "e979d0e06546ac158827e4a98cbc81630fa3f017a80642e46cd5cc4fe640da1e"
+  file: betrayed-production-post-applications.json
+  generatedAt: "2026-10-31T09:13:52.785Z"
+  sha256: "58e6bb05493ca117f371997525bebaf7f13a8fa7340d692c13e85ba7c4b9391c"
 
 roleBindings:
   guild-master: "705314740330561587"
@@ -77,15 +77,18 @@ channelBindings:
   announcements: "813866893798146080"
   server-guide: "1565838663466754069"
   welcome: "1565926670559355040"
+  raid-application: "1566017296311525416"
   internal-affairs: "706535819028201512"
   officer-voice: "842327436749176832"
   coordinator-chat: "1182447751942918194"
+  raid-applicants: "1566017297007509618"
   coordinator-voice: "1565838673050734713"
   council-chat: "705238667492458507"
   zors-council: "1565838679115833347"
   tenshock-council: "1565838681548529776"
   herc-council: "1565838684157251724"
   forever-discussion: "1176642587319353375"
+  pug-voice: "1566017298719051788"
   zors-40-team-chat: "1565838708551327824"
   tenshock-40-team-chat: "1548904383608131625"
   herc-40-team-chat: "1549624934379298988"

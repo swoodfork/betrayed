@@ -43,6 +43,10 @@ const emergencyOptions = [
   ["almost_never", "Almost never"],
   ["never", "It will never happen"],
 ] as const;
+export const emergencyQuestion =
+  "Likelihood of having to call out of raid on a given week";
+export const guildChangeQuestion =
+  "Why change guilds and join Betrayed?";
 
 const raiderTypeOptions = [
   ["casual", "Casual"],
@@ -174,7 +178,7 @@ function buildSelectionComponents(
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
       selectMenu(
         "emergency",
-        "Likelihood of missing raid for an emergency",
+        emergencyQuestion,
         emergencyOptions,
         draft.emergency ? [draft.emergency] : [],
         1,
@@ -215,7 +219,7 @@ function buildApplicationModal(): ModalBuilder {
       new ActionRowBuilder<TextInputBuilder>().addComponents(
         new TextInputBuilder()
           .setCustomId("guild_change")
-          .setLabel("Why do you want to change to Betrayed?")
+          .setLabel(guildChangeQuestion)
           .setPlaceholder("Enter N/A if you are not changing guilds.")
           .setStyle(TextInputStyle.Paragraph)
           .setMinLength(1)

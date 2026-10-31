@@ -163,6 +163,21 @@ function desiredTypeMatches(
     : currentType === "GuildForum";
 }
 
+function sortableChannelGroup(type: string): string {
+  if (
+    type === "GuildText" ||
+    type === "GuildAnnouncement" ||
+    type === "GuildForum" ||
+    type === "GuildMedia"
+  ) {
+    return "text";
+  }
+  if (type === "GuildVoice" || type === "GuildStageVoice") {
+    return "voice";
+  }
+  return type;
+}
+
 function sorted(values: string[]): string[] {
   return [...values].sort();
 }
@@ -397,7 +412,11 @@ export function createDryRunPlan(
       const currentAfterChannel = afterMatches[0];
       const currentSiblings = currentCategory
         ? currentChannels.filter(
-            (candidate) => candidate.parentId === currentCategory.id,
+            (candidate) =>
+              candidate.parentId === currentCategory.id &&
+              (!currentAfterChannel ||
+                sortableChannelGroup(candidate.type) ===
+                  sortableChannelGroup(currentAfterChannel.type)),
           )
         : [];
       const afterIndex = currentAfterChannel

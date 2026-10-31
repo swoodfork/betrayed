@@ -183,6 +183,84 @@ describe("createDryRunPlan", () => {
     });
   });
 
+  it("ignores voice channels when comparing text and Forum order", () => {
+    const orderedDesired = desiredStateSchema.parse({
+      ...desired,
+      permissionProfiles: [
+        ...desired.permissionProfiles,
+        { key: "private", description: "Private channels." },
+      ],
+      categories: [
+        {
+          key: "coordinator",
+          name: "Coordinator",
+          aliases: [],
+          permissionProfile: "private",
+          channels: [
+            {
+              key: "coordinator-chat",
+              name: "coordinator-chat",
+              aliases: [],
+              type: "text",
+              permissionProfile: "private",
+              preserveHistory: true,
+            },
+            {
+              key: "raid-applicants",
+              name: "raid-applicants",
+              aliases: [],
+              type: "forum",
+              permissionProfile: "private",
+              preserveHistory: true,
+              positionAfter: "coordinator-chat",
+            },
+          ],
+        },
+      ],
+    });
+    const plan = createDryRunPlan(
+      orderedDesired,
+      {
+        guild: { id: boundaries.testGuildId, name: "Betrayed Test" },
+        channels: [
+          {
+            id: "323456789012345678",
+            name: "Coordinator",
+            type: "GuildCategory",
+            parentId: null,
+            position: 0,
+          },
+          {
+            id: "523456789012345678",
+            name: "coordinator-chat",
+            type: "GuildText",
+            parentId: "323456789012345678",
+            position: 0,
+          },
+          {
+            id: "623456789012345678",
+            name: "coordinator-voice",
+            type: "GuildVoice",
+            parentId: "323456789012345678",
+            position: 0,
+          },
+          {
+            id: "423456789012345678",
+            name: "raid-applicants",
+            type: "GuildForum",
+            parentId: "323456789012345678",
+            position: 1,
+          },
+        ],
+      },
+      boundaries,
+    );
+
+    expect(plan.actions).not.toContainEqual(
+      expect.objectContaining({ action: "position-channel-after" }),
+    );
+  });
+
   it("rejects unknown permission profiles", () => {
     expect(() =>
       desiredStateSchema.parse({

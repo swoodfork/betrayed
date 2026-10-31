@@ -20,22 +20,34 @@ describe("welcome messages", () => {
     const message = buildDirectWelcome(member);
 
     expect(message).toContain(member.displayName);
-    expect(message).toContain("RuneScape");
-    expect(message).toContain("community");
+    expect(message).not.toContain("RuneScape");
+    expect(message).not.toContain(
+      "choose the game and community sections",
+    );
     expect(message).not.toMatch(/#rules|#server-guide/i);
     expect(message).not.toMatch(/automated (welcome )?message/i);
   });
 
   it("explains all available welcome actions", () => {
-    const message = buildDirectWelcome(member, {
-      raidApplication: true,
-      pugVoice: true,
-      communityDiscussion: true,
-    });
+    const message = buildDirectWelcome(
+      member,
+      {
+        raidApplication: true,
+        pugVoice: true,
+        communityDiscussion: true,
+      },
+      "123456789012345678",
+    );
 
     expect(message).toContain("Apply to the Raid Team");
     expect(message).toContain("Move Me to PUG Voice");
     expect(message).toContain("Explore Forever Discussion");
+    expect(message).toContain(
+      "https://discord.com/users/123456789012345678",
+    );
+    expect(message).toContain("@Officers");
+    expect(message).not.toContain("Take a look through");
+    expect(message).not.toContain("dedicated RuneScape areas");
     expect(message).not.toMatch(/NSFW|optional channel access/i);
   });
 });

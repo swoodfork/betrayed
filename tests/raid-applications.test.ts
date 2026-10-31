@@ -2,11 +2,23 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildRaidApplicationEmbed,
+  emergencyQuestion,
+  guildChangeQuestion,
   storedRaidApplicationFromEmbed,
   type StoredRaidApplication,
 } from "../src/raid-applications.js";
 
 describe("raid application Discord storage", () => {
+  it("uses the approved application question wording", () => {
+    expect(emergencyQuestion).toBe(
+      "Likelihood of having to call out of raid on a given week",
+    );
+    expect(guildChangeQuestion).toBe(
+      "Why change guilds and join Betrayed?",
+    );
+    expect(guildChangeQuestion.length).toBeLessThanOrEqual(45);
+  });
+
   it("round-trips every answer, applicant ID, and timestamp through an embed", () => {
     const application: StoredRaidApplication = {
       applicantId: "123456789012345678",

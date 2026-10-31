@@ -7,5 +7,5 @@ test:
 
 production:
   guildId: "705235406974615603"
-  applicationChannelId: null
-  forumChannelId: null
+  applicationChannelId: "1566017296311525416"
+  forumChannelId: "1566017297007509618"

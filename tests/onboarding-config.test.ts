@@ -30,7 +30,11 @@ describe("member onboarding bindings", () => {
     expect(onboarding.production.welcomeChannelId).toBe(
       "1565926670559355040",
     );
-    expect(onboarding.production.pugVoiceChannelId).toBeNull();
-    expect(onboarding.production.discussionChannelId).toBeNull();
+    expect(onboarding.production.pugVoiceChannelId).toBe(
+      "1566017298719051788",
+    );
+    expect(onboarding.production.discussionChannelId).toBe(
+      "1176642587319353375",
+    );
   });
 });

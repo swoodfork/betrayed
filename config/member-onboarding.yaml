@@ -9,5 +9,5 @@ test:
 production:
   guildId: "705235406974615603"
   welcomeChannelId: "1565926670559355040"
-  pugVoiceChannelId: null
-  discussionChannelId: null
+  pugVoiceChannelId: "1566017298719051788"
+  discussionChannelId: "1176642587319353375"
