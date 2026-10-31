@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   authorizeProductionApply,
+  productionConvergenceHash,
   productionPlanHash,
 } from "../src/planning/production-apply-policy.js";
 import type { ProductionPlan } from "../src/planning/production-planner.js";
@@ -56,5 +57,20 @@ describe("authorizeProductionApply", () => {
         plan.guild.id,
       ),
     ).toThrow(/deletion action/i);
+  });
+
+  it("ignores informational managed-role exceptions for convergence", () => {
+    expect(
+      productionConvergenceHash({
+        ...plan,
+        requiredRoleExceptions: [
+          {
+            roleId: "923456789012345678",
+            name: "Integration",
+            reason: "managed-integration",
+          },
+        ],
+      }),
+    ).toBe(productionConvergenceHash(plan));
   });
 });

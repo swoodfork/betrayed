@@ -6,9 +6,9 @@ guild:
   name: Betrayed
 
 inventory:
-  file: voice-names-production-current.json
-  generatedAt: "2026-10-31T15:15:45.308Z"
-  sha256: "74dbba3867a3abf945b2eaab0933909216b2a1866716f2d08870588432e80db6"
+  file: MATURE_PRODUCTION_FINAL.json
+  generatedAt: "2026-10-31T23:46:50.312Z"
+  sha256: "cef0256fd1c82f379473bc8e5d1f5c770e5ac14a4c8c0846b2f28c3eaf63227d"
 
 roleBindings:
   guild-master: "705314740330561587"
@@ -30,6 +30,10 @@ roleBindings:
   qzark-20-team: "1565838658295304384"
   herc-20-team: "1565838659712979046"
   zors-bot: "1565757248792432670"
+
+rolePresentation:
+  preserveColors: true
+  preserveOrder: true
 
 everyonePermissions:
   - AddReactions
@@ -71,7 +75,6 @@ categoryBindings:
   community-chat: "705320457343336509"
   community-voice: "705235406974615605"
   raid-voice: "842468522423484426"
-  archive: "1565838757096067112"
 
 channelBindings:
   announcements: "813866893798146080"

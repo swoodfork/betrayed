@@ -6,6 +6,14 @@ export function productionPlanHash(plan: ProductionPlan): string {
   return createHash("sha256").update(JSON.stringify(plan)).digest("hex");
 }
 
+export function productionConvergenceHash(plan: ProductionPlan): string {
+  const { requiredRoleExceptions: _requiredRoleExceptions, ...convergence } =
+    plan;
+  return createHash("sha256")
+    .update(JSON.stringify(convergence))
+    .digest("hex");
+}
+
 export function authorizeProductionApply(
   plan: ProductionPlan,
   approvalHash: string,

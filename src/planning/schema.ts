@@ -25,6 +25,7 @@ const categorySchema = z.object({
 const roleSchema = z.object({
   key: logicalKey,
   name: z.string().min(1),
+  aliases: z.array(z.string().min(1)).default([]),
   createIfMissing: z.boolean(),
   hierarchyRank: z.number().int().nonnegative().nullable(),
   color: z

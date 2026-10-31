@@ -78,11 +78,13 @@ interactive DM. The three action buttons are sent before a separate Zors
 profile-card DM. Discord's native member-join notices use the same channel.
 Closed DMs are reported but do not stop the public welcome.
 
-NSFW access is handled by Discord onboarding rather than Zors Bot. When bound,
-the welcome DM links to the raid application channel and can move a connected
-member into PUG Voice. It can also link members who are looking around directly
-to Forever Discussion. Discord cannot move a disconnected member into voice,
-so the member must join any server voice channel before pressing the PUG button.
+Mature access is handled by Discord onboarding rather than Zors Bot and gates
+only `🍆nsfw` and `🍝copy-pasta`. Controversial remains manually assigned by
+staff. When bound, the welcome DM links to the raid application channel and can
+move a connected member into PUG Voice. It can also link members who are
+looking around directly to Forever Discussion. Discord cannot move a
+disconnected member into voice, so the member must join any server voice
+channel before pressing the PUG button.
 
 Channels in Welcome to Betrayed are public-readable but staff-published.
 `📌server-guide`, `👋welcome`, and `📝raid-application` deny member messages

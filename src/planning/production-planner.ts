@@ -273,7 +273,14 @@ function bindDesiredState(
     if (!current) {
       throw new Error(`Bound production role ${role.key} (${roleId}) is missing.`);
     }
-    role.name = current.name;
+    if (role.aliases.length > 0) {
+      role.aliases = [...new Set([...role.aliases, current.name])];
+    } else {
+      role.name = current.name;
+    }
+    if (bindings.rolePresentation.preserveColors) {
+      role.color = current.color;
+    }
   }
 
   for (const category of bound.categories) {
@@ -520,6 +527,7 @@ export function createProductionPlan(
     ? inventory.roles.find((role) => role.id === anchorRoleId)
     : undefined;
   const rolesNeedReorder =
+    !bindings.rolePresentation.preserveOrder &&
     orderedRoles.length > 0 &&
     (!anchorRole ||
       orderedRoles.some((entry, index) => {
@@ -543,7 +551,11 @@ export function createProductionPlan(
     inventory: bindings.inventory,
     deletionAllowed: false,
     manualPrerequisites: [
-      "Move Zors Bot above Raid Coordinator, Council, Members, Socials & Friends, Runescaper, and all new team roles before apply.",
+      ...(!bindings.rolePresentation.preserveOrder
+        ? [
+            "Move Zors Bot above Raid Coordinator, Council, Members, Socials & Friends, Runescaper, and all new team roles before apply.",
+          ]
+        : []),
       "Re-export production inventory immediately before apply and require an identical regenerated plan hash.",
       "Review and approve retirement candidates through a separate exact-ID deletion plan.",
     ],

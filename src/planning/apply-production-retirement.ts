@@ -14,6 +14,7 @@ import { parse } from "yaml";
 
 import { loadConfig } from "../config.js";
 import {
+  productionConvergenceHash,
   productionPlanHash,
 } from "./production-apply-policy.js";
 import {
@@ -138,6 +139,7 @@ async function main(): Promise<void> {
     reconstructionFile,
   ) as ProductionPlan;
   const sourcePlanHash = productionPlanHash(reconstruction);
+  const sourceConvergenceHash = productionConvergenceHash(reconstruction);
   const bindings = productionBindingsSchema.parse(parse(bindingsFile));
   const desired = desiredStateSchema.parse(parse(desiredFile));
   const inventoryPath = path.resolve(
@@ -205,12 +207,14 @@ async function main(): Promise<void> {
       bindings,
       currentInventory,
     );
+    const liveReconstructionHash =
+      productionConvergenceHash(liveReconstruction);
     if (
       liveReconstruction.actions.length !== 0 ||
-      productionPlanHash(liveReconstruction) !== sourcePlanHash
+      liveReconstructionHash !== sourceConvergenceHash
     ) {
       throw new Error(
-        "Production is not at the approved converged reconstruction state.",
+        `Production is not at the approved converged reconstruction state: ${liveReconstruction.actions.length} action(s), approved ${sourceConvergenceHash}, live ${liveReconstructionHash}.`,
       );
     }
 

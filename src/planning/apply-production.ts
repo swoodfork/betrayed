@@ -152,6 +152,25 @@ async function applyAction(
       roleIds.set(action.roleKey, role.id);
       return { action, status: "applied", resourceId: role.id };
     }
+    case "rename-role": {
+      const role = await guild.roles.fetch(action.roleId);
+      if (
+        !role ||
+        role.managed ||
+        !role.editable ||
+        role.name !== action.from
+      ) {
+        throw new Error(
+          `Role ${action.roleId} is missing, not editable, or renamed.`,
+        );
+      }
+      await role.setName(
+        action.to,
+        "Approved Betrayed production role rename",
+      );
+      roleIds.set(action.roleKey, role.id);
+      return { action, status: "applied", resourceId: role.id };
+    }
     case "update-role-permissions": {
       const role = await guild.roles.fetch(action.roleId);
       if (!role || role.managed || !role.editable) {

@@ -55,6 +55,10 @@ const bindings: ProductionBindings = {
     sha256: "a".repeat(64),
   },
   roleBindings: {},
+  rolePresentation: {
+    preserveColors: false,
+    preserveOrder: false,
+  },
   everyonePermissions: [],
   categoryBindings: {
     community: "223456789012345678",
@@ -183,5 +187,78 @@ describe("createProductionPlan", () => {
         inventory,
       ),
     ).toThrow(/both bound and retired/i);
+  });
+
+  it("preserves bound production role colors and order when configured", () => {
+    const roleDesired = desiredStateSchema.parse({
+      ...desired,
+      roles: [
+        {
+          key: "member",
+          name: "Member",
+          createIfMissing: true,
+          hierarchyRank: 0,
+          color: "#FFFFFF",
+          permissions: [],
+        },
+        {
+          key: "zors-bot",
+          name: "Zors Bot",
+          createIfMissing: false,
+          hierarchyRank: null,
+          color: "#000000",
+          permissions: [],
+        },
+      ],
+    });
+    const roleBindings: ProductionBindings = {
+      ...bindings,
+      roleBindings: {
+        member: "523456789012345678",
+        "zors-bot": "623456789012345678",
+      },
+      rolePresentation: {
+        preserveColors: true,
+        preserveOrder: true,
+      },
+    };
+    const roleInventory: ProductionInventory = {
+      ...inventory,
+      roles: [
+        ...inventory.roles,
+        {
+          id: "523456789012345678",
+          name: "Member",
+          position: 3,
+          memberCount: 1,
+          managed: false,
+          color: "#123456",
+          permissions: [],
+        },
+        {
+          id: "623456789012345678",
+          name: "Zors Bot",
+          position: 10,
+          memberCount: 1,
+          managed: false,
+          color: "#000000",
+          permissions: [],
+        },
+      ],
+    };
+
+    const plan = createProductionPlan(
+      roleDesired,
+      roleBindings,
+      roleInventory,
+    );
+
+    expect(
+      plan.actions.some(
+        (action) =>
+          action.action === "update-role-color" ||
+          action.action === "reorder-production-roles",
+      ),
+    ).toBe(false);
   });
 });

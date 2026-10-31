@@ -14,6 +14,13 @@ const planActionSchema = z.discriminatedUnion("action", [
     color: z.string().nullable(),
   }),
   z.object({
+    action: z.literal("rename-role"),
+    roleKey: z.string(),
+    roleId: z.string(),
+    from: z.string(),
+    to: z.string(),
+  }),
+  z.object({
     action: z.literal("update-role-permissions"),
     roleKey: z.string(),
     roleId: z.string(),
@@ -170,6 +177,7 @@ export function authorizeTestApply(
       (action) =>
         action.action !== "create-category" &&
         action.action !== "create-role" &&
+        action.action !== "rename-role" &&
         action.action !== "update-role-permissions" &&
         action.action !== "update-role-color" &&
         action.action !== "reorder-roles" &&

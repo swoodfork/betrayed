@@ -10,6 +10,13 @@ export type PlanAction =
       color: string | null;
     }
   | {
+      action: "rename-role";
+      roleKey: string;
+      roleId: string;
+      from: string;
+      to: string;
+    }
+  | {
       action: "update-role-permissions";
       roleKey: string;
       roleId: string;
@@ -212,7 +219,10 @@ export function createDryRunPlan(
 
   for (const role of desired.roles) {
     const currentRole = inventory.roles.find(
-      (candidate) => normalizeName(candidate.name) === normalizeName(role.name),
+      (candidate) =>
+        [role.name, ...role.aliases].some(
+          (name) => normalizeName(candidate.name) === normalizeName(name),
+        ),
     );
     desiredRoleIds.set(role.key, currentRole?.id ?? null);
 
@@ -234,6 +244,16 @@ export function createDryRunPlan(
         });
       }
       continue;
+    }
+
+    if (normalizeName(currentRole.name) !== normalizeName(role.name)) {
+      actions.push({
+        action: "rename-role",
+        roleKey: role.key,
+        roleId: currentRole.id,
+        from: currentRole.name,
+        to: role.name,
+      });
     }
 
     if (

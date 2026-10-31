@@ -468,7 +468,7 @@ export function createBot(config: BotConfig): Client {
         if (interaction.customId.startsWith("zors-role:")) {
           await interaction.reply({
             content:
-              "Self-service NSFW role selection has moved to Discord onboarding.",
+              "Self-service Mature role selection has moved to Discord onboarding.",
             ...(interaction.inGuild()
               ? { flags: MessageFlags.Ephemeral }
               : {}),

@@ -517,4 +517,50 @@ describe("createDryRunPlan", () => {
       expectedOrder: ["Member", "Zors 40 Team", "RuneScaper"],
     });
   });
+
+  it("renames an aliased role without creating a replacement", () => {
+    const roleDesired = desiredStateSchema.parse({
+      ...desired,
+      roles: [
+        {
+          key: "nsfw",
+          name: "Mature",
+          aliases: ["NSFW"],
+          createIfMissing: true,
+          hierarchyRank: 0,
+          color: "#000000",
+          permissions: [],
+        },
+      ],
+    });
+    const plan = createDryRunPlan(
+      roleDesired,
+      {
+        guild: { id: boundaries.testGuildId, name: "Betrayed Test" },
+        roles: [
+          {
+            id: "323456789012345678",
+            name: "NSFW",
+            position: 1,
+            managed: false,
+            color: 0,
+            permissions: [],
+          },
+        ],
+        channels: [],
+      },
+      boundaries,
+    );
+
+    expect(plan.actions).toContainEqual({
+      action: "rename-role",
+      roleKey: "nsfw",
+      roleId: "323456789012345678",
+      from: "NSFW",
+      to: "Mature",
+    });
+    expect(plan.actions).not.toContainEqual(
+      expect.objectContaining({ action: "create-role", roleKey: "nsfw" }),
+    );
+  });
 });

@@ -77,7 +77,8 @@ roles:
     color: "#000000"
     permissions: []
   - key: nsfw
-    name: NSFW
+    name: Mature
+    aliases: [NSFW]
     createIfMissing: true
     hierarchyRank: 17
     color: "#000000"
@@ -284,15 +285,6 @@ permissionProfiles:
   - key: voice-community
     description: Approved community roles can view and connect.
     overwrites: []
-  - key: archive-read-only
-    description: Retained history is visible to approved roles but cannot receive new messages.
-    overwrites:
-      - roleKey: everyone
-        allow: [ViewChannel, ReadMessageHistory]
-        deny: [SendMessages]
-      - roleKey: zors-bot
-        allow: [ViewChannel]
-        deny: []
   - key: controversial-private
     description: Only staff and members with the Controversial role can view and participate.
     overwrites:
@@ -315,7 +307,7 @@ permissionProfiles:
         allow: [ViewChannel]
         deny: []
   - key: nsfw-private
-    description: Only staff and members with the NSFW role can view and participate.
+    description: Only staff and members with the Mature role can view and participate.
     overwrites:
       - roleKey: everyone
         allow: []
@@ -798,6 +790,13 @@ categories:
         type: text
         permissionProfile: member-chat
         preserveHistory: true
+      - key: copy-pasta
+        name: "🍝copy-pasta"
+        aliases: [copy-pasta]
+        type: text
+        permissionProfile: nsfw-private
+        preserveHistory: true
+        positionAfter: memes
       - key: nsfw
         name: "🍆nsfw"
         aliases: [nsfw]
@@ -899,15 +898,3 @@ categories:
         permissionProfile: voice-community
         preserveHistory: false
         positionAfter: raid-voice-8
-
-  - key: archive
-    name: "📦 Archive 📦"
-    aliases: [Archive]
-    permissionProfile: archive-read-only
-    channels:
-      - key: copy-pasta
-        name: "🍝copy-pasta"
-        aliases: [copy-pasta]
-        type: text
-        permissionProfile: archive-read-only
-        preserveHistory: true

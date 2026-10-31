@@ -16,6 +16,15 @@ export const productionBindingsSchema = z.object({
     sha256: z.string().regex(/^[a-f0-9]{64}$/),
   }),
   roleBindings: z.record(logicalKey, snowflake),
+  rolePresentation: z
+    .object({
+      preserveColors: z.boolean(),
+      preserveOrder: z.boolean(),
+    })
+    .default({
+      preserveColors: false,
+      preserveOrder: false,
+    }),
   everyonePermissions: z.array(z.string()).default([]),
   categoryBindings: z.record(logicalKey, snowflake),
   channelBindings: z.record(logicalKey, snowflake),

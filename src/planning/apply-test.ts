@@ -103,6 +103,18 @@ async function applyAction(
       roleIds.set(action.roleKey, role.id);
       return { action, status: "applied", resourceId: role.id };
     }
+    case "rename-role": {
+      const role = await guild.roles.fetch(action.roleId);
+      if (!role || role.managed || role.name !== action.from) {
+        throw new Error(`Role ${action.roleId} is missing, managed, or renamed.`);
+      }
+      await role.setName(
+        action.to,
+        "Approved Betrayed Test desired-state plan",
+      );
+      roleIds.set(action.roleKey, role.id);
+      return { action, status: "applied", resourceId: role.id };
+    }
     case "update-role-permissions": {
       const role = await guild.roles.fetch(action.roleId);
       if (!role || role.managed) {
@@ -413,6 +425,7 @@ async function main(): Promise<void> {
       plan.actions.some(
         (action) =>
           action.action === "create-role" ||
+          action.action === "rename-role" ||
           action.action === "update-role-permissions" ||
           action.action === "update-role-color" ||
           action.action === "reorder-roles",
