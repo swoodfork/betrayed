@@ -32,7 +32,7 @@ export function buildWelcomeActionComponents(
   if (applicationChannelId) {
     buttons.push(
       new ButtonBuilder()
-        .setLabel("Apply to the Raid Team")
+        .setLabel("Apply to the Raid Teams")
         .setStyle(ButtonStyle.Link)
         .setURL(
           `https://discord.com/channels/${guildId}/${applicationChannelId}`,

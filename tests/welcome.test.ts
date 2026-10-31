@@ -45,7 +45,7 @@ describe("welcome messages", () => {
       communityDiscussion: true,
     });
 
-    expect(message).toContain("Apply to the Raid Team");
+    expect(message).toContain("Apply to the Raid Teams");
     expect(message).toContain(
       "Interested in raiding on one of Betrayed's raid teams?",
     );

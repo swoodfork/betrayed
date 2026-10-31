@@ -16,7 +16,7 @@ We're glad you're here.
 
 If you have any questions regarding Betrayed as a whole, please message **@Zors** or any of the **@Officers** online in Discord and one will happily assist you.
 
-Interested in raiding on one of Betrayed's raid teams? Use **Apply to the Raid Team** below to open the application page.
+Interested in raiding on one of Betrayed's raid teams? Use **Apply to the Raid Teams** below to open the application page.
 
 Joining us for a PUG? Join any Betrayed voice channel first, then use **Move Me to PUG Voice** below.
 

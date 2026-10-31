@@ -72,7 +72,7 @@ export function buildDirectWelcome(
   if (actions.raidApplication) {
     message.push(
       "",
-      "Interested in raiding on one of Betrayed's raid teams? Use **Apply to the Raid Team** below to open the application page.",
+      "Interested in raiding on one of Betrayed's raid teams? Use **Apply to the Raid Teams** below to open the application page.",
     );
   }
   if (actions.pugVoice) {

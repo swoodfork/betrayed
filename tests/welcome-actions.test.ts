@@ -17,7 +17,7 @@ describe("welcome actions", () => {
     expect(buttons).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          label: "Apply to the Raid Team",
+          label: "Apply to the Raid Teams",
           url: "https://discord.com/channels/123456789012345678/223456789012345678",
         }),
         expect.objectContaining({
