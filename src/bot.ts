@@ -28,6 +28,11 @@ import {
   type OnboardingScope,
 } from "./onboarding-config.js";
 import { loadProtectedResources } from "./protected-resources.js";
+import {
+  loadStaffCommandConfig,
+  type StaffCommandConfig,
+} from "./staff-command-config.js";
+import { executeVoiceMove } from "./voice-move.js";
 import { buildDirectWelcome, buildPublicWelcome } from "./welcome.js";
 
 function isAllowedCommandGuild(
@@ -36,9 +41,7 @@ function isAllowedCommandGuild(
 ): boolean {
   return (
     guildId === config.DISCORD_TEST_GUILD_ID ||
-    ((config.ENABLE_PRODUCTION_INVENTORY ||
-      config.ENABLE_PRODUCTION_WELCOME) &&
-      guildId === config.DISCORD_PRODUCTION_GUILD_ID)
+    guildId === config.DISCORD_PRODUCTION_GUILD_ID
   );
 }
 
@@ -71,13 +74,14 @@ async function handleZorsCommand(
   client: Client,
   getInventory: (guild: Guild) => Promise<GuildInventory>,
   onboarding: MemberOnboardingConfig,
+  staffCommands: StaffCommandConfig,
 ): Promise<void> {
   if (
     interaction.commandName !== "zors" ||
     !isAllowedCommandGuild(interaction.guildId, config)
   ) {
     await interaction.reply({
-      content: "Zors Bot commands are currently available only in the test server.",
+      content: "Zors Bot commands are available only in approved Betrayed servers.",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -85,6 +89,18 @@ async function handleZorsCommand(
 
   const subcommand = interaction.options.getSubcommand();
   const inventorySection = inventorySections[subcommand];
+
+  if (
+    subcommand === "move-channel" ||
+    subcommand === "move-members"
+  ) {
+    const binding =
+      interaction.guildId === config.DISCORD_TEST_GUILD_ID
+        ? staffCommands.test
+        : staffCommands.production;
+    await executeVoiceMove(interaction, binding);
+    return;
+  }
 
   if (inventorySection) {
     if (
@@ -160,6 +176,8 @@ async function handleZorsCommand(
       "`/zors status` — Check whether the bot is online.",
       "`/zors help` — Show this command list.",
       "`/zors roles` — Choose optional 18+ NSFW access.",
+      "`/zors move-channel` — Administrator/Officer: move everyone between voice channels.",
+      "`/zors move-members` — Administrator/Officer: move mentioned members between voice channels.",
       "`/zors audit-channels` — Owner-only read-only channel inventory.",
       "`/zors audit-roles` — Owner-only read-only role inventory.",
       "`/zors audit-permissions` — Owner-only permission review.",
@@ -308,7 +326,11 @@ async function welcomeMember(
 
 export function createBot(config: BotConfig): Client {
   const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildVoiceStates,
+    ],
   });
   const inventoryCache = new Map<
     string,
@@ -316,6 +338,7 @@ export function createBot(config: BotConfig): Client {
   >();
   const protectedResources = loadProtectedResources();
   const onboarding = loadMemberOnboardingConfig(config);
+  const staffCommands = loadStaffCommandConfig(config);
 
   const getInventory = (guild: Guild): Promise<GuildInventory> => {
     const now = Date.now();
@@ -347,7 +370,10 @@ export function createBot(config: BotConfig): Client {
     }
 
     try {
-      const onboardingConfig = await onboarding;
+      const [onboardingConfig] = await Promise.all([
+        onboarding,
+        staffCommands,
+      ]);
       await readyClient.guilds.fetch(config.DISCORD_TEST_GUILD_ID);
       await registerGuildCommands(config, config.DISCORD_TEST_GUILD_ID);
       const testGuild = readyClient.guilds.cache.get(
@@ -360,16 +386,11 @@ export function createBot(config: BotConfig): Client {
       }
       await configureGuildOnboarding(testGuild, testWelcomeChannelId);
 
-      if (
-        config.ENABLE_PRODUCTION_INVENTORY ||
-        config.ENABLE_PRODUCTION_WELCOME
-      ) {
-        await readyClient.guilds.fetch(config.DISCORD_PRODUCTION_GUILD_ID);
-        await registerGuildCommands(
-          config,
-          config.DISCORD_PRODUCTION_GUILD_ID,
-        );
-      }
+      await readyClient.guilds.fetch(config.DISCORD_PRODUCTION_GUILD_ID);
+      await registerGuildCommands(
+        config,
+        config.DISCORD_PRODUCTION_GUILD_ID,
+      );
       if (config.ENABLE_PRODUCTION_WELCOME) {
         const productionGuild = readyClient.guilds.cache.get(
           config.DISCORD_PRODUCTION_GUILD_ID,
@@ -400,7 +421,10 @@ export function createBot(config: BotConfig): Client {
 
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
-      const onboardingConfig = await onboarding;
+      const [onboardingConfig, staffCommandConfig] = await Promise.all([
+        onboarding,
+        staffCommands,
+      ]);
       if (interaction.isButton()) {
         await handleRoleButton(
           interaction,
@@ -419,6 +443,7 @@ export function createBot(config: BotConfig): Client {
         client,
         getInventory,
         onboardingConfig,
+        staffCommandConfig,
       );
     } catch (error) {
       console.error("Failed to process a Zors Bot command.", error);

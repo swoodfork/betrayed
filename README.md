@@ -9,6 +9,7 @@ Zors Bot is being developed test-guild-first. The current milestone provides:
 - A concise public welcome for new test-guild members
 - An interactive welcome DM with allowlisted self-service roles
 - `/zors roles` for explicitly confirmed 18+ NSFW access
+- Administrator/Officer voice move commands with source-channel join behavior
 - Guarded desired-state planning and explicitly approved production reconstruction
 
 Production inventory commands remain disabled unless
@@ -23,7 +24,7 @@ automatically.
 - Node.js 22 or a currently supported newer LTS release
 - A Discord application with a bot user
 - `bot` and `applications.commands` OAuth scopes
-- View Channels, Send Messages, and Embed Links permissions in the test guild
+- View Channels, Send Messages, Embed Links, Connect, and Move Members permissions
 - Server Members Intent enabled in the Discord Developer Portal
 
 Grant only the permissions needed by the enabled runtime features. Temporary
@@ -77,9 +78,27 @@ through self-service.
 
 Stop the bot with `Ctrl+C`.
 
+## Staff voice commands
+
+Discord administrators and members with the immutable Officer role binding can
+run:
+
+- `/zors move-channel source:#Current destination:#Destination`
+- `/zors move-members members:@Member1 @Member2 destination:#Destination`
+
+The first command moves everyone currently connected to the source voice
+channel. The second accepts only Discord member mentions and moves the selected
+connected members. When selected members are spread across multiple voice
+channels, Zors briefly joins each source channel in turn, moves that channel's
+selected members, and then leaves. Disconnected members, members already in the
+destination, and move failures are reported in the command's private response.
+
 ## Safety boundary
 
-The production guild ID is loaded only to verify that it is different from the test guild ID. The current code does not register production commands or process production join events.
+Zors Bot registers commands only in the immutable Betrayed Test and production
+guild bindings. Voice move commands require Discord Administrator permission or
+the bound Officer role for that guild. Production inventory and onboarding
+remain independently controlled by their environment flags.
 
 ## Read-only inventory
 

@@ -1,4 +1,5 @@
 import {
+  ChannelType,
   REST,
   Routes,
   SlashCommandBuilder,
@@ -20,6 +21,44 @@ export const zorsCommand = new SlashCommandBuilder()
     command
       .setName("roles")
       .setDescription("Choose optional 18+ NSFW channel access"),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("move-channel")
+      .setDescription("Move everyone between voice channels")
+      .addChannelOption((option) =>
+        option
+          .setName("source")
+          .setDescription("Voice channel containing the members")
+          .addChannelTypes(ChannelType.GuildVoice)
+          .setRequired(true),
+      )
+      .addChannelOption((option) =>
+        option
+          .setName("destination")
+          .setDescription("Voice channel to move the members into")
+          .addChannelTypes(ChannelType.GuildVoice)
+          .setRequired(true),
+      ),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("move-members")
+      .setDescription("Move selected voice members")
+      .addStringOption((option) =>
+        option
+          .setName("members")
+          .setDescription("Discord member mentions separated by spaces")
+          .setMaxLength(1_000)
+          .setRequired(true),
+      )
+      .addChannelOption((option) =>
+        option
+          .setName("destination")
+          .setDescription("Voice channel to move the members into")
+          .addChannelTypes(ChannelType.GuildVoice)
+          .setRequired(true),
+      ),
   )
   .addSubcommand((command) =>
     command
