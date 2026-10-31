@@ -77,6 +77,13 @@ const planActionSchema = z.discriminatedUnion("action", [
     targetCategoryId: z.string().nullable(),
   }),
   z.object({
+    action: z.literal("position-channel-after"),
+    channelKey: z.string(),
+    channelId: z.string().nullable(),
+    afterChannelKey: z.string(),
+    afterChannelId: z.string().nullable(),
+  }),
+  z.object({
     action: z.literal("reorder-category"),
     categoryKey: z.string(),
     categoryId: z.string().nullable(),
@@ -171,6 +178,7 @@ export function authorizeTestApply(
         action.action !== "create-channel" &&
         action.action !== "rename-channel" &&
         action.action !== "move-channel" &&
+        action.action !== "position-channel-after" &&
         action.action !== "reorder-category" &&
         action.action !== "ensure-category-overwrites" &&
         action.action !== "ensure-channel-overwrites" &&

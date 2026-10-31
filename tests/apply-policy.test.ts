@@ -91,4 +91,25 @@ describe("test apply policy", () => {
       channelType: "forum",
     });
   });
+
+  it("accepts a bounded channel positioning action", () => {
+    const positionPlan = parseDryRunPlan({
+      ...plan,
+      actions: [
+        {
+          action: "position-channel-after",
+          channelKey: "raid-applicants",
+          channelId: "323456789012345678",
+          afterChannelKey: "coordinator-chat",
+          afterChannelId: "423456789012345678",
+        },
+      ],
+    });
+
+    expect(positionPlan.actions[0]?.action).toBe(
+      "position-channel-after",
+    );
+    const hash = planHash(positionPlan);
+    expect(authorizeTestApply(positionPlan, hash, boundaries)).toBe(hash);
+  });
 });

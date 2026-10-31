@@ -71,6 +71,13 @@ export type PlanAction =
       targetCategoryId: string | null;
     }
   | {
+      action: "position-channel-after";
+      channelKey: string;
+      channelId: string | null;
+      afterChannelKey: string;
+      afterChannelId: string | null;
+    }
+  | {
       action: "reorder-category";
       categoryKey: string;
       categoryId: string | null;
@@ -128,6 +135,16 @@ function normalizeName(name: string): string {
 
 function desiredNames(name: string, aliases: string[]): Set<string> {
   return new Set([name, ...aliases].map(normalizeName));
+}
+
+function matchingChannels(
+  currentChannels: PlannerInventory["channels"],
+  channel: DesiredState["categories"][number]["channels"][number],
+): PlannerInventory["channels"] {
+  const names = desiredNames(channel.name, channel.aliases);
+  return currentChannels.filter((current) =>
+    names.has(normalizeName(current.name)),
+  );
 }
 
 function isCategory(type: string): boolean {
@@ -355,10 +372,7 @@ export function createDryRunPlan(
     }
 
     for (const channel of category.channels) {
-      const channelNames = desiredNames(channel.name, channel.aliases);
-      const channelMatches = currentChannels.filter((current) =>
-        channelNames.has(normalizeName(current.name)),
-      );
+      const channelMatches = matchingChannels(currentChannels, channel);
 
       if (channelMatches.length > 1) {
         throw new Error(
@@ -367,6 +381,46 @@ export function createDryRunPlan(
       }
 
       const currentChannel = channelMatches[0];
+      const afterChannel = channel.positionAfter
+        ? category.channels.find(
+            (candidate) => candidate.key === channel.positionAfter,
+          )
+        : undefined;
+      const afterMatches = afterChannel
+        ? matchingChannels(currentChannels, afterChannel)
+        : [];
+      if (afterMatches.length > 1) {
+        throw new Error(
+          `Position anchor ${afterChannel?.key} ambiguously matches multiple test channels.`,
+        );
+      }
+      const currentAfterChannel = afterMatches[0];
+      const currentSiblings = currentCategory
+        ? currentChannels.filter(
+            (candidate) => candidate.parentId === currentCategory.id,
+          )
+        : [];
+      const afterIndex = currentAfterChannel
+        ? currentSiblings.findIndex(
+            (candidate) => candidate.id === currentAfterChannel.id,
+          )
+        : -1;
+      const channelIndex = currentChannel
+        ? currentSiblings.findIndex(
+            (candidate) => candidate.id === currentChannel.id,
+          )
+        : -1;
+      const positionAction =
+        channel.positionAfter &&
+        (afterIndex === -1 || channelIndex !== afterIndex + 1)
+          ? ({
+              action: "position-channel-after",
+              channelKey: channel.key,
+              channelId: currentChannel?.id ?? null,
+              afterChannelKey: channel.positionAfter,
+              afterChannelId: currentAfterChannel?.id ?? null,
+            } as const)
+          : null;
       if (!currentChannel) {
         actions.push({
           action: "create-channel",
@@ -409,6 +463,9 @@ export function createDryRunPlan(
               overwrites,
             });
           }
+        }
+        if (positionAction) {
+          actions.push(positionAction);
         }
         continue;
       }
@@ -495,6 +552,9 @@ export function createDryRunPlan(
             overwrites,
           });
         }
+      }
+      if (positionAction) {
+        actions.push(positionAction);
       }
     }
   }

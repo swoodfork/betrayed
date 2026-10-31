@@ -11,9 +11,7 @@ const snowflake = z.string().regex(/^\d{17,20}$/);
 const guildOnboardingSchema = z.object({
   guildId: snowflake,
   welcomeChannelId: snowflake.nullable(),
-  roles: z.object({
-    nsfw: snowflake,
-  }),
+  pugVoiceChannelId: snowflake.nullable(),
 });
 
 const memberOnboardingSchema = z.object({

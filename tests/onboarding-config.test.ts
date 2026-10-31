@@ -4,7 +4,7 @@ import { parseConfig } from "../src/config.js";
 import { loadMemberOnboardingConfig } from "../src/onboarding-config.js";
 
 describe("member onboarding bindings", () => {
-  it("loads immutable test and production role bindings", async () => {
+  it("loads immutable welcome bindings with optional PUG voice channels", async () => {
     const botConfig = parseConfig({
       DISCORD_TOKEN: "test-token-with-sufficient-length",
       DISCORD_APPLICATION_ID: "123456789012345678",
@@ -21,11 +21,12 @@ describe("member onboarding bindings", () => {
     expect(onboarding.test.welcomeChannelId).toBe(
       "1565925042389516410",
     );
-    expect(onboarding.test.roles).toEqual({
-      nsfw: "1565924732333850708",
-    });
+    expect(onboarding.test.pugVoiceChannelId).toBe(
+      "1566006742502875217",
+    );
     expect(onboarding.production.welcomeChannelId).toBe(
       "1565926670559355040",
     );
+    expect(onboarding.production.pugVoiceChannelId).toBeNull();
   });
 });

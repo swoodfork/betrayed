@@ -55,11 +55,6 @@ export const zorsCommand = new SlashCommandBuilder()
   )
   .addSubcommand((command) =>
     command
-      .setName("roles")
-      .setDescription("Choose optional 18+ NSFW channel access"),
-  )
-  .addSubcommand((command) =>
-    command
       .setName("move-channel")
       .setDescription("Move everyone between voice channels")
       .addChannelOption((option) =>

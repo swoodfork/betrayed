@@ -18,12 +18,10 @@ Take a look through the available channels and choose the game and community sec
 
 If you are joining a guild, coalition, group, or raid that needs private access, contact a member of the staff team.
 
-Zors Bot can help you choose optional channel access below. We're happy to have you here. Enjoy the server!
+Interested in joining the Betrayed raid team? Use **Apply to the Raid Team** below to open the application page.
+
+Joining us for a PUG? Join any Betrayed voice channel first, then use **Move Me to PUG Voice** below.
+
+We're happy to have you here. Enjoy the server!
 
 — **Zors Bot**
-
-## Optional access questions
-
-- If you are at least 18 years old, would you like to opt into the NSFW channel?
-
-Members can change this choice later with `/zors roles`. Controversial access is assigned manually by staff.

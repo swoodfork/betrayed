@@ -16,6 +16,7 @@ import {
   parseDryRunPlan,
   planHash,
 } from "./apply-policy.js";
+import { positionImmediatelyAfter } from "./channel-position.js";
 import { createDryRunPlan, type PlanAction } from "./planner.js";
 import {
   permissionBits,
@@ -246,6 +247,42 @@ async function applyAction(
       await channel.setParent(
         parent,
         { lockPermissions: false },
+      );
+      channelIds.set(action.channelKey, channel.id);
+      return { action, status: "applied", resourceId: channel.id };
+    }
+    case "position-channel-after": {
+      const channelId =
+        action.channelId ?? channelIds.get(action.channelKey);
+      const afterChannelId =
+        action.afterChannelId ?? channelIds.get(action.afterChannelKey);
+      if (!channelId || !afterChannelId) {
+        throw new Error(
+          `Channel position bindings for ${action.channelKey} are unavailable.`,
+        );
+      }
+      const [channel, afterChannel] = await Promise.all([
+        guild.channels.fetch(channelId),
+        guild.channels.fetch(afterChannelId),
+      ]);
+      if (
+        !channel ||
+        !afterChannel ||
+        channel.type === ChannelType.GuildCategory ||
+        afterChannel.type === ChannelType.GuildCategory ||
+        channel.isThread() ||
+        afterChannel.isThread() ||
+        channel.parentId !== afterChannel.parentId
+      ) {
+        throw new Error(
+          `Channel position anchor for ${action.channelKey} is invalid.`,
+        );
+      }
+      await channel.setPosition(
+        positionImmediatelyAfter(channel.position, afterChannel.position),
+        {
+          reason: "Approved Betrayed Test desired-state channel order",
+        },
       );
       channelIds.set(action.channelKey, channel.id);
       return { action, status: "applied", resourceId: channel.id };

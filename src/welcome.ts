@@ -11,8 +11,19 @@ export function buildPublicWelcome(member: WelcomeMember): string {
   ].join("\n");
 }
 
-export function buildDirectWelcome(member: WelcomeMember): string {
-  return [
+export interface WelcomeActionsAvailable {
+  raidApplication: boolean;
+  pugVoice: boolean;
+}
+
+export function buildDirectWelcome(
+  member: WelcomeMember,
+  actions: WelcomeActionsAvailable = {
+    raidApplication: false,
+    pugVoice: false,
+  },
+): string {
+  const message = [
     `Welcome to **Betrayed**, ${member.displayName}!`,
     "",
     "We're glad you're here.",
@@ -20,9 +31,24 @@ export function buildDirectWelcome(member: WelcomeMember): string {
     "Take a look through the available channels and choose the game and community sections that interest you. You'll find dedicated RuneScape areas and general community conversations.",
     "",
     "If you are joining a guild, coalition, group, or raid that needs private access, contact a member of the staff team.",
+  ];
+  if (actions.raidApplication) {
+    message.push(
+      "",
+      "Interested in joining the Betrayed raid team? Use **Apply to the Raid Team** below to open the application page.",
+    );
+  }
+  if (actions.pugVoice) {
+    message.push(
+      "",
+      "Joining us for a PUG? Join any Betrayed voice channel first, then use **Move Me to PUG Voice** below.",
+    );
+  }
+  message.push(
     "",
-    "Zors Bot can help you choose optional channel access below. We're happy to have you here. Enjoy the server!",
+    "We're happy to have you here. Enjoy the server!",
     "",
     "— **Zors Bot**",
-  ].join("\n");
+  );
+  return message.join("\n");
 }

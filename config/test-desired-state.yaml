@@ -552,8 +552,8 @@ categories:
         permissionProfile: welcome-feed
         preserveHistory: false
       - key: raid-application
-        name: "raid-application"
-        aliases: ["Raid Application"]
+        name: "📝raid-application"
+        aliases: ["Raid Application", "raid-application"]
         type: text
         permissionProfile: welcome-feed
         preserveHistory: false
@@ -595,11 +595,12 @@ categories:
         permissionProfile: raid-coordinator-private
         preserveHistory: false
       - key: raid-applicants
-        name: "raid-applicants"
-        aliases: ["Raid Applicants"]
+        name: "📨raid-applicants"
+        aliases: ["Raid Applicants", "raid-applicants"]
         type: forum
         permissionProfile: raid-applicants-private
         preserveHistory: true
+        positionAfter: coordinator-chat
       - key: coordinator-voice
         name: "🔊 Coordinator Chat"
         aliases:
@@ -887,6 +888,13 @@ categories:
         type: voice
         permissionProfile: voice-community
         preserveHistory: false
+      - key: pug-voice
+        name: "🔊 PUG Voice"
+        aliases: ["PUG Voice"]
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+        positionAfter: raid-voice-8
 
   - key: archive
     name: "📦 Archive 📦"

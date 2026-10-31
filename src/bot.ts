@@ -4,7 +4,6 @@ import {
   GatewayIntentBits,
   GuildSystemChannelFlags,
   MessageFlags,
-  type ButtonInteraction,
   type ChatInputCommandInteraction,
   type Guild,
   type GuildMember,
@@ -18,17 +17,15 @@ import {
   type InventorySection,
 } from "./inventory-response.js";
 import {
-  buildRoleComponents,
-  buildRolePrompt,
-  parseRoleAction,
-} from "./member-onboarding.js";
-import {
   loadMemberOnboardingConfig,
   type MemberOnboardingConfig,
   type OnboardingScope,
 } from "./onboarding-config.js";
 import { loadProtectedResources } from "./protected-resources.js";
-import { loadRaidApplicationConfig } from "./raid-application-config.js";
+import {
+  loadRaidApplicationConfig,
+  type RaidApplicationConfig,
+} from "./raid-application-config.js";
 import {
   configureRaidApplicationGuild,
   handleRaidApplicationInteraction,
@@ -42,6 +39,10 @@ import {
   isVoiceModerationCommand,
 } from "./voice-moderation.js";
 import { executeVoiceMove } from "./voice-move.js";
+import {
+  buildWelcomeActionComponents,
+  handleWelcomeActionButton,
+} from "./welcome-actions.js";
 import { buildDirectWelcome, buildPublicWelcome } from "./welcome.js";
 
 function isAllowedCommandGuild(
@@ -166,30 +167,6 @@ async function handleZorsCommand(
     return;
   }
 
-  if (subcommand === "roles") {
-    if (!interaction.guildId) {
-      await interaction.reply({
-        content: "Run `/zors roles` inside Betrayed or Betrayed Test.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-    const scope = onboardingScopeForGuild(interaction.guildId, config);
-    if (!scope || onboarding[scope].guildId !== interaction.guildId) {
-      await interaction.reply({
-        content: "Self-service roles are not enabled in this server.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-    await interaction.reply({
-      content: buildRolePrompt(),
-      components: buildRoleComponents(scope),
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
   if (subcommand === "status") {
     const uptimeSeconds = Math.floor((client.uptime ?? 0) / 1_000);
     await interaction.reply({
@@ -203,7 +180,6 @@ async function handleZorsCommand(
       "**Zors Bot commands**",
       "`/zors status` — Check whether the bot is online.",
       "`/zors help` — Show this command list.",
-      "`/zors roles` — Choose optional 18+ NSFW access.",
       "`/zors move-channel`, `move-members`, `move-role` — Administrator/Officer voice moves.",
       "`/zors mute-*`, `unmute-*`, `deafen-*`, `undeafen-*` — Administrator/Officer voice moderation.",
       "`/zors disconnect-*` — Administrator/Officer voice disconnects.",
@@ -220,59 +196,6 @@ async function handleZorsCommand(
   await interaction.reply({
     content: help.join("\n"),
     flags: MessageFlags.Ephemeral,
-  });
-}
-
-async function handleRoleButton(
-  interaction: ButtonInteraction,
-  config: BotConfig,
-  client: Client,
-  onboarding: MemberOnboardingConfig,
-): Promise<void> {
-  const roleAction = parseRoleAction(interaction.customId);
-  if (!roleAction) {
-    return;
-  }
-  if (
-    roleAction.scope === "production" &&
-    !config.ENABLE_PRODUCTION_WELCOME
-  ) {
-    await interaction.reply({
-      content: "Production self-service roles are currently disabled.",
-      ...(interaction.inGuild() ? { flags: MessageFlags.Ephemeral } : {}),
-    });
-    return;
-  }
-
-  const binding = onboarding[roleAction.scope];
-  const guild =
-    client.guilds.cache.get(binding.guildId) ??
-    (await client.guilds.fetch(binding.guildId));
-  const member = await guild.members.fetch(interaction.user.id);
-  const roleId = binding.roles[roleAction.roleKey];
-  const role = await guild.roles.fetch(roleId);
-  if (!role || role.managed || !role.editable) {
-    throw new Error(
-      `Self-service role ${roleAction.roleKey} is missing or not editable.`,
-    );
-  }
-
-  if (roleAction.action === "add") {
-    await member.roles.add(
-      role,
-      `Self-service role selected by ${interaction.user.id}`,
-    );
-  } else {
-    await member.roles.remove(
-      role,
-      `Self-service role removed by ${interaction.user.id}`,
-    );
-  }
-
-  const verb = roleAction.action === "add" ? "added" : "removed";
-  await interaction.reply({
-    content: `The **${role.name}** role was ${verb}.`,
-    ...(interaction.inGuild() ? { flags: MessageFlags.Ephemeral } : {}),
   });
 }
 
@@ -311,6 +234,7 @@ async function welcomeMember(
   member: GuildMember,
   config: BotConfig,
   onboarding: MemberOnboardingConfig,
+  raidApplications: RaidApplicationConfig,
 ): Promise<void> {
   if (member.user.bot) {
     return;
@@ -346,11 +270,26 @@ async function welcomeMember(
   }
 
   try {
+    const applicationsEnabled =
+      scope === "test"
+        ? config.ENABLE_TEST_RAID_APPLICATIONS
+        : config.ENABLE_PRODUCTION_RAID_APPLICATIONS;
+    const applicationChannelId = applicationsEnabled
+      ? raidApplications[scope].applicationChannelId
+      : null;
+    const pugVoiceChannelId = onboarding[scope].pugVoiceChannelId;
+    const components = buildWelcomeActionComponents(
+      member.guild.id,
+      scope,
+      applicationChannelId,
+      pugVoiceChannelId,
+    );
     await member.send({
-      content: [buildDirectWelcome(welcomeMember), "", buildRolePrompt()].join(
-        "\n",
-      ),
-      components: buildRoleComponents(scope),
+      content: buildDirectWelcome(welcomeMember, {
+        raidApplication: applicationChannelId !== null,
+        pugVoice: pugVoiceChannelId !== null,
+      }),
+      components,
     });
   } catch (error) {
     console.warn(
@@ -506,7 +445,17 @@ export function createBot(config: BotConfig): Client {
         return;
       }
       if (interaction.isButton()) {
-        await handleRoleButton(
+        if (interaction.customId.startsWith("zors-role:")) {
+          await interaction.reply({
+            content:
+              "Self-service NSFW role selection has moved to Discord onboarding.",
+            ...(interaction.inGuild()
+              ? { flags: MessageFlags.Ephemeral }
+              : {}),
+          });
+          return;
+        }
+        await handleWelcomeActionButton(
           interaction,
           config,
           client,
@@ -547,7 +496,12 @@ export function createBot(config: BotConfig): Client {
   });
 
   client.on(Events.GuildMemberAdd, async (member) => {
-    await welcomeMember(member, config, await onboarding);
+    await welcomeMember(
+      member,
+      config,
+      await onboarding,
+      await raidApplications,
+    );
   });
 
   client.on(Events.Error, (error) => {

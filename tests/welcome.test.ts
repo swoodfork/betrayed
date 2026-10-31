@@ -25,4 +25,15 @@ describe("welcome messages", () => {
     expect(message).not.toMatch(/#rules|#server-guide/i);
     expect(message).not.toMatch(/automated (welcome )?message/i);
   });
+
+  it("explains raid application and PUG voice buttons when available", () => {
+    const message = buildDirectWelcome(member, {
+      raidApplication: true,
+      pugVoice: true,
+    });
+
+    expect(message).toContain("Apply to the Raid Team");
+    expect(message).toContain("Move Me to PUG Voice");
+    expect(message).not.toMatch(/NSFW|optional channel access/i);
+  });
 });

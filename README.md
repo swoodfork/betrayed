@@ -7,8 +7,7 @@ Zors Bot is being developed test-guild-first. The current milestone provides:
 - Owner-only read-only channel, role, and permission inventories
 - Owner-only sanitized JSON inventory export
 - A concise public welcome for new test-guild members
-- An interactive welcome DM with allowlisted self-service roles
-- `/zors roles` for explicitly confirmed 18+ NSFW access
+- An interactive welcome DM with raid application and PUG Voice actions
 - Administrator/Officer voice move commands with source-channel join behavior
 - Database-free Discord-native raid applications (disabled until channels are approved and bound)
 - Guarded desired-state planning and explicitly approved production reconstruction
@@ -78,18 +77,17 @@ account posts in `👋welcome` and sends an interactive DM. Discord's native
 member-join notices use the same channel. Closed DMs are reported but do not
 stop the public welcome.
 
-The DM and `/zors roles` can add or remove only the immutable NSFW role binding
-in `config/member-onboarding.yaml`. NSFW addition requires a button explicitly
-labeled as an 18+ confirmation. Controversial access is assigned manually by
-staff. Staff, raid, team, and other privileged roles are never available
-through self-service.
+NSFW access is handled by Discord onboarding rather than Zors Bot. When bound,
+the welcome DM links to the raid application channel and can move a connected
+member into PUG Voice. Discord cannot move a disconnected member into voice, so
+the member must join any server voice channel before pressing the PUG button.
 
 Stop the bot with `Ctrl+C`.
 
 ## Raid applications
 
-The desired state adds public read-only `raid-application` beneath `👋welcome`
-and a private `raid-applicants` Forum beneath Raid Coordinator Affairs. Only
+The desired state adds public read-only `📝raid-application` beneath `👋welcome`
+and a private `📨raid-applicants` Forum beneath Raid Coordinator Affairs. Only
 Guild Masters, Discord Administrators, Officers, Raid Coordinators, and Zors
 Bot can view the Forum.
 

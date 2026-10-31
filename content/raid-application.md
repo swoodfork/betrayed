@@ -1,6 +1,6 @@
 # Betrayed Raid Application
 
-The `raid-application` channel contains one persistent **Start Raid Application**
+The `📝raid-application` channel contains one persistent **Start Raid Application**
 button. The applicant completes four private Discord dropdowns followed by one
 Discord modal with four required written answers.
 
@@ -36,7 +36,7 @@ Discord modal with four required written answers.
 3. Link your Warcraft Logs.
 4. Anything you would like us to know?
 
-Each submission creates one post in the private `raid-applicants` Forum. The
+Each submission creates one post in the private `📨raid-applicants` Forum. The
 starter embed contains all answers, the applicant's Discord user ID, and the
 submission timestamp. There is no approval, denial, status, or review workflow.
 Discord stores the completed application; no external database is used.

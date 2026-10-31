@@ -11,6 +11,7 @@ const channelSchema = z.object({
   type: z.enum(["text", "voice", "forum"]),
   permissionProfile: logicalKey,
   preserveHistory: z.boolean(),
+  positionAfter: logicalKey.nullable().default(null),
 });
 
 const categorySchema = z.object({
@@ -149,6 +150,25 @@ export const desiredStateSchema = z
               "channels",
               channelIndex,
               "permissionProfile",
+            ],
+          });
+        }
+        if (
+          channel.positionAfter !== null &&
+          !category.channels
+            .slice(0, channelIndex)
+            .some((candidate) => candidate.key === channel.positionAfter)
+        ) {
+          context.addIssue({
+            code: "custom",
+            message:
+              "positionAfter must reference an earlier channel in the same category.",
+            path: [
+              "categories",
+              categoryIndex,
+              "channels",
+              channelIndex,
+              "positionAfter",
             ],
           });
         }
