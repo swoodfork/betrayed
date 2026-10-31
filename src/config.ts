@@ -34,12 +34,27 @@ export function parseConfig(environment: NodeJS.ProcessEnv): BotConfig {
   return configSchema.parse(environment);
 }
 
+export function canIgnoreEnvironmentFileError(
+  explicitEnvironmentPath: string | undefined,
+  error: Error,
+): boolean {
+  return (
+    explicitEnvironmentPath === undefined &&
+    "code" in error &&
+    error.code === "ENOENT"
+  );
+}
+
 export function loadConfig(): BotConfig {
+  const explicitEnvironmentPath = process.env.ZORS_ENV_FILE;
   const environmentPath =
-    process.env.ZORS_ENV_FILE ?? path.resolve(process.cwd(), ".env");
+    explicitEnvironmentPath ?? path.resolve(process.cwd(), ".env");
   const result = loadDotEnv({ path: environmentPath, quiet: true });
 
-  if (result.error) {
+  if (
+    result.error &&
+    !canIgnoreEnvironmentFileError(explicitEnvironmentPath, result.error)
+  ) {
     throw new Error(
       `Unable to load Zors Bot environment file at ${environmentPath}: ${result.error.message}`,
       { cause: result.error },

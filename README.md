@@ -101,6 +101,7 @@ is pushed:
 2. Select `swoodfork/betrayed` and the `main` branch.
 3. Add all variables from `.env.example` in Railway's service variables. Never
    paste `C:\env\.env` into the repository.
+   Do not define `ZORS_ENV_FILE` on Railway; it is only a local override.
 4. Keep `ENABLE_PRODUCTION_INVENTORY=false` for normal hosting.
 5. Leave the service root directory as `/`; Railpack detects Node.js 22 from
    `package.json`.

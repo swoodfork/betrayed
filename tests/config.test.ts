@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { parseConfig } from "../src/config.js";
+import {
+  canIgnoreEnvironmentFileError,
+  parseConfig,
+} from "../src/config.js";
 
 const validEnvironment = {
   DISCORD_TOKEN: "test-token-with-sufficient-length",
@@ -49,5 +52,24 @@ describe("parseConfig", () => {
         ENABLE_PRODUCTION_INVENTORY: "yes",
       }),
     ).toThrow();
+  });
+});
+
+describe("environment file loading", () => {
+  it("allows Railway variables without a local .env file", () => {
+    const missingFile = Object.assign(new Error("missing"), {
+      code: "ENOENT",
+    });
+
+    expect(canIgnoreEnvironmentFileError(undefined, missingFile)).toBe(true);
+    expect(
+      canIgnoreEnvironmentFileError("/explicit/.env", missingFile),
+    ).toBe(false);
+    expect(
+      canIgnoreEnvironmentFileError(
+        undefined,
+        Object.assign(new Error("denied"), { code: "EACCES" }),
+      ),
+    ).toBe(false);
   });
 });
