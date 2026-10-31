@@ -1,8 +1,8 @@
 # Betrayed Raid Application
 
 The `📝raid-application` channel contains one persistent **Start Raid Application**
-button. The applicant completes four private Discord dropdowns followed by one
-Discord modal with four required written answers.
+button. The applicant completes private Discord dropdowns in three stages,
+followed by one Discord modal with four required written answers.
 
 ## Selection questions
 
@@ -27,6 +27,36 @@ Discord modal with four required written answers.
    - Somewhat likely
    - Very likely
    - I sleep when the boss dies
+5. Are you currently on WoW Forever PvP Alliance?
+   - Yes: continue the application.
+   - No: end the application and explain that Betrayed's raid teams are on
+     WoW Forever PvP Alliance.
+6. What class are you?
+   - Druid
+   - Hunter
+   - Mage
+   - Paladin
+   - Priest
+   - Rogue
+   - Shaman
+   - Warlock
+   - Warrior
+7. What is your main specialization?
+   - The choices are the three specializations available to the selected
+     class.
+8. Which raid-ready off-specializations do you have?
+   - Select one or more specializations other than the selected main
+     specialization, or select `None`.
+9. How willing are you to play an off-spec when asked?
+   - I only play my main spec
+   - I can do it rarely for the team
+   - I prefer my main spec but will play what is needed for the team
+   - I do not care what spec I play and will play whatever the team needs
+
+The WoW Forever class and specialization roster follows the
+[Warcraft Tavern WoW Forever class guide](https://www.warcrafttavern.com/forever/guides/classes/).
+The guide lists nine playable classes with three specializations each and
+confirms that Shaman is available to Alliance in WoW Forever.
 
 ## Required written questions
 
@@ -36,6 +66,9 @@ Discord modal with four required written answers.
 4. Anything you would like us to know?
 
 Each submission creates one post in the private `📨raid-applicants` Forum. The
-starter embed contains all answers, the applicant's Discord user ID, and the
-submission timestamp. There is no approval, denial, status, or review workflow.
-Discord stores the completed application; no external database is used.
+starter embed contains all answers, including class and specialization
+information, the applicant's Discord user ID, and the submission timestamp.
+Applications submitted before the character questions were added remain
+reconstructable after bot restarts. There is no approval, denial, status, or
+review workflow. Discord stores the completed application; no external
+database is used.

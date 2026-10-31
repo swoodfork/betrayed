@@ -61,8 +61,120 @@ const overtimeOptions = [
   ["boss_dies", "I sleep when the boss dies"],
 ] as const;
 
+const foreverServerOptions = [
+  ["yes", "Yes"],
+  ["no", "No"],
+] as const;
+
+export const wowForeverClassSpecializations = {
+  druid: {
+    label: "Druid",
+    specializations: [
+      ["balance", "Balance"],
+      ["feral", "Feral"],
+      ["restoration", "Restoration"],
+    ],
+  },
+  hunter: {
+    label: "Hunter",
+    specializations: [
+      ["beast_mastery", "Beast Mastery"],
+      ["marksmanship", "Marksmanship"],
+      ["survival", "Survival"],
+    ],
+  },
+  mage: {
+    label: "Mage",
+    specializations: [
+      ["arcane", "Arcane"],
+      ["fire", "Fire"],
+      ["frost", "Frost"],
+    ],
+  },
+  paladin: {
+    label: "Paladin",
+    specializations: [
+      ["holy", "Holy"],
+      ["protection", "Protection"],
+      ["retribution", "Retribution"],
+    ],
+  },
+  priest: {
+    label: "Priest",
+    specializations: [
+      ["discipline", "Discipline"],
+      ["holy", "Holy"],
+      ["shadow", "Shadow"],
+    ],
+  },
+  rogue: {
+    label: "Rogue",
+    specializations: [
+      ["assassination", "Assassination"],
+      ["combat", "Combat"],
+      ["subtlety", "Subtlety"],
+    ],
+  },
+  shaman: {
+    label: "Shaman",
+    specializations: [
+      ["elemental", "Elemental"],
+      ["enhancement", "Enhancement"],
+      ["restoration", "Restoration"],
+    ],
+  },
+  warlock: {
+    label: "Warlock",
+    specializations: [
+      ["affliction", "Affliction"],
+      ["demonology", "Demonology"],
+      ["destruction", "Destruction"],
+    ],
+  },
+  warrior: {
+    label: "Warrior",
+    specializations: [
+      ["arms", "Arms"],
+      ["fury", "Fury"],
+      ["protection", "Protection"],
+    ],
+  },
+} as const;
+
+type WowForeverClass = keyof typeof wowForeverClassSpecializations;
+
+const wowClassOptions = Object.entries(wowForeverClassSpecializations).map(
+  ([value, definition]) => [value, definition.label] as const,
+);
+
+const noOffSpecValue = "none";
+const offSpecWillingnessOptions = [
+  ["main_only", "I only play my main spec"],
+  ["rarely", "I can do it rarely for the team"],
+  [
+    "team_needs",
+    "I prefer my main spec but will play what is needed for the team",
+  ],
+  [
+    "any_spec",
+    "I do not care what spec I play and will play whatever the team needs",
+  ],
+] as const;
+
+export const foreverServerQuestion =
+  "Are you currently on WoW Forever PvP Alliance?";
+
 type ChoiceOption = readonly [string, string];
-type ChoiceKey = "availability" | "emergency" | "raider" | "overtime";
+type ChoiceKey =
+  | "availability"
+  | "emergency"
+  | "raider"
+  | "overtime"
+  | "forever_server"
+  | "wow_class"
+  | "main_specialization"
+  | "off_specializations"
+  | "off_spec_willingness";
 
 interface RaidApplicationDraft {
   guildId: string;
@@ -73,6 +185,11 @@ interface RaidApplicationDraft {
   emergency: string | null;
   raider: string | null;
   overtime: string | null;
+  onForeverPvpAlliance: boolean | null;
+  wowClass: WowForeverClass | null;
+  mainSpecialization: string | null;
+  raidReadyOffSpecializations: string[] | null;
+  offSpecWillingness: string | null;
 }
 
 export interface StoredRaidApplication {
@@ -86,6 +203,11 @@ export interface StoredRaidApplication {
   overtimeLikelihood: string;
   warcraftLogs: string;
   additionalInformation: string;
+  onForeverPvpAlliance?: string;
+  wowClass?: string;
+  mainSpecialization?: string;
+  raidReadyOffSpecializations?: string;
+  offSpecWillingness?: string;
 }
 
 const drafts = new Map<string, RaidApplicationDraft>();
@@ -103,6 +225,7 @@ function selectCustomId(key: ChoiceKey): string {
 }
 
 const continueCustomId = `${customIdPrefix}:continue`;
+const continueToModalCustomId = `${customIdPrefix}:continue-to-modal`;
 const modalCustomId = `${customIdPrefix}:modal`;
 
 function applicationScopeForGuild(
@@ -205,10 +328,103 @@ function buildSelectionComponents(
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(continueCustomId)
-        .setLabel("Continue to Written Questions")
+        .setLabel("Continue")
         .setStyle(ButtonStyle.Primary),
     ),
   ];
+}
+
+function buildServerComponents(
+  draft: RaidApplicationDraft,
+): ActionRowBuilder<MessageActionRowComponentBuilder>[] {
+  return [
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      selectMenu(
+        "forever_server",
+        foreverServerQuestion,
+        foreverServerOptions,
+        draft.onForeverPvpAlliance === null
+          ? []
+          : [draft.onForeverPvpAlliance ? "yes" : "no"],
+        1,
+      ),
+    ),
+  ];
+}
+
+function specializationsFor(
+  wowClass: WowForeverClass,
+): readonly ChoiceOption[] {
+  return wowForeverClassSpecializations[wowClass].specializations;
+}
+
+function buildCharacterComponents(
+  draft: RaidApplicationDraft,
+): ActionRowBuilder<MessageActionRowComponentBuilder>[] {
+  const components: ActionRowBuilder<MessageActionRowComponentBuilder>[] = [
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      selectMenu(
+        "wow_class",
+        "What class are you?",
+        wowClassOptions,
+        draft.wowClass ? [draft.wowClass] : [],
+        1,
+      ),
+    ),
+  ];
+  if (!draft.wowClass) {
+    return components;
+  }
+
+  const specializationOptions = specializationsFor(draft.wowClass);
+  components.push(
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      selectMenu(
+        "main_specialization",
+        "What is your main specialization?",
+        specializationOptions,
+        draft.mainSpecialization ? [draft.mainSpecialization] : [],
+        1,
+      ),
+    ),
+  );
+  if (!draft.mainSpecialization) {
+    return components;
+  }
+
+  const offSpecializationOptions: readonly ChoiceOption[] = [
+    [noOffSpecValue, "None"],
+    ...specializationOptions.filter(
+      ([value]) => value !== draft.mainSpecialization,
+    ),
+  ];
+  components.push(
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      selectMenu(
+        "off_specializations",
+        "Select every raid-ready off-spec, or None",
+        offSpecializationOptions,
+        draft.raidReadyOffSpecializations ?? [],
+        offSpecializationOptions.length - 1,
+      ),
+    ),
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      selectMenu(
+        "off_spec_willingness",
+        "How willing are you to play an off-spec?",
+        offSpecWillingnessOptions,
+        draft.offSpecWillingness ? [draft.offSpecWillingness] : [],
+        1,
+      ),
+    ),
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(continueToModalCustomId)
+        .setLabel("Continue to Written Questions")
+        .setStyle(ButtonStyle.Primary),
+    ),
+  );
+  return components;
 }
 
 function buildApplicationModal(): ModalBuilder {
@@ -257,6 +473,18 @@ function buildApplicationModal(): ModalBuilder {
 }
 
 function completeDraft(draft: RaidApplicationDraft): boolean {
+  if (
+    draft.onForeverPvpAlliance !== true ||
+    !draft.wowClass ||
+    !draft.mainSpecialization ||
+    !draft.raidReadyOffSpecializations ||
+    !draft.offSpecWillingness
+  ) {
+    return false;
+  }
+  const specializationOptions = specializationsFor(draft.wowClass);
+  const validOffSpecs = draft.raidReadyOffSpecializations;
+  const selectedNone = validOffSpecs.includes(noOffSpecValue);
   return (
     selectedValuesAreValid(draft.availability, availabilityOptions) &&
     draft.emergency !== null &&
@@ -264,7 +492,20 @@ function completeDraft(draft: RaidApplicationDraft): boolean {
     draft.raider !== null &&
     selectedValuesAreValid([draft.raider], raiderTypeOptions) &&
     draft.overtime !== null &&
-    selectedValuesAreValid([draft.overtime], overtimeOptions)
+    selectedValuesAreValid([draft.overtime], overtimeOptions) &&
+    selectedValuesAreValid(
+      [draft.mainSpecialization],
+      specializationOptions,
+    ) &&
+    validOffSpecs.length > 0 &&
+    (selectedNone
+      ? validOffSpecs.length === 1
+      : selectedValuesAreValid(validOffSpecs, specializationOptions) &&
+        !validOffSpecs.includes(draft.mainSpecialization)) &&
+    selectedValuesAreValid(
+      [draft.offSpecWillingness],
+      offSpecWillingnessOptions,
+    )
   );
 }
 
@@ -298,6 +539,11 @@ function createDraft(
     emergency: null,
     raider: null,
     overtime: null,
+    onForeverPvpAlliance: null,
+    wowClass: null,
+    mainSpecialization: null,
+    raidReadyOffSpecializations: null,
+    offSpecWillingness: null,
   };
   const key = draftKey(guildId, userId);
   drafts.set(key, draft);
@@ -331,7 +577,7 @@ function panelContent(): string {
     "Use the button below to submit a private raid application.",
     "Your answers will be visible only to Betrayed Officers and Raid Coordinators.",
     "",
-    "You will choose your raid availability and preferences, then answer four written questions.",
+    "You will choose your raid availability, character, and preferences, then answer four written questions.",
   ].join("\n");
 }
 
@@ -379,6 +625,17 @@ export function storedRaidApplicationFromEmbed(
   if (required.some((name) => !fields.has(name))) {
     return null;
   }
+  const foreverFields = [
+    "WoW Forever PvP Alliance",
+    "Class",
+    "Main Specialization",
+    "Raid-Ready Off-Specializations",
+    "Off-Spec Willingness",
+  ] as const;
+  const hasForeverFields = foreverFields.map((name) => fields.has(name));
+  if (hasForeverFields.some(Boolean) && !hasForeverFields.every(Boolean)) {
+    return null;
+  }
 
   return {
     applicantId,
@@ -393,6 +650,21 @@ export function storedRaidApplicationFromEmbed(
     overtimeLikelihood: fields.get("Overtime Likelihood") as string,
     warcraftLogs: fields.get("Warcraft Logs") as string,
     additionalInformation: fields.get("Additional Information") as string,
+    ...(hasForeverFields.every(Boolean)
+      ? {
+          onForeverPvpAlliance: fields.get(
+            "WoW Forever PvP Alliance",
+          ) as string,
+          wowClass: fields.get("Class") as string,
+          mainSpecialization: fields.get("Main Specialization") as string,
+          raidReadyOffSpecializations: fields.get(
+            "Raid-Ready Off-Specializations",
+          ) as string,
+          offSpecWillingness: fields.get(
+            "Off-Spec Willingness",
+          ) as string,
+        }
+      : {}),
   };
 }
 
@@ -408,7 +680,7 @@ export function buildRaidApplicationEmbed(
     ? { name: displayName, iconURL: avatarUrl }
     : { name: displayName };
 
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setTitle(applicationEmbedTitle)
     .setColor(0x8e44ad)
     .setAuthor(author)
@@ -452,6 +724,39 @@ export function buildRaidApplicationEmbed(
         name: "Overtime Likelihood",
         value: application.overtimeLikelihood,
       },
+    );
+  if (
+    application.onForeverPvpAlliance &&
+    application.wowClass &&
+    application.mainSpecialization &&
+    application.raidReadyOffSpecializations &&
+    application.offSpecWillingness
+  ) {
+    embed.addFields(
+      {
+        name: "WoW Forever PvP Alliance",
+        value: application.onForeverPvpAlliance,
+      },
+      {
+        name: "Class",
+        value: application.wowClass,
+      },
+      {
+        name: "Main Specialization",
+        value: application.mainSpecialization,
+      },
+      {
+        name: "Raid-Ready Off-Specializations",
+        value: application.raidReadyOffSpecializations,
+      },
+      {
+        name: "Off-Spec Willingness",
+        value: application.offSpecWillingness,
+      },
+    );
+  }
+  return embed
+    .addFields(
       {
         name: "Warcraft Logs",
         value: application.warcraftLogs,
@@ -645,22 +950,133 @@ export async function handleRaidApplicationInteraction(
         throw new Error("Invalid overtime selection.");
       }
       draft.overtime = interaction.values[0] ?? null;
+    } else if (key === "forever_server") {
+      if (!selectedValuesAreValid(interaction.values, foreverServerOptions)) {
+        throw new Error("Invalid WoW Forever server selection.");
+      }
+      if (interaction.values[0] === "no") {
+        drafts.delete(draftKey(interaction.guildId, interaction.user.id));
+        await interaction.update({
+          content: [
+            "Betrayed's raid teams are on **WoW Forever PvP Alliance**.",
+            "This application has ended because you selected No. You can restart if that was a mistake.",
+          ].join("\n\n"),
+          components: panelComponents(scope),
+        });
+        return true;
+      }
+      draft.onForeverPvpAlliance = true;
+      await interaction.update({
+        content:
+          "Select your class, main specialization, raid-ready off-specs, and off-spec willingness.",
+        components: buildCharacterComponents(draft),
+      });
+      return true;
+    } else if (key === "wow_class") {
+      if (!selectedValuesAreValid(interaction.values, wowClassOptions)) {
+        throw new Error("Invalid WoW Forever class selection.");
+      }
+      draft.wowClass = interaction.values[0] as WowForeverClass;
+      draft.mainSpecialization = null;
+      draft.raidReadyOffSpecializations = null;
+    } else if (key === "main_specialization") {
+      if (
+        !draft.wowClass ||
+        !selectedValuesAreValid(
+          interaction.values,
+          specializationsFor(draft.wowClass),
+        )
+      ) {
+        throw new Error("Invalid main specialization selection.");
+      }
+      draft.mainSpecialization = interaction.values[0] ?? null;
+      draft.raidReadyOffSpecializations = null;
+    } else if (key === "off_specializations") {
+      if (!draft.wowClass || !draft.mainSpecialization) {
+        throw new Error("Select a class and main specialization first.");
+      }
+      const selectedNone = interaction.values.includes(noOffSpecValue);
+      const specializationOptions = specializationsFor(draft.wowClass);
+      if (
+        interaction.values.length === 0 ||
+        (selectedNone && interaction.values.length !== 1) ||
+        (!selectedNone &&
+          (!selectedValuesAreValid(
+            interaction.values,
+            specializationOptions,
+          ) ||
+            interaction.values.includes(draft.mainSpecialization)))
+      ) {
+        throw new Error("Invalid raid-ready off-specialization selection.");
+      }
+      draft.raidReadyOffSpecializations = [...interaction.values];
+    } else if (key === "off_spec_willingness") {
+      if (
+        !selectedValuesAreValid(
+          interaction.values,
+          offSpecWillingnessOptions,
+        )
+      ) {
+        throw new Error("Invalid off-spec willingness selection.");
+      }
+      draft.offSpecWillingness = interaction.values[0] ?? null;
     } else {
       throw new Error("Unknown raid application selection.");
     }
     await interaction.update({
       content:
-        "Complete all four selections, then continue to the written questions.",
-      components: buildSelectionComponents(draft),
+        key === "wow_class" ||
+        key === "main_specialization" ||
+        key === "off_specializations" ||
+        key === "off_spec_willingness"
+          ? "Select your class, main specialization, raid-ready off-specs, and off-spec willingness."
+          : "Complete all four raid preference selections, then continue.",
+      components:
+        key === "wow_class" ||
+        key === "main_specialization" ||
+        key === "off_specializations" ||
+        key === "off_spec_willingness"
+          ? buildCharacterComponents(draft)
+          : buildSelectionComponents(draft),
     });
     return true;
   }
 
   if (interaction.isButton() && interaction.customId === continueCustomId) {
     if (!completeDraft(draft)) {
+      const raidPreferencesComplete =
+        selectedValuesAreValid(draft.availability, availabilityOptions) &&
+        draft.emergency !== null &&
+        selectedValuesAreValid([draft.emergency], emergencyOptions) &&
+        draft.raider !== null &&
+        selectedValuesAreValid([draft.raider], raiderTypeOptions) &&
+        draft.overtime !== null &&
+        selectedValuesAreValid([draft.overtime], overtimeOptions);
+      if (raidPreferencesComplete) {
+        await interaction.update({
+          content: foreverServerQuestion,
+          components: buildServerComponents(draft),
+        });
+        return true;
+      }
       await interaction.reply({
         content:
           "Complete all four dropdown questions before continuing.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return true;
+    }
+    throw new Error("Raid application advanced before server confirmation.");
+  }
+
+  if (
+    interaction.isButton() &&
+    interaction.customId === continueToModalCustomId
+  ) {
+    if (!completeDraft(draft)) {
+      await interaction.reply({
+        content:
+          "Complete the class, specialization, off-spec, and willingness questions before continuing.",
         flags: MessageFlags.Ephemeral,
       });
       return true;
@@ -712,6 +1128,29 @@ export async function handleRaidApplicationInteraction(
       overtimeLikelihood: labelFor(
         overtimeOptions,
         draft.overtime as string,
+      ),
+      onForeverPvpAlliance: "Yes",
+      wowClass: labelFor(wowClassOptions, draft.wowClass as string),
+      mainSpecialization: labelFor(
+        specializationsFor(draft.wowClass as WowForeverClass),
+        draft.mainSpecialization as string,
+      ),
+      raidReadyOffSpecializations:
+        draft.raidReadyOffSpecializations?.[0] === noOffSpecValue
+          ? "None"
+          : (draft.raidReadyOffSpecializations ?? [])
+              .map((value) =>
+                labelFor(
+                  specializationsFor(
+                    draft.wowClass as WowForeverClass,
+                  ),
+                  value,
+                ),
+              )
+              .join("\n"),
+      offSpecWillingness: labelFor(
+        offSpecWillingnessOptions,
+        draft.offSpecWillingness as string,
       ),
       warcraftLogs: requiredTextAnswer(
         interaction.fields.getTextInputValue("warcraft_logs"),
