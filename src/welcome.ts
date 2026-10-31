@@ -97,5 +97,5 @@ export function buildDirectWelcome(
 }
 
 export function buildZorsProfileMessage(ownerUserId: string): string {
-  return `[View Zors' Discord profile](https://discord.com/users/${ownerUserId})`;
+  return `[Message Zors through his Discord profile](https://discord.com/users/${ownerUserId})`;
 }

@@ -57,7 +57,7 @@ describe("welcome messages", () => {
 
   it("builds the separate Zors profile message", () => {
     expect(buildZorsProfileMessage("123456789012345678")).toBe(
-      "[View Zors' Discord profile](https://discord.com/users/123456789012345678)",
+      "[Message Zors through his Discord profile](https://discord.com/users/123456789012345678)",
     );
   });
 });

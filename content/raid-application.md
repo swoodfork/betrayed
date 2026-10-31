@@ -12,7 +12,7 @@ Discord modal with four required written answers.
    - Wednesday
    - Thursday
    - Sunday
-2. Likelihood of having to call out of raid on a given week
+2. Likelihood of missing raid
    - Very likely
    - Somewhat likely
    - Almost never

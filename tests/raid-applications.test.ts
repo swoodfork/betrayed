@@ -11,7 +11,7 @@ import {
 describe("raid application Discord storage", () => {
   it("uses the approved application question wording", () => {
     expect(emergencyQuestion).toBe(
-      "Likelihood of having to call out of raid on a given week",
+      "Likelihood of missing raid",
     );
     expect(guildChangeQuestion).toBe(
       "Why change guilds and join Betrayed?",

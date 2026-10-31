@@ -44,7 +44,7 @@ const emergencyOptions = [
   ["never", "It will never happen"],
 ] as const;
 export const emergencyQuestion =
-  "Likelihood of having to call out of raid on a given week";
+  "Likelihood of missing raid";
 export const guildChangeQuestion =
   "Why change guilds and join Betrayed?";
 
