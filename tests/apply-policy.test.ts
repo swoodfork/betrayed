@@ -70,4 +70,25 @@ describe("test apply policy", () => {
 
     expect(reorderPlan.actions[0]?.action).toBe("reorder-category");
   });
+
+  it("accepts a hash-gated Forum channel create action", () => {
+    const forumPlan = parseDryRunPlan({
+      ...plan,
+      actions: [
+        {
+          action: "create-channel",
+          channelKey: "raid-applicants",
+          name: "raid-applicants",
+          channelType: "forum",
+          targetCategoryKey: "raid-coordinator",
+          targetCategoryId: "323456789012345678",
+        },
+      ],
+    });
+
+    expect(forumPlan.actions[0]).toMatchObject({
+      action: "create-channel",
+      channelType: "forum",
+    });
+  });
 });

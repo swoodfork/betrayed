@@ -202,7 +202,9 @@ async function applyAction(
         type:
           action.channelType === "text"
             ? ChannelType.GuildText
-            : ChannelType.GuildVoice,
+            : action.channelType === "voice"
+              ? ChannelType.GuildVoice
+              : ChannelType.GuildForum,
         parent,
         reason: "Approved Betrayed Test desired-state plan",
       });

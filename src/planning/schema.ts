@@ -8,7 +8,7 @@ const channelSchema = z.object({
   key: logicalKey,
   name: z.string().min(1),
   aliases: z.array(z.string().min(1)).default([]),
-  type: z.enum(["text", "voice"]),
+  type: z.enum(["text", "voice", "forum"]),
   permissionProfile: logicalKey,
   preserveHistory: z.boolean(),
 });

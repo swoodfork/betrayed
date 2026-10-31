@@ -1,0 +1,11 @@
+version: 1
+
+test:
+  guildId: "1565530049229234268"
+  applicationChannelId: "1566000934566502401"
+  forumChannelId: "1566000938278191136"
+
+production:
+  guildId: "705235406974615603"
+  applicationChannelId: null
+  forumChannelId: null

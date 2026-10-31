@@ -8,7 +8,10 @@ async function main(): Promise<void> {
     throw new Error("Usage: npm run plan:production:hash -- <plan-file>");
   }
   const plan = JSON.parse(
-    await readFile(path.resolve(planPath), "utf8"),
+    (await readFile(path.resolve(planPath), "utf8")).replace(
+      /^\uFEFF/,
+      "",
+    ),
   ) as unknown;
   const hash = createHash("sha256")
     .update(JSON.stringify(plan))

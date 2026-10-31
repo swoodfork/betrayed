@@ -28,6 +28,11 @@ import {
   type OnboardingScope,
 } from "./onboarding-config.js";
 import { loadProtectedResources } from "./protected-resources.js";
+import { loadRaidApplicationConfig } from "./raid-application-config.js";
+import {
+  configureRaidApplicationGuild,
+  handleRaidApplicationInteraction,
+} from "./raid-applications.js";
 import {
   loadStaffCommandConfig,
   type StaffCommandConfig,
@@ -370,6 +375,7 @@ export function createBot(config: BotConfig): Client {
   const protectedResources = loadProtectedResources();
   const onboarding = loadMemberOnboardingConfig(config);
   const staffCommands = loadStaffCommandConfig(config);
+  const raidApplications = loadRaidApplicationConfig(config);
 
   const getInventory = (guild: Guild): Promise<GuildInventory> => {
     const now = Date.now();
@@ -401,9 +407,10 @@ export function createBot(config: BotConfig): Client {
     }
 
     try {
-      const [onboardingConfig] = await Promise.all([
+      const [onboardingConfig, , raidApplicationConfig] = await Promise.all([
         onboarding,
         staffCommands,
+        raidApplications,
       ]);
       await readyClient.guilds.fetch(config.DISCORD_TEST_GUILD_ID);
       await registerGuildCommands(config, config.DISCORD_TEST_GUILD_ID);
@@ -436,9 +443,37 @@ export function createBot(config: BotConfig): Client {
           productionWelcomeChannelId,
         );
       }
+      if (config.ENABLE_TEST_RAID_APPLICATIONS) {
+        const testApplications = await configureRaidApplicationGuild(
+          testGuild,
+          raidApplicationConfig.test,
+          "test",
+        );
+        console.info(
+          `Reconstructed ${testApplications} Betrayed Test raid application(s) from Discord.`,
+        );
+      }
+      if (config.ENABLE_PRODUCTION_RAID_APPLICATIONS) {
+        const productionGuild = readyClient.guilds.cache.get(
+          config.DISCORD_PRODUCTION_GUILD_ID,
+        );
+        if (!productionGuild) {
+          throw new Error(
+            "Production guild is unavailable for raid applications.",
+          );
+        }
+        const productionApplications = await configureRaidApplicationGuild(
+          productionGuild,
+          raidApplicationConfig.production,
+          "production",
+        );
+        console.info(
+          `Reconstructed ${productionApplications} production raid application(s) from Discord.`,
+        );
+      }
 
       console.info(
-        `Zors Bot is ready as ${readyClient.user.tag}. Test onboarding is enabled; production welcome is ${config.ENABLE_PRODUCTION_WELCOME ? "enabled" : "disabled"}; production inventory is ${config.ENABLE_PRODUCTION_INVENTORY ? "enabled" : "disabled"}.`,
+        `Zors Bot is ready as ${readyClient.user.tag}. Test onboarding is enabled; production welcome is ${config.ENABLE_PRODUCTION_WELCOME ? "enabled" : "disabled"}; production inventory is ${config.ENABLE_PRODUCTION_INVENTORY ? "enabled" : "disabled"}; test raid applications are ${config.ENABLE_TEST_RAID_APPLICATIONS ? "enabled" : "disabled"}; production raid applications are ${config.ENABLE_PRODUCTION_RAID_APPLICATIONS ? "enabled" : "disabled"}.`,
       );
     } catch (error) {
       console.error(
@@ -452,10 +487,24 @@ export function createBot(config: BotConfig): Client {
 
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
-      const [onboardingConfig, staffCommandConfig] = await Promise.all([
+      const [
+        onboardingConfig,
+        staffCommandConfig,
+        raidApplicationConfig,
+      ] = await Promise.all([
         onboarding,
         staffCommands,
+        raidApplications,
       ]);
+      if (
+        await handleRaidApplicationInteraction(
+          interaction,
+          config,
+          raidApplicationConfig,
+        )
+      ) {
+        return;
+      }
       if (interaction.isButton()) {
         await handleRoleButton(
           interaction,
@@ -477,7 +526,7 @@ export function createBot(config: BotConfig): Client {
         staffCommandConfig,
       );
     } catch (error) {
-      console.error("Failed to process a Zors Bot command.", error);
+      console.error("Failed to process a Zors Bot interaction.", error);
 
       if (!interaction.isRepliable()) {
         return;

@@ -21,6 +21,8 @@ describe("parseConfig", () => {
       ...validEnvironment,
       ENABLE_PRODUCTION_INVENTORY: false,
       ENABLE_PRODUCTION_WELCOME: false,
+      ENABLE_TEST_RAID_APPLICATIONS: false,
+      ENABLE_PRODUCTION_RAID_APPLICATIONS: false,
     });
   });
 
@@ -65,6 +67,13 @@ describe("parseConfig", () => {
         ENABLE_PRODUCTION_WELCOME: "true",
       }).ENABLE_PRODUCTION_WELCOME,
     ).toBe(true);
+  });
+
+  it("defaults raid applications to disabled in both guilds", () => {
+    const config = parseConfig(validEnvironment);
+
+    expect(config.ENABLE_TEST_RAID_APPLICATIONS).toBe(false);
+    expect(config.ENABLE_PRODUCTION_RAID_APPLICATIONS).toBe(false);
   });
 });
 

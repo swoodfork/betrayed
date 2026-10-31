@@ -239,6 +239,27 @@ permissionProfiles:
       - roleKey: zors-bot
         allow: [ViewChannel]
         deny: []
+  - key: raid-applicants-private
+    description: Only staff, Raid Coordinators, and Zors Bot can view applications.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, ReadMessageHistory]
+        deny: []
+      - roleKey: raid-coordinator
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, EmbedLinks, ReadMessageHistory]
+        deny: []
   - key: council-private
     description: Only staff and Council members can view and participate.
     overwrites:
@@ -530,6 +551,12 @@ categories:
         type: text
         permissionProfile: welcome-feed
         preserveHistory: false
+      - key: raid-application
+        name: "raid-application"
+        aliases: ["Raid Application"]
+        type: text
+        permissionProfile: welcome-feed
+        preserveHistory: false
   - key: staff
     name: "🔒 Officer 🔒"
     aliases:
@@ -567,6 +594,12 @@ categories:
         type: text
         permissionProfile: raid-coordinator-private
         preserveHistory: false
+      - key: raid-applicants
+        name: "raid-applicants"
+        aliases: ["Raid Applicants"]
+        type: forum
+        permissionProfile: raid-applicants-private
+        preserveHistory: true
       - key: coordinator-voice
         name: "🔊 Coordinator Chat"
         aliases:

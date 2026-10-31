@@ -57,7 +57,7 @@ const planActionSchema = z.discriminatedUnion("action", [
     action: z.literal("create-channel"),
     channelKey: z.string(),
     name: z.string(),
-    channelType: z.enum(["text", "voice"]),
+    channelType: z.enum(["text", "voice", "forum"]),
     targetCategoryKey: z.string(),
     targetCategoryId: z.string().nullable(),
   }),
@@ -115,7 +115,7 @@ const planActionSchema = z.discriminatedUnion("action", [
     channelKey: z.string(),
     channelId: z.string(),
     currentType: z.string(),
-    desiredType: z.enum(["text", "voice"]),
+    desiredType: z.enum(["text", "voice", "forum"]),
   }),
   z.object({
     action: z.literal("review-unmanaged-existing"),

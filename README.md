@@ -10,6 +10,7 @@ Zors Bot is being developed test-guild-first. The current milestone provides:
 - An interactive welcome DM with allowlisted self-service roles
 - `/zors roles` for explicitly confirmed 18+ NSFW access
 - Administrator/Officer voice move commands with source-channel join behavior
+- Database-free Discord-native raid applications (disabled until channels are approved and bound)
 - Guarded desired-state planning and explicitly approved production reconstruction
 
 Production inventory commands remain disabled unless
@@ -18,6 +19,12 @@ disabled unless `ENABLE_PRODUCTION_WELCOME=true`. Production changes are
 separate operator commands protected by inventory binding, live drift checks,
 and exact plan-hash approval; the continuously running bot does not apply them
 automatically.
+
+Raid applications are independently gated by
+`ENABLE_TEST_RAID_APPLICATIONS` and
+`ENABLE_PRODUCTION_RAID_APPLICATIONS`. Both default to `false`. Enabling a
+scope also requires immutable `applicationChannelId` and `forumChannelId`
+values in `config/raid-applications.yaml`.
 
 ## Requirements
 
@@ -78,6 +85,25 @@ staff. Staff, raid, team, and other privileged roles are never available
 through self-service.
 
 Stop the bot with `Ctrl+C`.
+
+## Raid applications
+
+The desired state adds public read-only `raid-application` beneath `👋welcome`
+and a private `raid-applicants` Forum beneath Raid Coordinator Affairs. Only
+Guild Masters, Discord Administrators, Officers, Raid Coordinators, and Zors
+Bot can view the Forum.
+
+Applicants start from a persistent channel button. Four Discord dropdowns
+collect raid availability and choice answers, then one Discord modal collects
+the four required written answers. Repeat submissions are allowed. Each
+completed submission creates a self-contained Forum starter embed with all
+answers, the Discord user ID, and timestamp. There are no decision buttons or
+review statuses.
+
+On restart, Zors restores the application panel and reads active and archived
+Forum starter messages to reconstruct the number of stored applications. No
+SQLite or external database is used. The exact questions are documented in
+`content/raid-application.md`.
 
 ## Staff voice commands
 

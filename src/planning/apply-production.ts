@@ -266,7 +266,9 @@ async function applyAction(
         type:
           action.channelType === "text"
             ? ChannelType.GuildText
-            : ChannelType.GuildVoice,
+            : action.channelType === "voice"
+              ? ChannelType.GuildVoice
+              : ChannelType.GuildForum,
         parent,
         reason: "Approved Betrayed production reconstruction",
       });
@@ -405,7 +407,9 @@ async function main(): Promise<void> {
     readFile(bindingsPath, "utf8"),
     readFile(desiredPath, "utf8"),
   ]);
-  const plan = JSON.parse(planFile) as ProductionPlan;
+  const plan = JSON.parse(
+    planFile.replace(/^\uFEFF/, ""),
+  ) as ProductionPlan;
   const bindings = productionBindingsSchema.parse(parse(bindingsFile));
   const inventoryPath = path.resolve(
     process.cwd(),

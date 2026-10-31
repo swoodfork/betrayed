@@ -51,7 +51,7 @@ export type PlanAction =
       action: "create-channel";
       channelKey: string;
       name: string;
-      channelType: "text" | "voice";
+      channelType: "text" | "voice" | "forum";
       targetCategoryKey: string;
       targetCategoryId: string | null;
     }
@@ -105,7 +105,7 @@ export type PlanAction =
       channelKey: string;
       channelId: string;
       currentType: string;
-      desiredType: "text" | "voice";
+      desiredType: "text" | "voice" | "forum";
     }
   | {
       action: "review-unmanaged-existing";
@@ -134,10 +134,16 @@ function isCategory(type: string): boolean {
   return type === "GuildCategory";
 }
 
-function desiredTypeMatches(currentType: string, desiredType: "text" | "voice") {
-  return desiredType === "text"
-    ? currentType === "GuildText" || currentType === "GuildAnnouncement"
-    : currentType === "GuildVoice";
+function desiredTypeMatches(
+  currentType: string,
+  desiredType: "text" | "voice" | "forum",
+) {
+  if (desiredType === "text") {
+    return currentType === "GuildText" || currentType === "GuildAnnouncement";
+  }
+  return desiredType === "voice"
+    ? currentType === "GuildVoice"
+    : currentType === "GuildForum";
 }
 
 function sorted(values: string[]): string[] {
