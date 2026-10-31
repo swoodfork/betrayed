@@ -24,7 +24,8 @@ automatically.
 - Node.js 22 or a currently supported newer LTS release
 - A Discord application with a bot user
 - `bot` and `applications.commands` OAuth scopes
-- View Channels, Send Messages, Embed Links, Connect, and Move Members permissions
+- View Channels, Send Messages, Embed Links, Connect, Move Members, Mute
+  Members, Deafen Members, and Manage Channels permissions
 - Server Members Intent enabled in the Discord Developer Portal
 
 Grant only the permissions needed by the enabled runtime features. Temporary
@@ -85,13 +86,39 @@ run:
 
 - `/zors move-channel source:#Current destination:#Destination`
 - `/zors move-members members:@Member1 @Member2 destination:#Destination`
+- `/zors move-role role:@Role destination:#Destination`
+- `/zors mute-channel channel:#Current`
+- `/zors mute-members members:@Member1 @Member2`
+- `/zors unmute-channel channel:#Current`
+- `/zors unmute-members members:@Member1 @Member2`
+- `/zors deafen-channel channel:#Current`
+- `/zors deafen-members members:@Member1 @Member2`
+- `/zors undeafen-channel channel:#Current`
+- `/zors undeafen-members members:@Member1 @Member2`
+- `/zors disconnect-channel channel:#Current`
+- `/zors disconnect-members members:@Member1 @Member2`
+- `/zors mute-soundboard-channel channel:#Current`
+- `/zors unmute-soundboard-channel channel:#Current`
 
 The first command moves everyone currently connected to the source voice
 channel. The second accepts only Discord member mentions and moves the selected
-connected members. When selected members are spread across multiple voice
-channels, Zors briefly joins each source channel in turn, moves that channel's
-selected members, and then leaves. Disconnected members, members already in the
-destination, and move failures are reported in the command's private response.
+connected members. The role command moves all connected members with the
+selected role. Channel commands affect everyone currently connected to the
+selected channel, while member commands accept only Discord member mentions.
+When selected members are spread across multiple voice channels, Zors briefly
+joins each source channel in turn, performs the action, and then leaves.
+Disconnected members, protected members, members already in a move destination,
+and failures are reported in the command's private response.
+
+Officers cannot use these commands against the server owner, Administrators, or
+other Officers. Administrators retain authority over all members allowed by
+Discord's role hierarchy.
+
+Discord does not provide a temporary member-level soundboard mute. The
+soundboard commands therefore operate only at channel level by persistently
+denying or restoring the channel's inherited Use Soundboard permission. The
+desired-state planner treats only this `@everyone` permission bit as
+runtime-managed and preserves it during approved permission replacement.
 
 ## Safety boundary
 

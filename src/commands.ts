@@ -4,9 +4,44 @@ import {
   Routes,
   SlashCommandBuilder,
   type RESTPostAPIApplicationCommandsJSONBody,
+  type SlashCommandSubcommandBuilder,
 } from "discord.js";
 
 import type { BotConfig } from "./config.js";
+
+function addChannelCommand(
+  command: SlashCommandSubcommandBuilder,
+  name: string,
+  description: string,
+): SlashCommandSubcommandBuilder {
+  return command
+    .setName(name)
+    .setDescription(description)
+    .addChannelOption((option) =>
+      option
+        .setName("channel")
+        .setDescription("Voice channel containing the members")
+        .addChannelTypes(ChannelType.GuildVoice)
+        .setRequired(true),
+    );
+}
+
+function addMemberCommand(
+  command: SlashCommandSubcommandBuilder,
+  name: string,
+  description: string,
+): SlashCommandSubcommandBuilder {
+  return command
+    .setName(name)
+    .setDescription(description)
+    .addStringOption((option) =>
+      option
+        .setName("members")
+        .setDescription("Discord member mentions separated by spaces")
+        .setMaxLength(1_000)
+        .setRequired(true),
+    );
+}
 
 export const zorsCommand = new SlashCommandBuilder()
   .setName("zors")
@@ -59,6 +94,108 @@ export const zorsCommand = new SlashCommandBuilder()
           .addChannelTypes(ChannelType.GuildVoice)
           .setRequired(true),
       ),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("move-role")
+      .setDescription("Move connected members with a role")
+      .addRoleOption((option) =>
+        option
+          .setName("role")
+          .setDescription("Role whose connected members should move")
+          .setRequired(true),
+      )
+      .addChannelOption((option) =>
+        option
+          .setName("destination")
+          .setDescription("Voice channel to move the members into")
+          .addChannelTypes(ChannelType.GuildVoice)
+          .setRequired(true),
+      ),
+  )
+  .addSubcommand((command) =>
+    addChannelCommand(
+      command,
+      "mute-channel",
+      "Server-mute everyone in a voice channel",
+    ),
+  )
+  .addSubcommand((command) =>
+    addMemberCommand(
+      command,
+      "mute-members",
+      "Server-mute selected voice members",
+    ),
+  )
+  .addSubcommand((command) =>
+    addChannelCommand(
+      command,
+      "unmute-channel",
+      "Server-unmute everyone in a voice channel",
+    ),
+  )
+  .addSubcommand((command) =>
+    addMemberCommand(
+      command,
+      "unmute-members",
+      "Server-unmute selected voice members",
+    ),
+  )
+  .addSubcommand((command) =>
+    addChannelCommand(
+      command,
+      "deafen-channel",
+      "Server-deafen everyone in a voice channel",
+    ),
+  )
+  .addSubcommand((command) =>
+    addMemberCommand(
+      command,
+      "deafen-members",
+      "Server-deafen selected voice members",
+    ),
+  )
+  .addSubcommand((command) =>
+    addChannelCommand(
+      command,
+      "undeafen-channel",
+      "Server-undeafen everyone in a voice channel",
+    ),
+  )
+  .addSubcommand((command) =>
+    addMemberCommand(
+      command,
+      "undeafen-members",
+      "Server-undeafen selected voice members",
+    ),
+  )
+  .addSubcommand((command) =>
+    addChannelCommand(
+      command,
+      "mute-soundboard-channel",
+      "Disable soundboard use in a voice channel",
+    ),
+  )
+  .addSubcommand((command) =>
+    addChannelCommand(
+      command,
+      "unmute-soundboard-channel",
+      "Restore soundboard use in a voice channel",
+    ),
+  )
+  .addSubcommand((command) =>
+    addChannelCommand(
+      command,
+      "disconnect-channel",
+      "Disconnect everyone from a voice channel",
+    ),
+  )
+  .addSubcommand((command) =>
+    addMemberCommand(
+      command,
+      "disconnect-members",
+      "Disconnect selected voice members",
+    ),
   )
   .addSubcommand((command) =>
     command

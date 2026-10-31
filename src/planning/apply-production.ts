@@ -28,6 +28,7 @@ import {
   type ProductionBindings,
   type ProductionInventory,
 } from "./production-schema.js";
+import { preserveRuntimeEveryonePermissions } from "./runtime-permissions.js";
 import { desiredStateSchema } from "./schema.js";
 
 interface AuditEntry {
@@ -352,16 +353,27 @@ async function applyAction(
         await channel.lockPermissions();
       } else {
         await channel.permissionOverwrites.set(
-          action.overwrites.map((overwrite) => ({
-            id: resolvedRoleId(
+          action.overwrites.map((overwrite) => {
+            const roleId = resolvedRoleId(
               overwrite.roleKey,
               overwrite.roleId,
               roleIds,
-            ),
-            type: OverwriteType.Role,
-            allow: permissionFlags(overwrite.allow),
-            deny: permissionFlags(overwrite.deny),
-          })),
+            );
+            const current = channel.permissionOverwrites.cache.get(roleId);
+            const permissions = preserveRuntimeEveryonePermissions(
+              overwrite.allow,
+              overwrite.deny,
+              current?.allow.toArray() ?? [],
+              current?.deny.toArray() ?? [],
+              roleId === guild.id,
+            );
+            return {
+              id: roleId,
+              type: OverwriteType.Role,
+              allow: permissionFlags(permissions.allow),
+              deny: permissionFlags(permissions.deny),
+            };
+          }),
           "Approved Betrayed production permission profile",
         );
       }

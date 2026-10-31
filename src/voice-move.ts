@@ -18,7 +18,7 @@ import {
 import type { StaffCommandBinding } from "./staff-command-config.js";
 
 const memberMentionPattern = /<@!?(\d{17,20})>/g;
-const activeMoveGuilds = new Set<string>();
+const activeVoiceGuilds = new Set<string>();
 
 export function parseMemberMentions(input: string): string[] {
   const memberIds = [
@@ -48,7 +48,22 @@ export function hasVoiceMoveAccess(
   );
 }
 
-async function brieflyJoinSource(channel: VoiceBasedChannel): Promise<void> {
+export function isProtectedStaffTarget(
+  isServerOwner: boolean,
+  isAdministrator: boolean,
+  memberRoleIds: Iterable<string>,
+  officerRoleId: string,
+): boolean {
+  return (
+    isServerOwner ||
+    isAdministrator ||
+    [...memberRoleIds].some((roleId) => roleId === officerRoleId)
+  );
+}
+
+export async function brieflyJoinSource(
+  channel: VoiceBasedChannel,
+): Promise<void> {
   getVoiceConnection(channel.guild.id)?.destroy();
   const connection = joinVoiceChannel({
     channelId: channel.id,
@@ -69,7 +84,7 @@ async function brieflyJoinSource(channel: VoiceBasedChannel): Promise<void> {
   }
 }
 
-function summarizeMembers(members: GuildMember[]): string {
+export function summarizeMembers(members: GuildMember[]): string {
   const visible = members.slice(0, 15).map((member) => member.toString());
   const remaining = members.length - visible.length;
   return remaining > 0
@@ -91,8 +106,11 @@ async function executeVoiceMoveUnlocked(
 
   const guild = interaction.guild;
   const caller = await guild.members.fetch(interaction.user.id);
+  const callerIsAdministrator = caller.permissions.has(
+    PermissionFlagsBits.Administrator,
+  );
   const authorized = hasVoiceMoveAccess(
-    caller.permissions.has(PermissionFlagsBits.Administrator),
+    callerIsAdministrator,
     caller.roles.cache.keys(),
     binding.officerRoleId,
   );
@@ -179,12 +197,44 @@ async function executeVoiceMoveUnlocked(
     requestedMembers = await Promise.all(
       memberIds.map((memberId) => guild.members.fetch(memberId)),
     );
+  } else if (subcommand === "move-role") {
+    const roleOption = interaction.options.getRole("role", true);
+    const role = await guild.roles.fetch(roleOption.id);
+    if (!role || role.id === guild.id) {
+      await interaction.editReply(
+        "Choose a specific assignable role rather than @everyone.",
+      );
+      return;
+    }
+    await guild.members.fetch();
+    requestedMembers = [...role.members.values()].filter(
+      (member) => member.id !== botMember.id,
+    );
   } else {
     await interaction.editReply("Unknown voice move command.");
     return;
   }
 
-  if (requestedMembers.length === 0) {
+  const protectedMembers = callerIsAdministrator
+    ? []
+    : requestedMembers.filter((member) =>
+        isProtectedStaffTarget(
+          member.id === guild.ownerId,
+          member.permissions.has(PermissionFlagsBits.Administrator),
+          member.roles.cache.keys(),
+          binding.officerRoleId,
+        ),
+      );
+  if (protectedMembers.length > 0) {
+    const protectedIds = new Set(
+      protectedMembers.map((member) => member.id),
+    );
+    requestedMembers = requestedMembers.filter(
+      (member) => !protectedIds.has(member.id),
+    );
+  }
+
+  if (requestedMembers.length === 0 && protectedMembers.length === 0) {
     await interaction.editReply("There are no members to move.");
     return;
   }
@@ -277,33 +327,47 @@ async function executeVoiceMoveUnlocked(
   if (failed.length > 0) {
     result.push(`Could not move: ${summarizeMembers(failed)}.`);
   }
+  if (protectedMembers.length > 0) {
+    result.push(
+      `Protected staff not moved: ${summarizeMembers(protectedMembers)}.`,
+    );
+  }
 
   await interaction.editReply(result.join("\n"));
 }
 
-export async function executeVoiceMove(
+export async function runExclusiveVoiceCommand(
   interaction: ChatInputCommandInteraction,
-  binding: StaffCommandBinding,
+  operation: () => Promise<void>,
 ): Promise<void> {
   const guildId = interaction.guildId;
-  if (guildId && activeMoveGuilds.has(guildId)) {
+  if (guildId && activeVoiceGuilds.has(guildId)) {
     await interaction.reply({
       content:
-        "Zors Bot is already processing another voice move in this server.",
+        "Zors Bot is already processing another staff voice command in this server.",
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
   if (guildId) {
-    activeMoveGuilds.add(guildId);
+    activeVoiceGuilds.add(guildId);
   }
   try {
-    await executeVoiceMoveUnlocked(interaction, binding);
+    await operation();
   } finally {
     if (guildId) {
-      activeMoveGuilds.delete(guildId);
+      activeVoiceGuilds.delete(guildId);
       getVoiceConnection(guildId)?.destroy();
     }
   }
+}
+
+export async function executeVoiceMove(
+  interaction: ChatInputCommandInteraction,
+  binding: StaffCommandBinding,
+): Promise<void> {
+  await runExclusiveVoiceCommand(interaction, () =>
+    executeVoiceMoveUnlocked(interaction, binding),
+  );
 }

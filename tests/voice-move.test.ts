@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   hasVoiceMoveAccess,
+  isProtectedStaffTarget,
   parseMemberMentions,
 } from "../src/voice-move.js";
 
@@ -29,6 +30,33 @@ describe("voice move commands", () => {
     ).toBe(true);
     expect(
       hasVoiceMoveAccess(
+        false,
+        ["423456789012345678"],
+        officerRoleId,
+      ),
+    ).toBe(false);
+  });
+
+  it("protects the owner, Administrators, and Officers", () => {
+    const officerRoleId = "323456789012345678";
+
+    expect(
+      isProtectedStaffTarget(true, false, [], officerRoleId),
+    ).toBe(true);
+    expect(
+      isProtectedStaffTarget(false, true, [], officerRoleId),
+    ).toBe(true);
+    expect(
+      isProtectedStaffTarget(
+        false,
+        false,
+        [officerRoleId],
+        officerRoleId,
+      ),
+    ).toBe(true);
+    expect(
+      isProtectedStaffTarget(
+        false,
         false,
         ["423456789012345678"],
         officerRoleId,

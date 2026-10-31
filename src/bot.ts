@@ -32,6 +32,10 @@ import {
   loadStaffCommandConfig,
   type StaffCommandConfig,
 } from "./staff-command-config.js";
+import {
+  executeVoiceModeration,
+  isVoiceModerationCommand,
+} from "./voice-moderation.js";
 import { executeVoiceMove } from "./voice-move.js";
 import { buildDirectWelcome, buildPublicWelcome } from "./welcome.js";
 
@@ -92,13 +96,22 @@ async function handleZorsCommand(
 
   if (
     subcommand === "move-channel" ||
-    subcommand === "move-members"
+    subcommand === "move-members" ||
+    subcommand === "move-role"
   ) {
     const binding =
       interaction.guildId === config.DISCORD_TEST_GUILD_ID
         ? staffCommands.test
         : staffCommands.production;
     await executeVoiceMove(interaction, binding);
+    return;
+  }
+  if (isVoiceModerationCommand(subcommand)) {
+    const binding =
+      interaction.guildId === config.DISCORD_TEST_GUILD_ID
+        ? staffCommands.test
+        : staffCommands.production;
+    await executeVoiceModeration(interaction, binding);
     return;
   }
 
@@ -176,8 +189,10 @@ async function handleZorsCommand(
       "`/zors status` — Check whether the bot is online.",
       "`/zors help` — Show this command list.",
       "`/zors roles` — Choose optional 18+ NSFW access.",
-      "`/zors move-channel` — Administrator/Officer: move everyone between voice channels.",
-      "`/zors move-members` — Administrator/Officer: move mentioned members between voice channels.",
+      "`/zors move-channel`, `move-members`, `move-role` — Administrator/Officer voice moves.",
+      "`/zors mute-*`, `unmute-*`, `deafen-*`, `undeafen-*` — Administrator/Officer voice moderation.",
+      "`/zors disconnect-*` — Administrator/Officer voice disconnects.",
+      "`/zors mute-soundboard-channel`, `unmute-soundboard-channel` — Channel soundboard controls.",
       "`/zors audit-channels` — Owner-only read-only channel inventory.",
       "`/zors audit-roles` — Owner-only read-only role inventory.",
       "`/zors audit-permissions` — Owner-only permission review.",

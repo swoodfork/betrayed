@@ -7,6 +7,7 @@ import type {
   ProductionBindings,
   ProductionInventory,
 } from "./production-schema.js";
+import { permissionsForStructuralComparison } from "./runtime-permissions.js";
 
 export interface ProductionPlan {
   version: 1;
@@ -194,12 +195,23 @@ function exactOverwritesMatch(
   ) {
     return false;
   }
+  const everyoneRoleId = desired.find(
+    (overwrite) => overwrite.roleKey === "everyone",
+  )?.roleId;
   const normalize = (
     id: string,
     allow: string[],
     deny: string[],
   ): string =>
-    `${id}|${[...allow].sort().join(",")}|${[...deny]
+    `${id}|${permissionsForStructuralComparison(
+      allow,
+      id === everyoneRoleId,
+    )
+      .sort()
+      .join(",")}|${permissionsForStructuralComparison(
+      deny,
+      id === everyoneRoleId,
+    )
       .sort()
       .join(",")}`;
   const currentValues = current
