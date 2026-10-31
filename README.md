@@ -84,6 +84,10 @@ member into PUG Voice. It can also link members who are looking around directly
 to Forever Discussion. Discord cannot move a disconnected member into voice,
 so the member must join any server voice channel before pressing the PUG button.
 
+Channels in Welcome to Betrayed are public-readable but staff-published.
+`📌server-guide`, `👋welcome`, and `📝raid-application` deny member messages
+while allowing Guild Master, Discord Admin, Officer, and Zors Bot to publish.
+
 Stop the bot with `Ctrl+C`.
 
 ## Raid applications

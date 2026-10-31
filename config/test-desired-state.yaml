@@ -543,7 +543,7 @@ categories:
         aliases:
           - server-guide
         type: text
-        permissionProfile: public-read
+        permissionProfile: welcome-feed
         preserveHistory: false
       - key: welcome
         name: "👋welcome"

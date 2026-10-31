@@ -6,9 +6,9 @@ guild:
   name: Betrayed
 
 inventory:
-  file: betrayed-production-post-applications.json
-  generatedAt: "2026-10-31T09:13:52.785Z"
-  sha256: "58e6bb05493ca117f371997525bebaf7f13a8fa7340d692c13e85ba7c4b9391c"
+  file: server-guide-production-post-apply.json
+  generatedAt: "2026-10-31T09:54:38.097Z"
+  sha256: "dc2294e173d18bb25115e0bd83c0e3a8a7e7dd18f6211d02f451b3dbce8b424f"
 
 roleBindings:
   guild-master: "705314740330561587"
