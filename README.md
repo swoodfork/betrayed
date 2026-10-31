@@ -142,7 +142,9 @@ and failures are reported in the command's private response.
 
 Officers cannot use these commands against the server owner, Administrators, or
 other Officers. Administrators retain authority over all members allowed by
-Discord's role hierarchy.
+Discord's role hierarchy, except that mass mute and deafen actions always skip
+the server owner and the person executing the command. Move commands may still
+move either person when they match the requested channel, member, or role.
 
 Discord does not provide a temporary member-level soundboard mute. The
 soundboard commands therefore operate only at channel level by persistently

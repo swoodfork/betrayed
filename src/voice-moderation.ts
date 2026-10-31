@@ -98,6 +98,18 @@ export function isVoiceModerationCommand(
   );
 }
 
+export function isProtectedMuteOrDeafenTarget(
+  action: MemberVoiceAction,
+  memberId: string,
+  guildOwnerId: string,
+  callerId: string,
+): boolean {
+  return (
+    (action === "mute" || action === "deafen") &&
+    (memberId === guildOwnerId || memberId === callerId)
+  );
+}
+
 function requiredPermission(
   action: MemberVoiceAction,
 ): PermissionResolvable {
@@ -223,16 +235,22 @@ async function executeMemberVoiceCommand(
     );
   }
 
-  const protectedMembers = callerIsAdministrator
-    ? []
-    : requestedMembers.filter((member) =>
+  const protectedMembers = requestedMembers.filter(
+    (member) =>
+      isProtectedMuteOrDeafenTarget(
+        definition.action,
+        member.id,
+        guild.ownerId,
+        interaction.user.id,
+      ) ||
+      (!callerIsAdministrator &&
         isProtectedStaffTarget(
           member.id === guild.ownerId,
           member.permissions.has(PermissionFlagsBits.Administrator),
           member.roles.cache.keys(),
           binding.officerRoleId,
-        ),
-      );
+        )),
+  );
   if (protectedMembers.length > 0) {
     const protectedIds = new Set(
       protectedMembers.map((member) => member.id),
@@ -314,7 +332,7 @@ async function executeMemberVoiceCommand(
   }
   if (protectedMembers.length > 0) {
     result.push(
-      `Protected staff not affected: ${summarizeMembers(protectedMembers)}.`,
+      `Protected members not affected: ${summarizeMembers(protectedMembers)}.`,
     );
   }
   if (failed.length > 0) {

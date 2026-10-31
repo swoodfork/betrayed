@@ -820,27 +820,31 @@ categories:
     permissionProfile: voice-community
     channels:
       - key: zors-throne-room
-        name: "👑 Zors Throne Room"
+        name: "🔊  Zors' Enclave"
         type: voice
         permissionProfile: voice-community
         preserveHistory: false
       - key: voice-chat-1
-        name: "🔊 Voice Chat 1"
+        name: "🔊 Salami's Casting Couch"
         type: voice
         permissionProfile: voice-community
         preserveHistory: false
       - key: voice-chat-2
-        name: "🔊 Voice Chat 2"
+        name: "🔊Qzark’s Rage Room"
         type: voice
         permissionProfile: voice-community
         preserveHistory: false
       - key: voice-chat-3
-        name: "🔊 Voice Chat 3"
+        name: "🔊 Voice Chat 1"
+        aliases:
+          - "🔊 Voice Chat 3"
         type: voice
         permissionProfile: voice-community
         preserveHistory: false
       - key: voice-chat-4
-        name: "🔊 Voice Chat 4"
+        name: "🔊 Voice Chat 2"
+        aliases:
+          - "🔊 Voice Chat 4"
         type: voice
         permissionProfile: voice-community
         preserveHistory: false
