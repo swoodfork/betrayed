@@ -1,0 +1,123 @@
+version: 1
+target: production
+
+guild:
+  id: "705235406974615603"
+  name: Betrayed
+
+inventory:
+  file: betrayed-complete-inventory-channel-access.json
+  generatedAt: "2026-10-30T23:22:15.865Z"
+  sha256: "1b3a2d781519b05316093d0fd3e794f4bc7a6e51eb431306fe1f4a91aa80776a"
+
+roleBindings:
+  guild-master: "705314740330561587"
+  discord-admin: "842313959230799882"
+  officer: "705314605378830367"
+  raid-coordinator: "1030904868451389551"
+  council: "803302368178470912"
+  member: "705315854853603393"
+  social: "707317695548227584"
+  runescaper: "1468071412043485346"
+  controversial: "1565846234873331742"
+  nsfw: "1565846235993350165"
+  zors-40-team: "1565838651294875790"
+  tenshock-40-team: "1565838652209102858"
+  herc-40-team: "1565838653140373634"
+  zors-20-team: "1565838654361043106"
+  josh-20-team: "1565838656470654996"
+  tenshock-20-team: "1565838657401921719"
+  qzark-20-team: "1565838658295304384"
+  herc-20-team: "1565838659712979046"
+  zors-bot: "1565757248792432670"
+
+everyonePermissions:
+  - AddReactions
+  - AttachFiles
+  - ChangeNickname
+  - Connect
+  - CreateInstantInvite
+  - CreatePrivateThreads
+  - CreatePublicThreads
+  - EmbedLinks
+  - ReadMessageHistory
+  - RequestToSpeak
+  - SendMessages
+  - SendMessagesInThreads
+  - SendPolls
+  - SendVoiceMessages
+  - SetVoiceChannelStatus
+  - Speak
+  - Stream
+  - UseApplicationCommands
+  - UseEmbeddedActivities
+  - UseExternalApps
+  - UseExternalEmojis
+  - UseExternalSounds
+  - UseExternalStickers
+  - UseSoundboard
+  - UseVAD
+  - ViewChannel
+
+categoryBindings:
+  start-here: "705235406974615604"
+  staff: "705238614342238249"
+  raid-coordinator: "1565838668554305636"
+  council: "1565838674271412344"
+  warcraft-forever: "1176640986991054930"
+  warcraft-40-teams: "1565838686736879666"
+  warcraft-20-teams: "1565838715677315252"
+  runescape: "1398070776552357988"
+  community-chat: "705320457343336509"
+  community-voice: "705235406974615605"
+  raid-voice: "842468522423484426"
+  archive: "1565838757096067112"
+
+channelBindings:
+  announcements: "813866893798146080"
+  server-guide: "1565838663466754069"
+  internal-affairs: "706535819028201512"
+  officer-voice: "842327436749176832"
+  coordinator-chat: "1182447751942918194"
+  coordinator-voice: "1565838673050734713"
+  council-chat: "705238667492458507"
+  zors-council: "1565838679115833347"
+  tenshock-council: "1565838681548529776"
+  herc-council: "1565838684157251724"
+  forever-discussion: "1176642587319353375"
+  zors-40-team-chat: "1565838708551327824"
+  tenshock-40-team-chat: "1548904383608131625"
+  herc-40-team-chat: "1549624934379298988"
+  zors-20-team-chat: "1565838718676238448"
+  josh-20-team-chat: "1565838720064553012"
+  tenshock-20-team-chat: "1180938777720533073"
+  qzark-20-team-chat: "1459232728389255345"
+  herc-20-team-chat: "1565838723814522984"
+  runescape-discussion: "1398071183513096193"
+  runescape-memes: "1398070043043958885"
+  runescape-drops: "1413945726286954658"
+  general: "705320487911161946"
+  zors-talk: "757254629317935194"
+  pictures: "832705396610957382"
+  screenshots: "748729788834775121"
+  wow-news: "1022691367685726218"
+  music: "705854661915312138"
+  memes: "705320612121542736"
+  nsfw: "831369547311218719"
+  controversial: "1034579683792138360"
+  zors-throne-room: "1565838736053239828"
+  voice-chat-1: "1565838737047556246"
+  voice-chat-2: "1565838737953263726"
+  voice-chat-3: "1565838738762768394"
+  voice-chat-4: "1565838739668738093"
+  raid-voice-1: "1565838748900655255"
+  raid-voice-2: "1565838750422933674"
+  raid-voice-3: "1565838751585013991"
+  raid-voice-4: "1565838752549568512"
+  raid-voice-5: "1565838753447149568"
+  raid-voice-6: "1565838754453655622"
+  raid-voice-7: "1565838755447705660"
+  raid-voice-8: "1565838756274110514"
+  copy-pasta: "905136377543426098"
+
+retirementCandidates: {}

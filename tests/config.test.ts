@@ -1,0 +1,53 @@
+import { describe, expect, it } from "vitest";
+
+import { parseConfig } from "../src/config.js";
+
+const validEnvironment = {
+  DISCORD_TOKEN: "test-token-with-sufficient-length",
+  DISCORD_APPLICATION_ID: "123456789012345678",
+  DISCORD_TEST_GUILD_ID: "223456789012345678",
+  DISCORD_PRODUCTION_GUILD_ID: "323456789012345678",
+  DISCORD_TEST_WELCOME_CHANNEL_ID: "423456789012345678",
+  DISCORD_OWNER_USER_ID: "523456789012345678",
+  ENABLE_PRODUCTION_INVENTORY: "false",
+};
+
+describe("parseConfig", () => {
+  it("accepts a complete test-guild configuration", () => {
+    expect(parseConfig(validEnvironment)).toEqual({
+      ...validEnvironment,
+      ENABLE_PRODUCTION_INVENTORY: false,
+    });
+  });
+
+  it("rejects matching test and production guild IDs", () => {
+    expect(() =>
+      parseConfig({
+        ...validEnvironment,
+        DISCORD_PRODUCTION_GUILD_ID: validEnvironment.DISCORD_TEST_GUILD_ID,
+      }),
+    ).toThrow(/must be different/i);
+  });
+
+  it("rejects missing secrets", () => {
+    expect(() =>
+      parseConfig({ ...validEnvironment, DISCORD_TOKEN: "" }),
+    ).toThrow();
+  });
+
+  it("requires an explicit boolean production inventory flag", () => {
+    expect(
+      parseConfig({
+        ...validEnvironment,
+        ENABLE_PRODUCTION_INVENTORY: "true",
+      }).ENABLE_PRODUCTION_INVENTORY,
+    ).toBe(true);
+
+    expect(() =>
+      parseConfig({
+        ...validEnvironment,
+        ENABLE_PRODUCTION_INVENTORY: "yes",
+      }),
+    ).toThrow();
+  });
+});

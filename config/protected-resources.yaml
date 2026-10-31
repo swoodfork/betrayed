@@ -1,0 +1,34 @@
+version: 1
+
+# These names came from the server owner. Resolve and record their Discord IDs
+# during read-only inventory before generating any production change plan.
+protectedChannels:
+  - id: "706535819028201512"
+    name: internal-affairs
+    reason: Preserve history when renaming and moving this channel to officer-affairs.
+  - id: "813866893798146080"
+    name: announcements
+    reason: Owner requested that this channel be preserved.
+  - id: "1182447751942918194"
+    name: warcraft-forever-leader-chat
+    reason: Preserve history when renaming and moving this channel to coordinator-affairs.
+  - id: "1176642587319353375"
+    name: forever-discussion
+    reason: Owner requested that this channel be preserved.
+
+protectedSections:
+  - id: "1398070776552357988"
+    name: RuneScape
+    match: owner-confirmed-category
+    reason: Preserve the entire RuneScape section and its channels.
+  - id: "705320457343336509"
+    name: Community Chat
+    match: owner-confirmed-category
+    reason: Preserve the entire Community Chat section and its channels.
+
+policy:
+  allowRename: true
+  allowMove: true
+  allowPermissionChanges: false
+  allowArchive: true
+  allowDelete: false

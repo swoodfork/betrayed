@@ -1,0 +1,25 @@
+# Betrayed Welcome Messages
+
+These templates use placeholders that Zors Bot will replace with Discord mentions and member information.
+
+## Public welcome channel
+
+Welcome to **Betrayed**, {{memberMention}}!
+
+We're glad you're here. Take a look around, choose the game and community sections that interest you, and say hello when you're ready.
+
+## Direct message from Zors Bot
+
+Welcome to **Betrayed**, {{displayName}}!
+
+We're glad you're here.
+
+Take a look through the available channels and choose the game and community sections that interest you. You'll find dedicated RuneScape areas and general community conversations.
+
+If you are joining a guild, coalition, group, or raid that needs private access, contact a member of the staff team.
+
+We're happy to have you here. Enjoy the server!
+
+— **Zors Bot**
+
+> This is an automated welcome message. If you cannot see the expected channels, return to Betrayed and check whether Discord has an onboarding step for you to complete.

@@ -1,0 +1,844 @@
+version: 1
+target: test
+
+policy:
+  deletion: forbidden
+  archiveReviewDays: 30
+  preserveAllBots: true
+
+roles:
+  - key: guild-master
+    name: Guild Master
+    createIfMissing: true
+    hierarchyRank: 0
+    color: "#DD7D15"
+    permissions:
+      - Administrator
+  - key: discord-admin
+    name: Discord Admin
+    createIfMissing: true
+    hierarchyRank: 1
+    color: "#1F8B4C"
+    permissions:
+      - Administrator
+  - key: officer
+    name: Officer
+    createIfMissing: true
+    hierarchyRank: 2
+    color: "#AD1457"
+    permissions:
+      - ViewAuditLog
+      - ManageRoles
+      - ManageMessages
+      - ModerateMembers
+      - KickMembers
+      - BanMembers
+      - ManageNicknames
+      - MoveMembers
+      - MuteMembers
+      - DeafenMembers
+  - key: raid-coordinator
+    name: Raid Coordinator
+    createIfMissing: true
+    hierarchyRank: 3
+    color: "#1ABC9C"
+    permissions:
+      - ManageMessages
+      - MoveMembers
+      - DeafenMembers
+  - key: council
+    name: Council
+    createIfMissing: true
+    hierarchyRank: 4
+    color: "#206694"
+    permissions: []
+  - key: member
+    name: Member
+    createIfMissing: true
+    hierarchyRank: 5
+    color: "#00DF00"
+    permissions: []
+  - key: social
+    name: Social / Friend
+    createIfMissing: true
+    hierarchyRank: 6
+    color: "#DDDDDD"
+    permissions: []
+  - key: runescaper
+    name: RuneScaper
+    createIfMissing: true
+    hierarchyRank: 15
+    color: "#369876"
+    permissions: []
+  - key: controversial
+    name: Controversial
+    createIfMissing: true
+    hierarchyRank: 16
+    color: "#000000"
+    permissions: []
+  - key: nsfw
+    name: NSFW
+    createIfMissing: true
+    hierarchyRank: 17
+    color: "#000000"
+    permissions: []
+  - key: zors-40-team
+    name: Zors 40 Team
+    createIfMissing: true
+    hierarchyRank: 7
+    color: "#5DADE2"
+    permissions: []
+  - key: tenshock-40-team
+    name: Tenshock 40 Team
+    createIfMissing: true
+    hierarchyRank: 8
+    color: "#3498DB"
+    permissions: []
+  - key: herc-40-team
+    name: Herc 40 Team
+    createIfMissing: true
+    hierarchyRank: 9
+    color: "#2874A6"
+    permissions: []
+  - key: zors-20-team
+    name: Zors 20 Team
+    createIfMissing: true
+    hierarchyRank: 10
+    color: "#F7DC6F"
+    permissions: []
+  - key: josh-20-team
+    name: Josh 20 Team
+    createIfMissing: true
+    hierarchyRank: 11
+    color: "#F4D03F"
+    permissions: []
+  - key: tenshock-20-team
+    name: Tenshock 20 Team
+    createIfMissing: true
+    hierarchyRank: 12
+    color: "#F1C40F"
+    permissions: []
+  - key: qzark-20-team
+    name: Qzark 20 Team
+    createIfMissing: true
+    hierarchyRank: 13
+    color: "#D4AC0D"
+    permissions: []
+  - key: herc-20-team
+    name: Herc 20 Team
+    createIfMissing: true
+    hierarchyRank: 14
+    color: "#B7950B"
+    permissions: []
+  - key: zors-bot
+    name: Zors Bot
+    createIfMissing: false
+    hierarchyRank: null
+    permissions: []
+
+permissionProfiles:
+  - key: public-read
+    description: Everyone can view; only approved roles can publish.
+    overwrites: []
+  - key: announcements-read-only
+    description: Everyone can read announcements; only staff can publish.
+    overwrites:
+      - roleKey: everyone
+        allow: [ViewChannel, ReadMessageHistory]
+        deny: [SendMessages]
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: member-chat
+    description: Members can view and participate.
+    overwrites: []
+  - key: runescape-private
+    description: Only staff and members with the RuneScaper role can view and participate.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: runescaper
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: staff-private
+    description: Only approved staff roles can view and participate.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory, Connect, Speak]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory, Connect, Speak]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory, Connect, Speak]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: raid-coordinator-private
+    description: Only staff and Raid Coordinators can view and participate.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory, Connect, Speak]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory, Connect, Speak]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory, Connect, Speak]
+        deny: []
+      - roleKey: raid-coordinator
+        allow: [ViewChannel, SendMessages, ReadMessageHistory, Connect, Speak]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: council-private
+    description: Only staff and Council members can view and participate.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: council
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: voice-community
+    description: Approved community roles can view and connect.
+    overwrites: []
+  - key: archive-read-only
+    description: Retained history is visible to approved roles but cannot receive new messages.
+    overwrites:
+      - roleKey: everyone
+        allow: [ViewChannel, ReadMessageHistory]
+        deny: [SendMessages]
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: controversial-private
+    description: Only staff and members with the Controversial role can view and participate.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: controversial
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: nsfw-private
+    description: Only staff and members with the NSFW role can view and participate.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: nsfw
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: team-section-private
+    description: Team section is hidden by default while staff retain visibility.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: guild-master
+        allow: [ViewChannel]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: zors-40-private
+    description: Zors 40 Team channel access.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: zors-40-team
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: tenshock-40-private
+    description: Tenshock 40 Team channel access.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: tenshock-40-team
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: herc-40-private
+    description: Herc 40 Team channel access.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: herc-40-team
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: zors-20-private
+    description: Zors 20 Team channel access.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: zors-20-team
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: josh-20-private
+    description: Josh 20 Team channel access.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: josh-20-team
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: tenshock-20-private
+    description: Tenshock 20 Team channel access.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: tenshock-20-team
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: qzark-20-private
+    description: Qzark 20 Team channel access.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: qzark-20-team
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+  - key: herc-20-private
+    description: Herc 20 Team channel access.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: herc-20-team
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel]
+        deny: []
+
+categories:
+  - key: start-here
+    name: "👋 Welcome to Betrayed! 👋"
+    aliases:
+      - Start Here
+      - Welcome To Betrayed!
+      - Text Channels
+    permissionProfile: public-read
+    channels:
+      - key: announcements
+        name: "🔔announcements"
+        aliases:
+          - announcements
+        type: text
+        permissionProfile: announcements-read-only
+        preserveHistory: true
+      - key: server-guide
+        name: "📌server-guide"
+        aliases:
+          - server-guide
+        type: text
+        permissionProfile: public-read
+        preserveHistory: false
+  - key: staff
+    name: "🔒 Officer 🔒"
+    aliases:
+      - Officer
+      - Staff
+      - "Officer [hidden] 🔒"
+    permissionProfile: staff-private
+    channels:
+      - key: internal-affairs
+        name: "🔒officer-affairs"
+        aliases:
+          - internal-affairs
+          - "🔒internal-affairs"
+        type: text
+        permissionProfile: staff-private
+        preserveHistory: true
+      - key: officer-voice
+        name: "🔊 Officer Chat"
+        aliases:
+          - "🔒 Officer Voice"
+        type: voice
+        permissionProfile: staff-private
+        preserveHistory: false
+
+  - key: raid-coordinator
+    name: "🔒 Raid Coordinator 🔒"
+    aliases:
+      - "📋 Raid Coordinator 📋"
+    permissionProfile: raid-coordinator-private
+    channels:
+      - key: coordinator-chat
+        name: "🔒coordinator-affairs"
+        aliases:
+          - "📋coordinator-chat"
+        type: text
+        permissionProfile: raid-coordinator-private
+        preserveHistory: false
+      - key: coordinator-voice
+        name: "🔊 Coordinator Chat"
+        aliases:
+          - "🔊 Coordinator Voice"
+        type: voice
+        permissionProfile: raid-coordinator-private
+        preserveHistory: false
+
+  - key: council
+    name: "🏛️ Council 🏛️"
+    permissionProfile: council-private
+    channels:
+      - key: council-chat
+        name: "🔊 Council Chat"
+        type: voice
+        permissionProfile: council-private
+        preserveHistory: false
+      - key: zors-council
+        name: "⚖️zors-council"
+        aliases:
+          - "⚔️zors-council"
+        type: text
+        permissionProfile: council-private
+        preserveHistory: false
+      - key: tenshock-council
+        name: "⚖️tenshock-council"
+        aliases:
+          - "⚔️tenshock-council"
+        type: text
+        permissionProfile: council-private
+        preserveHistory: false
+      - key: herc-council
+        name: "⚖️herc-council"
+        aliases:
+          - "⚔️herc-council"
+        type: text
+        permissionProfile: council-private
+        preserveHistory: false
+
+  - key: warcraft-forever
+    name: "🌍 Warcraft Forever 🌍"
+    aliases:
+      - Warcraft Forever
+      - "🌍Warcraft Forever🌍"
+    permissionProfile: member-chat
+    channels:
+      - key: forever-discussion
+        name: "👋forever-discussion"
+        aliases:
+          - forever-discussion
+        type: text
+        permissionProfile: member-chat
+        preserveHistory: true
+
+  - key: warcraft-40-teams
+    name: "⚔️ 40 Man Teams ⚔️"
+    permissionProfile: team-section-private
+    channels:
+      - key: zors-40-team-chat
+        name: "🗡️zors-40-team"
+        aliases: ["🔒zors-40-team"]
+        type: text
+        permissionProfile: zors-40-private
+        preserveHistory: false
+      - key: tenshock-40-team-chat
+        name: "🗡️tenshock-40-team"
+        aliases:
+          - "🔒tenshock-40-team"
+          - forever-signups-tenshock-qzark-teams
+          - "👋forever-signups-tenshock-qzark-teams"
+        type: text
+        permissionProfile: tenshock-40-private
+        preserveHistory: true
+      - key: herc-40-team-chat
+        name: "🗡️herc-40-team"
+        aliases: [herc-raid-chat, "🔒herc-40-team"]
+        type: text
+        permissionProfile: herc-40-private
+        preserveHistory: true
+
+  - key: warcraft-20-teams
+    name: "🛡️ 20 Man Teams 🛡️"
+    permissionProfile: team-section-private
+    channels:
+      - key: zors-20-team-chat
+        name: "🗡️zors-20-team"
+        aliases: ["🔒zors-20-team"]
+        type: text
+        permissionProfile: zors-20-private
+        preserveHistory: false
+      - key: josh-20-team-chat
+        name: "🗡️josh-20-team"
+        aliases: ["🔒josh-20-team"]
+        type: text
+        permissionProfile: josh-20-private
+        preserveHistory: false
+      - key: tenshock-20-team-chat
+        name: "🗡️tenshock-20-team"
+        aliases:
+          - "🔒tenshock-20-team"
+          - tenshock-raid
+          - "📅tenshock-raid"
+        type: text
+        permissionProfile: tenshock-20-private
+        preserveHistory: true
+      - key: qzark-20-team-chat
+        name: "🗡️qzark-20-team"
+        aliases:
+          - "🔒qzark-20-team"
+          - qzark-raid-chat
+          - "📅qzark-raid-chat"
+        type: text
+        permissionProfile: qzark-20-private
+        preserveHistory: true
+      - key: herc-20-team-chat
+        name: "🗡️herc-20-team"
+        aliases: ["🔒herc-20-team"]
+        type: text
+        permissionProfile: herc-20-private
+        preserveHistory: false
+
+  - key: runescape
+    name: "☠️ RuneScape ☠️"
+    aliases:
+      - RuneScape
+      - "☠️RuneScape☠️"
+      - "☠️Runescape☠️"
+    permissionProfile: runescape-private
+    channels:
+      - key: runescape-discussion
+        name: "👋runescape"
+        aliases:
+          - runescape
+        type: text
+        permissionProfile: runescape-private
+        preserveHistory: true
+      - key: runescape-memes
+        name: "😂rs-memes"
+        aliases: [rs-memes]
+        type: text
+        permissionProfile: runescape-private
+        preserveHistory: true
+      - key: runescape-drops
+        name: "🏆rs-drops"
+        aliases: [rs-drops]
+        type: text
+        permissionProfile: runescape-private
+        preserveHistory: true
+
+  - key: community-chat
+    name: "💬 Community Chat 💬"
+    aliases:
+      - Community Chat
+    permissionProfile: member-chat
+    channels:
+      - key: general
+        name: "👋general"
+        aliases: [general]
+        type: text
+        permissionProfile: member-chat
+        preserveHistory: true
+      - key: zors-talk
+        name: "🤣zors-talk"
+        aliases: [zors-talk]
+        type: text
+        permissionProfile: member-chat
+        preserveHistory: true
+      - key: pictures
+        name: "📷pictures"
+        aliases: [pictures]
+        type: text
+        permissionProfile: member-chat
+        preserveHistory: true
+      - key: screenshots
+        name: "💻screenshots"
+        aliases: [screenshots]
+        type: text
+        permissionProfile: member-chat
+        preserveHistory: true
+      - key: wow-news
+        name: "📰wow-news"
+        aliases: [wow-news]
+        type: text
+        permissionProfile: member-chat
+        preserveHistory: true
+      - key: music
+        name: "🎵music"
+        aliases: [music]
+        type: text
+        permissionProfile: member-chat
+        preserveHistory: true
+      - key: memes
+        name: "👌memes"
+        aliases: [memes]
+        type: text
+        permissionProfile: member-chat
+        preserveHistory: true
+      - key: nsfw
+        name: "🍆nsfw"
+        aliases: [nsfw]
+        type: text
+        permissionProfile: nsfw-private
+        preserveHistory: true
+      - key: controversial
+        name: "⚠️controversial-channel"
+        aliases: [controversial-channel]
+        type: text
+        permissionProfile: controversial-private
+        preserveHistory: true
+
+  - key: community-voice
+    name: "🔊 Community Voice 🔊"
+    aliases:
+      - Community Voice
+      - "Community Voice 🔊"
+      - Voice Channels
+    permissionProfile: voice-community
+    channels:
+      - key: zors-throne-room
+        name: "👑 Zors Throne Room"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+      - key: voice-chat-1
+        name: "🔊 Voice Chat 1"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+      - key: voice-chat-2
+        name: "🔊 Voice Chat 2"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+      - key: voice-chat-3
+        name: "🔊 Voice Chat 3"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+      - key: voice-chat-4
+        name: "🔊 Voice Chat 4"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+  - key: raid-voice
+    name: "🔊 Raid Voice (PTT) 🔊"
+    permissionProfile: voice-community
+    channels:
+      - key: raid-voice-1
+        name: "🎙️ Raid Voice 1"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+      - key: raid-voice-2
+        name: "🎙️ Raid Voice 2"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+      - key: raid-voice-3
+        name: "🎙️ Raid Voice 3"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+      - key: raid-voice-4
+        name: "🎙️ Raid Voice 4"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+      - key: raid-voice-5
+        name: "🎙️ Raid Voice 5"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+      - key: raid-voice-6
+        name: "🎙️ Raid Voice 6"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+      - key: raid-voice-7
+        name: "🎙️ Raid Voice 7"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+      - key: raid-voice-8
+        name: "🎙️ Raid Voice 8"
+        type: voice
+        permissionProfile: voice-community
+        preserveHistory: false
+
+  - key: archive
+    name: "📦 Archive 📦"
+    aliases: [Archive]
+    permissionProfile: archive-read-only
+    channels:
+      - key: copy-pasta
+        name: "🍝copy-pasta"
+        aliases: [copy-pasta]
+        type: text
+        permissionProfile: archive-read-only
+        preserveHistory: true
