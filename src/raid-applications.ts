@@ -148,7 +148,7 @@ const wowClassOptions = Object.entries(wowForeverClassSpecializations).map(
 );
 
 const noOffSpecValue = "none";
-const offSpecWillingnessOptions = [
+export const offSpecWillingnessOptions = [
   ["main_only", "I only play my main spec"],
   ["rarely", "I can do it rarely for the team"],
   [
@@ -157,7 +157,7 @@ const offSpecWillingnessOptions = [
   ],
   [
     "any_spec",
-    "I do not care what spec I play and will play whatever the team needs",
+    "I do not care what spec I play and will play whatever",
   ],
 ] as const;
 
@@ -224,7 +224,8 @@ function selectCustomId(key: ChoiceKey): string {
   return `${customIdPrefix}:select:${key}`;
 }
 
-const continueCustomId = `${customIdPrefix}:continue`;
+const continueToRaidPreferencesCustomId =
+  `${customIdPrefix}:continue-to-raid-preferences`;
 const continueToModalCustomId = `${customIdPrefix}:continue-to-modal`;
 const modalCustomId = `${customIdPrefix}:modal`;
 
@@ -327,8 +328,8 @@ function buildSelectionComponents(
     ),
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
       new ButtonBuilder()
-        .setCustomId(continueCustomId)
-        .setLabel("Continue")
+        .setCustomId(continueToModalCustomId)
+        .setLabel("Continue to Written Questions")
         .setStyle(ButtonStyle.Primary),
     ),
   ];
@@ -419,8 +420,8 @@ function buildCharacterComponents(
     ),
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
       new ButtonBuilder()
-        .setCustomId(continueToModalCustomId)
-        .setLabel("Continue to Written Questions")
+        .setCustomId(continueToRaidPreferencesCustomId)
+        .setLabel("Continue to Raid Preferences")
         .setStyle(ButtonStyle.Primary),
     ),
   );
@@ -472,7 +473,19 @@ function buildApplicationModal(): ModalBuilder {
     );
 }
 
-function completeDraft(draft: RaidApplicationDraft): boolean {
+function completeRaidPreferences(draft: RaidApplicationDraft): boolean {
+  return (
+    selectedValuesAreValid(draft.availability, availabilityOptions) &&
+    draft.emergency !== null &&
+    selectedValuesAreValid([draft.emergency], emergencyOptions) &&
+    draft.raider !== null &&
+    selectedValuesAreValid([draft.raider], raiderTypeOptions) &&
+    draft.overtime !== null &&
+    selectedValuesAreValid([draft.overtime], overtimeOptions)
+  );
+}
+
+function completeCharacterQuestions(draft: RaidApplicationDraft): boolean {
   if (
     draft.onForeverPvpAlliance !== true ||
     !draft.wowClass ||
@@ -486,13 +499,6 @@ function completeDraft(draft: RaidApplicationDraft): boolean {
   const validOffSpecs = draft.raidReadyOffSpecializations;
   const selectedNone = validOffSpecs.includes(noOffSpecValue);
   return (
-    selectedValuesAreValid(draft.availability, availabilityOptions) &&
-    draft.emergency !== null &&
-    selectedValuesAreValid([draft.emergency], emergencyOptions) &&
-    draft.raider !== null &&
-    selectedValuesAreValid([draft.raider], raiderTypeOptions) &&
-    draft.overtime !== null &&
-    selectedValuesAreValid([draft.overtime], overtimeOptions) &&
     selectedValuesAreValid(
       [draft.mainSpecialization],
       specializationOptions,
@@ -506,6 +512,13 @@ function completeDraft(draft: RaidApplicationDraft): boolean {
       [draft.offSpecWillingness],
       offSpecWillingnessOptions,
     )
+  );
+}
+
+function completeDraft(draft: RaidApplicationDraft): boolean {
+  return (
+    completeCharacterQuestions(draft) &&
+    completeRaidPreferences(draft)
   );
 }
 
@@ -908,9 +921,8 @@ export async function handleRaidApplicationInteraction(
       scope,
     );
     await interaction.reply({
-      content:
-        "Complete all four selections, then continue to the written questions.",
-      components: buildSelectionComponents(draft),
+      content: foreverServerQuestion,
+      components: buildServerComponents(draft),
       flags: MessageFlags.Ephemeral,
     });
     return true;
@@ -1042,31 +1054,24 @@ export async function handleRaidApplicationInteraction(
     return true;
   }
 
-  if (interaction.isButton() && interaction.customId === continueCustomId) {
-    if (!completeDraft(draft)) {
-      const raidPreferencesComplete =
-        selectedValuesAreValid(draft.availability, availabilityOptions) &&
-        draft.emergency !== null &&
-        selectedValuesAreValid([draft.emergency], emergencyOptions) &&
-        draft.raider !== null &&
-        selectedValuesAreValid([draft.raider], raiderTypeOptions) &&
-        draft.overtime !== null &&
-        selectedValuesAreValid([draft.overtime], overtimeOptions);
-      if (raidPreferencesComplete) {
-        await interaction.update({
-          content: foreverServerQuestion,
-          components: buildServerComponents(draft),
-        });
-        return true;
-      }
+  if (
+    interaction.isButton() &&
+    interaction.customId === continueToRaidPreferencesCustomId
+  ) {
+    if (!completeCharacterQuestions(draft)) {
       await interaction.reply({
         content:
-          "Complete all four dropdown questions before continuing.",
+          "Complete the class, specialization, off-spec, and willingness questions before continuing.",
         flags: MessageFlags.Ephemeral,
       });
       return true;
     }
-    throw new Error("Raid application advanced before server confirmation.");
+    await interaction.update({
+      content:
+        "Complete all four raid preference selections, then continue to the written questions.",
+      components: buildSelectionComponents(draft),
+    });
+    return true;
   }
 
   if (
@@ -1076,7 +1081,7 @@ export async function handleRaidApplicationInteraction(
     if (!completeDraft(draft)) {
       await interaction.reply({
         content:
-          "Complete the class, specialization, off-spec, and willingness questions before continuing.",
+          "Complete all four raid preference questions before continuing.",
         flags: MessageFlags.Ephemeral,
       });
       return true;

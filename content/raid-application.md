@@ -6,32 +6,11 @@ followed by one Discord modal with four required written answers.
 
 ## Selection questions
 
-1. Select every day you can raid from 6–9 PM Pacific:
-   - Monday
-   - Tuesday
-   - Wednesday
-   - Thursday
-   - Sunday
-2. Likelihood of missing raid
-   - Very likely
-   - Somewhat likely
-   - Almost never
-   - It will never happen
-3. What type of raider do you consider yourself?
-   - Casual
-   - Semi-hardcore
-   - Hardcore
-4. How likely are you to be able to go past raid time at the raid leader's
-   discretion?
-   - Not likely
-   - Somewhat likely
-   - Very likely
-   - I sleep when the boss dies
-5. Are you currently on WoW Forever PvP Alliance?
+1. Are you currently on WoW Forever PvP Alliance?
    - Yes: continue the application.
    - No: end the application and explain that Betrayed's raid teams are on
      WoW Forever PvP Alliance.
-6. What class are you?
+2. What class are you?
    - Druid
    - Hunter
    - Mage
@@ -41,17 +20,38 @@ followed by one Discord modal with four required written answers.
    - Shaman
    - Warlock
    - Warrior
-7. What is your main specialization?
+3. What is your main specialization?
    - The choices are the three specializations available to the selected
      class.
-8. Which raid-ready off-specializations do you have?
+4. Which raid-ready off-specializations do you have?
    - Select one or more specializations other than the selected main
      specialization, or select `None`.
-9. How willing are you to play an off-spec when asked?
+5. How willing are you to play an off-spec when asked?
    - I only play my main spec
    - I can do it rarely for the team
    - I prefer my main spec but will play what is needed for the team
-   - I do not care what spec I play and will play whatever the team needs
+   - I do not care what spec I play and will play whatever
+6. Select every day you can raid from 6–9 PM Pacific:
+   - Monday
+   - Tuesday
+   - Wednesday
+   - Thursday
+   - Sunday
+7. Likelihood of missing raid
+   - Very likely
+   - Somewhat likely
+   - Almost never
+   - It will never happen
+8. What type of raider do you consider yourself?
+   - Casual
+   - Semi-hardcore
+   - Hardcore
+9. How likely are you to be able to go past raid time at the raid leader's
+   discretion?
+   - Not likely
+   - Somewhat likely
+   - Very likely
+   - I sleep when the boss dies
 
 The WoW Forever class and specialization roster follows the
 [Warcraft Tavern WoW Forever class guide](https://www.warcrafttavern.com/forever/guides/classes/).

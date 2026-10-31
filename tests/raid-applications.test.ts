@@ -5,6 +5,7 @@ import {
   emergencyQuestion,
   foreverServerQuestion,
   guildChangeQuestion,
+  offSpecWillingnessOptions,
   storedRaidApplicationFromEmbed,
   wowForeverClassSpecializations,
   type StoredRaidApplication,
@@ -21,6 +22,9 @@ describe("raid application Discord storage", () => {
     expect(guildChangeQuestion.length).toBeLessThanOrEqual(45);
     expect(foreverServerQuestion).toBe(
       "Are you currently on WoW Forever PvP Alliance?",
+    );
+    expect(offSpecWillingnessOptions.at(-1)?.[1]).toBe(
+      "I do not care what spec I play and will play whatever",
     );
   });
 
