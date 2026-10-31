@@ -17,6 +17,10 @@ export const configSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((value) => value === "true"),
+    ENABLE_PRODUCTION_WELCOME: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
   })
   .superRefine((config, context) => {
     if (config.DISCORD_TEST_GUILD_ID === config.DISCORD_PRODUCTION_GUILD_ID) {

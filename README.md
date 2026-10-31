@@ -7,13 +7,16 @@ Zors Bot is being developed test-guild-first. The current milestone provides:
 - Owner-only read-only channel, role, and permission inventories
 - Owner-only sanitized JSON inventory export
 - A concise public welcome for new test-guild members
-- A welcome DM
+- An interactive welcome DM with allowlisted self-service roles
+- `/zors roles` for Controversial and explicitly confirmed 18+ NSFW access
 - Guarded desired-state planning and explicitly approved production reconstruction
 
 Production inventory commands remain disabled unless
-`ENABLE_PRODUCTION_INVENTORY=true`. Production changes are separate operator
-commands protected by inventory binding, live drift checks, and exact plan-hash
-approval; the continuously running bot does not apply them automatically.
+`ENABLE_PRODUCTION_INVENTORY=true`, and production welcome/onboarding remains
+disabled unless `ENABLE_PRODUCTION_WELCOME=true`. Production changes are
+separate operator commands protected by inventory binding, live drift checks,
+and exact plan-hash approval; the continuously running bot does not apply them
+automatically.
 
 ## Requirements
 
@@ -61,7 +64,15 @@ $env:ZORS_ENV_FILE = "C:\env\.env"
 npm run dev
 ```
 
-The bot registers `/zors` only in the configured test guild. Joining that guild with a non-bot test account triggers the public welcome and a DM attempt. Closed DMs are reported but do not stop the public welcome.
+The bot always registers `/zors` in Betrayed Test. Joining with a non-bot test
+account posts in `👋welcome` and sends an interactive DM. Discord's native
+member-join notices use the same channel. Closed DMs are reported but do not
+stop the public welcome.
+
+The DM and `/zors roles` can add or remove only the immutable Controversial and
+NSFW role bindings in `config/member-onboarding.yaml`. NSFW addition requires a
+button explicitly labeled as an 18+ confirmation. Staff, raid, team, and other
+privileged roles are never available through self-service.
 
 Stop the bot with `Ctrl+C`.
 
@@ -86,36 +97,30 @@ Inventory results are cached in memory for two minutes. This lets the owner down
 
 Keep `ENABLE_PRODUCTION_INVENTORY=false` until all inventory commands pass in the test guild and Zors Bot has been invited to production with read-only permissions.
 
-## Railway hosting
+## Render hosting
 
-Railway is the recommended always-on host. Railway Railpack detects the root
-`package.json`, installs from `package-lock.json`, runs `npm run build`, and
-starts the process with `npm start`. No web port, public domain, database, or
-persistent volume is required for the current gateway bot.
+Zors Bot runs as a paid Render background worker connected to the
+`swoodfork/betrayed` repository and `main` branch. It uses one instance, builds
+with `npm ci && npm run build`, and starts with `npm start`. No web port, public
+domain, database, or persistent disk is required for the current gateway bot.
 
-The repository includes a GitHub Actions workflow that runs tests and the
-TypeScript build on pushes and pull requests. After the initial reviewed commit
-is pushed:
+Render stores the variables listed in `.env.example`. Never commit the local
+`C:\env\.env` file, and do not define `ZORS_ENV_FILE` on Render because it is
+only a local file override. Keep `ENABLE_PRODUCTION_INVENTORY=false` for normal
+hosting.
 
-1. Create a Railway Hobby project and choose **Deploy from GitHub repo**.
-2. Select `swoodfork/betrayed` and the `main` branch.
-3. Add all variables from `.env.example` in Railway's service variables. Never
-   paste `C:\env\.env` into the repository.
-   Do not define `ZORS_ENV_FILE` on Railway; it is only a local override.
-4. Keep `ENABLE_PRODUCTION_INVENTORY=false` for normal hosting.
-5. Leave the service root directory as `/`; Railpack detects Node.js 22 from
-   `package.json`.
-6. Disable **Serverless** so the Discord gateway process is not intentionally
-   put to sleep.
-7. On the paid plan, set the restart policy to **Always**.
-8. Enable GitHub autodeploy and **Wait for CI** so failed checks do not deploy.
-9. Use one replica. Multiple replicas would duplicate gateway event handling.
-10. Verify the deployment log contains the `Zors Bot is ready` message, then
-    run `/zors status`.
+GitHub Actions runs tests and the TypeScript build on pushes and pull requests.
+Render automatically deploys commits pushed to `main`. Use one worker instance;
+multiple instances would duplicate Discord gateway event handling. A successful
+deployment log contains `Zors Bot is ready`.
+
+The official Render CLI is authorized locally through browser login and can
+inspect logs and status or trigger deploys and restarts. Its local token and any
+Render API key must never be committed or copied into chat.
 
 Future Copilot updates follow the normal path: edit and validate locally,
-commit, push to `main`, allow CI to pass, and let Railway deploy that commit.
-Railway variables remain unchanged across deployments.
+commit, push to `main`, allow CI to pass, and let Render deploy that commit.
+Render variables remain unchanged across deployments.
 
 ## Test-guild desired state
 

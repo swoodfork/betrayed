@@ -158,6 +158,24 @@ permissionProfiles:
       - roleKey: zors-bot
         allow: [ViewChannel]
         deny: []
+  - key: welcome-feed
+    description: Everyone can read welcome notices; only staff and Zors Bot can publish.
+    overwrites:
+      - roleKey: everyone
+        allow: [ViewChannel, ReadMessageHistory]
+        deny: [SendMessages]
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
+      - roleKey: zors-bot
+        allow: [ViewChannel, SendMessages, ReadMessageHistory]
+        deny: []
   - key: member-chat
     description: Members can view and participate.
     overwrites: []
@@ -698,6 +716,12 @@ categories:
       - Community Chat
     permissionProfile: member-chat
     channels:
+      - key: welcome
+        name: "👋welcome"
+        aliases: [welcome, new-arrivals]
+        type: text
+        permissionProfile: welcome-feed
+        preserveHistory: false
       - key: general
         name: "👋general"
         aliases: [general]

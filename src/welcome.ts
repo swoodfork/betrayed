@@ -21,10 +21,8 @@ export function buildDirectWelcome(member: WelcomeMember): string {
     "",
     "If you are joining a guild, coalition, group, or raid that needs private access, contact a member of the staff team.",
     "",
-    "We're happy to have you here. Enjoy the server!",
+    "Zors Bot can help you choose optional channel access below. We're happy to have you here. Enjoy the server!",
     "",
     "— **Zors Bot**",
-    "",
-    "_This is an automated welcome message._",
   ].join("\n");
 }

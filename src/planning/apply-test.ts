@@ -130,32 +130,38 @@ async function applyAction(
       return { action, status: "applied", resourceId: role.id };
     }
     case "reorder-roles": {
-      const botMember = guild.members.me;
+      const botMember = await guild.members.fetchMe();
       if (!botMember) {
         throw new Error("Zors Bot member is unavailable.");
       }
-      const highestTargetPosition = action.roles.length;
-      if (highestTargetPosition >= botMember.roles.highest.position) {
+      if (action.roles.length >= botMember.roles.highest.position) {
         throw new Error(
           "Zors Bot role is not high enough to establish the desired hierarchy.",
         );
       }
-      const positions = await Promise.all(action.roles.map(async (entry) => {
+
+      for (const entry of [...action.roles].reverse()) {
         const roleId = entry.roleId ?? roleIds.get(entry.roleKey);
         if (!roleId) {
           throw new Error(`Role ${entry.roleKey} is unavailable.`);
         }
         const role = await guild.roles.fetch(roleId);
-        if (!role || role.managed) {
-          throw new Error(`Role ${entry.roleKey} is missing or managed.`);
+        if (!role || role.managed || !role.editable) {
+          throw new Error(
+            `Role ${entry.roleKey} is missing, managed, or not editable.`,
+          );
         }
         roleIds.set(entry.roleKey, role.id);
-        return {
-          role: roleId,
-          position: action.roles.length - entry.hierarchyRank,
-        };
-      }));
-      await guild.roles.setPositions(positions);
+        const refreshedBot = await guild.members.fetchMe();
+        if (refreshedBot.roles.highest.position < 2) {
+          throw new Error(
+            "Zors Bot is not high enough to order desired roles.",
+          );
+        }
+        await role.setPosition(refreshedBot.roles.highest.position - 1, {
+          reason: "Approved Betrayed Test desired-state role hierarchy",
+        });
+      }
       return { action, status: "applied" };
     }
     case "review-missing-role-binding":

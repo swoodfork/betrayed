@@ -18,8 +18,13 @@ Take a look through the available channels and choose the game and community sec
 
 If you are joining a guild, coalition, group, or raid that needs private access, contact a member of the staff team.
 
-We're happy to have you here. Enjoy the server!
+Zors Bot can help you choose optional channel access below. We're happy to have you here. Enjoy the server!
 
 — **Zors Bot**
 
-> This is an automated welcome message. If you cannot see the expected channels, return to Betrayed and check whether Discord has an onboarding step for you to complete.
+## Optional access questions
+
+- Would you like access to the Controversial discussion channel?
+- If you are at least 18 years old, would you like to opt into the NSFW channel?
+
+Members can change either choice later with `/zors roles`.

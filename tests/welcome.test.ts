@@ -23,5 +23,6 @@ describe("welcome messages", () => {
     expect(message).toContain("RuneScape");
     expect(message).toContain("community");
     expect(message).not.toMatch(/#rules|#server-guide/i);
+    expect(message).not.toMatch(/automated (welcome )?message/i);
   });
 });

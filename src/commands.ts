@@ -18,6 +18,11 @@ export const zorsCommand = new SlashCommandBuilder()
   )
   .addSubcommand((command) =>
     command
+      .setName("roles")
+      .setDescription("Choose optional Controversial and NSFW channel access"),
+  )
+  .addSubcommand((command) =>
+    command
       .setName("audit-channels")
       .setDescription("Export a read-only channel and category inventory"),
   )

@@ -20,6 +20,7 @@ describe("parseConfig", () => {
     expect(parseConfig(validEnvironment)).toEqual({
       ...validEnvironment,
       ENABLE_PRODUCTION_INVENTORY: false,
+      ENABLE_PRODUCTION_WELCOME: false,
     });
   });
 
@@ -52,6 +53,18 @@ describe("parseConfig", () => {
         ENABLE_PRODUCTION_INVENTORY: "yes",
       }),
     ).toThrow();
+  });
+
+  it("defaults production welcome to disabled", () => {
+    expect(
+      parseConfig(validEnvironment).ENABLE_PRODUCTION_WELCOME,
+    ).toBe(false);
+    expect(
+      parseConfig({
+        ...validEnvironment,
+        ENABLE_PRODUCTION_WELCOME: "true",
+      }).ENABLE_PRODUCTION_WELCOME,
+    ).toBe(true);
   });
 });
 
