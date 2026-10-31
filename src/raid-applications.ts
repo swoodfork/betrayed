@@ -229,6 +229,12 @@ const continueToRaidPreferencesCustomId =
 const continueToModalCustomId = `${customIdPrefix}:continue-to-modal`;
 const modalCustomId = `${customIdPrefix}:modal`;
 
+export function isRaidApplicationContinuationCustomId(
+  customId: string,
+): boolean {
+  return customId.startsWith(`${customIdPrefix}:continue`);
+}
+
 function applicationScopeForGuild(
   guildId: string,
   config: BotConfig,
@@ -1009,19 +1015,26 @@ export async function handleRaidApplicationInteraction(
       }
       const selectedNone = interaction.values.includes(noOffSpecValue);
       const specializationOptions = specializationsFor(draft.wowClass);
+      const selectedSpecializations = interaction.values.filter(
+        (value) => value !== noOffSpecValue,
+      );
       if (
         interaction.values.length === 0 ||
-        (selectedNone && interaction.values.length !== 1) ||
-        (!selectedNone &&
+        (selectedSpecializations.length > 0 &&
           (!selectedValuesAreValid(
-            interaction.values,
+            selectedSpecializations,
             specializationOptions,
           ) ||
-            interaction.values.includes(draft.mainSpecialization)))
+            selectedSpecializations.includes(draft.mainSpecialization)))
       ) {
         throw new Error("Invalid raid-ready off-specialization selection.");
       }
-      draft.raidReadyOffSpecializations = [...interaction.values];
+      draft.raidReadyOffSpecializations =
+        selectedSpecializations.length > 0
+          ? selectedSpecializations
+          : selectedNone
+            ? [noOffSpecValue]
+            : null;
     } else if (key === "off_spec_willingness") {
       if (
         !selectedValuesAreValid(
@@ -1056,37 +1069,33 @@ export async function handleRaidApplicationInteraction(
 
   if (
     interaction.isButton() &&
-    interaction.customId === continueToRaidPreferencesCustomId
+    isRaidApplicationContinuationCustomId(interaction.customId)
   ) {
-    if (!completeCharacterQuestions(draft)) {
-      await interaction.reply({
+    if (completeDraft(draft)) {
+      await interaction.showModal(buildApplicationModal());
+      return true;
+    }
+    if (completeCharacterQuestions(draft)) {
+      await interaction.update({
         content:
-          "Complete the class, specialization, off-spec, and willingness questions before continuing.",
-        flags: MessageFlags.Ephemeral,
+          "Complete all four raid preference selections, then continue to the written questions.",
+        components: buildSelectionComponents(draft),
       });
       return true;
     }
-    await interaction.update({
-      content:
-        "Complete all four raid preference selections, then continue to the written questions.",
-      components: buildSelectionComponents(draft),
+    if (completeRaidPreferences(draft)) {
+      await interaction.update({
+        content: foreverServerQuestion,
+        components: buildServerComponents(draft),
+      });
+      return true;
+    }
+    await interaction.reply({
+      content: draft.onForeverPvpAlliance
+        ? "Complete the class, specialization, off-spec, and willingness questions before continuing."
+        : "Complete the current application questions before continuing.",
+      flags: MessageFlags.Ephemeral,
     });
-    return true;
-  }
-
-  if (
-    interaction.isButton() &&
-    interaction.customId === continueToModalCustomId
-  ) {
-    if (!completeDraft(draft)) {
-      await interaction.reply({
-        content:
-          "Complete all four raid preference questions before continuing.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return true;
-    }
-    await interaction.showModal(buildApplicationModal());
     return true;
   }
 
@@ -1191,5 +1200,7 @@ export async function handleRaidApplicationInteraction(
     return true;
   }
 
-  throw new Error("Unknown raid application interaction.");
+  throw new Error(
+    `Unknown raid application interaction: ${interaction.customId}`,
+  );
 }

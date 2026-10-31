@@ -5,6 +5,7 @@ import {
   emergencyQuestion,
   foreverServerQuestion,
   guildChangeQuestion,
+  isRaidApplicationContinuationCustomId,
   offSpecWillingnessOptions,
   storedRaidApplicationFromEmbed,
   wowForeverClassSpecializations,
@@ -40,6 +41,29 @@ describe("raid application Discord storage", () => {
       ["enhancement", "Enhancement"],
       ["restoration", "Restoration"],
     ]);
+  });
+
+  it("recognizes current and previously deployed continuation buttons", () => {
+    expect(
+      isRaidApplicationContinuationCustomId(
+        "zors-raid-application:continue",
+      ),
+    ).toBe(true);
+    expect(
+      isRaidApplicationContinuationCustomId(
+        "zors-raid-application:continue-to-raid-preferences",
+      ),
+    ).toBe(true);
+    expect(
+      isRaidApplicationContinuationCustomId(
+        "zors-raid-application:continue-to-modal",
+      ),
+    ).toBe(true);
+    expect(
+      isRaidApplicationContinuationCustomId(
+        "zors-raid-application:start:test",
+      ),
+    ).toBe(false);
   });
 
   it("round-trips every answer, applicant ID, and timestamp through an embed", () => {
