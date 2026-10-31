@@ -1,7 +1,10 @@
 import { ApplicationCommandOptionType, ChannelType } from "discord.js";
 import { describe, expect, it } from "vitest";
 
-import { zorsCommand } from "../src/commands.js";
+import {
+  zorsCommand,
+  zorsOwnerCommand,
+} from "../src/commands.js";
 
 describe("Zors Bot command registration", () => {
   it("registers typed channel and member voice move commands", () => {
@@ -81,5 +84,29 @@ describe("Zors Bot command registration", () => {
         "disconnect-members",
       ]),
     );
+  });
+
+  it("separates Administrator-visible owner inventory commands", () => {
+    const publicCommand = zorsCommand.toJSON();
+    const ownerCommand = zorsOwnerCommand.toJSON();
+    const ownerSubcommands = ownerCommand.options?.map(
+      (option) => option.name,
+    );
+
+    expect(publicCommand.options?.map((option) => option.name)).not.toEqual(
+      expect.arrayContaining([
+        "audit-channels",
+        "audit-roles",
+        "audit-permissions",
+        "export-inventory",
+      ]),
+    );
+    expect(ownerCommand.default_member_permissions).toBe("8");
+    expect(ownerSubcommands).toEqual([
+      "audit-channels",
+      "audit-roles",
+      "audit-permissions",
+      "export-inventory",
+    ]);
   });
 });

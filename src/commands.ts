@@ -1,5 +1,6 @@
 import {
   ChannelType,
+  PermissionFlagsBits,
   REST,
   Routes,
   SlashCommandBuilder,
@@ -196,7 +197,12 @@ export const zorsCommand = new SlashCommandBuilder()
       "disconnect-members",
       "Disconnect selected voice members",
     ),
-  )
+  );
+
+export const zorsOwnerCommand = new SlashCommandBuilder()
+  .setName("zors-owner")
+  .setDescription("Owner-only Zors Bot inventory commands")
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addSubcommand((command) =>
     command
       .setName("audit-channels")
@@ -225,6 +231,7 @@ export async function registerGuildCommands(
   const rest = new REST({ version: "10" }).setToken(config.DISCORD_TOKEN);
   const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
     zorsCommand.toJSON(),
+    zorsOwnerCommand.toJSON(),
   ];
 
   await rest.put(

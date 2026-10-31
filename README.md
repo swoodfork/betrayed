@@ -131,10 +131,15 @@ remain independently controlled by their environment flags.
 
 The configured owner can run:
 
-- `/zors audit-channels`
-- `/zors audit-roles`
-- `/zors audit-permissions`
-- `/zors export-inventory`
+- `/zors-owner audit-channels`
+- `/zors-owner audit-roles`
+- `/zors-owner audit-permissions`
+- `/zors-owner export-inventory`
+
+`/zors-owner` requires Discord Administrator permission for command visibility,
+so regular members do not see it. Zors Bot still verifies the configured owner
+ID at runtime; other Administrators can see the command but cannot execute its
+subcommands.
 
 Each command responds ephemerally with a JSON attachment. Inventory collects server structure, role metadata, aggregate role member counts, and permission overwrites. To calculate role counts, member data is fetched temporarily but member identities are not exported or persisted. It does not read message content or modify Discord.
 

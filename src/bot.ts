@@ -80,10 +80,7 @@ async function handleZorsCommand(
   onboarding: MemberOnboardingConfig,
   staffCommands: StaffCommandConfig,
 ): Promise<void> {
-  if (
-    interaction.commandName !== "zors" ||
-    !isAllowedCommandGuild(interaction.guildId, config)
-  ) {
+  if (!isAllowedCommandGuild(interaction.guildId, config)) {
     await interaction.reply({
       content: "Zors Bot commands are available only in approved Betrayed servers.",
       flags: MessageFlags.Ephemeral,
@@ -93,6 +90,55 @@ async function handleZorsCommand(
 
   const subcommand = interaction.options.getSubcommand();
   const inventorySection = inventorySections[subcommand];
+
+  if (interaction.commandName === "zors-owner") {
+    if (!inventorySection) {
+      await interaction.reply({
+        content: "Unknown owner command.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    if (
+      interaction.guildId === config.DISCORD_PRODUCTION_GUILD_ID &&
+      !config.ENABLE_PRODUCTION_INVENTORY
+    ) {
+      await interaction.reply({
+        content: "Production inventory commands are disabled.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    if (interaction.user.id !== config.DISCORD_OWNER_USER_ID) {
+      await interaction.reply({
+        content: "Only the configured server owner can run inventory commands.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    if (!interaction.guild) {
+      await interaction.reply({
+        content: "Inventory commands must be run inside an approved server.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const inventory = await getInventory(interaction.guild);
+    await interaction.editReply(
+      createInventoryResponse(inventory, inventorySection),
+    );
+    return;
+  }
+
+  if (interaction.commandName !== "zors") {
+    await interaction.reply({
+      content: "Unknown Zors Bot command.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
   if (
     subcommand === "move-channel" ||
@@ -112,41 +158,6 @@ async function handleZorsCommand(
         ? staffCommands.test
         : staffCommands.production;
     await executeVoiceModeration(interaction, binding);
-    return;
-  }
-
-  if (inventorySection) {
-    if (
-      interaction.guildId === config.DISCORD_PRODUCTION_GUILD_ID &&
-      !config.ENABLE_PRODUCTION_INVENTORY
-    ) {
-      await interaction.reply({
-        content: "Production inventory commands are disabled.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-    if (interaction.user.id !== config.DISCORD_OWNER_USER_ID) {
-      await interaction.reply({
-        content: "Only the configured server owner can run inventory commands.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "Inventory commands must be run inside an approved server.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const inventory = await getInventory(interaction.guild);
-    await interaction.editReply(
-      createInventoryResponse(inventory, inventorySection),
-    );
     return;
   }
 
@@ -183,8 +194,7 @@ async function handleZorsCommand(
     return;
   }
 
-  await interaction.reply({
-    content: [
+  const help = [
       "**Zors Bot commands**",
       "`/zors status` — Check whether the bot is online.",
       "`/zors help` — Show this command list.",
@@ -193,11 +203,17 @@ async function handleZorsCommand(
       "`/zors mute-*`, `unmute-*`, `deafen-*`, `undeafen-*` — Administrator/Officer voice moderation.",
       "`/zors disconnect-*` — Administrator/Officer voice disconnects.",
       "`/zors mute-soundboard-channel`, `unmute-soundboard-channel` — Channel soundboard controls.",
-      "`/zors audit-channels` — Owner-only read-only channel inventory.",
-      "`/zors audit-roles` — Owner-only read-only role inventory.",
-      "`/zors audit-permissions` — Owner-only permission review.",
-      "`/zors export-inventory` — Owner-only complete sanitized export.",
-    ].join("\n"),
+    ];
+  if (interaction.user.id === config.DISCORD_OWNER_USER_ID) {
+    help.push(
+      "`/zors-owner audit-channels` — Owner-only read-only channel inventory.",
+      "`/zors-owner audit-roles` — Owner-only read-only role inventory.",
+      "`/zors-owner audit-permissions` — Owner-only permission review.",
+      "`/zors-owner export-inventory` — Owner-only complete sanitized export.",
+    );
+  }
+  await interaction.reply({
+    content: help.join("\n"),
     flags: MessageFlags.Ephemeral,
   });
 }
