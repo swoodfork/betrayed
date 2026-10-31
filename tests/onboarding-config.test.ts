@@ -24,9 +24,13 @@ describe("member onboarding bindings", () => {
     expect(onboarding.test.pugVoiceChannelId).toBe(
       "1566006742502875217",
     );
+    expect(onboarding.test.discussionChannelId).toBe(
+      "1565783551973130283",
+    );
     expect(onboarding.production.welcomeChannelId).toBe(
       "1565926670559355040",
     );
     expect(onboarding.production.pugVoiceChannelId).toBeNull();
+    expect(onboarding.production.discussionChannelId).toBeNull();
   });
 });

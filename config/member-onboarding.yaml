@@ -4,8 +4,10 @@ test:
   guildId: "1565530049229234268"
   welcomeChannelId: "1565925042389516410"
   pugVoiceChannelId: "1566006742502875217"
+  discussionChannelId: "1565783551973130283"
 
 production:
   guildId: "705235406974615603"
   welcomeChannelId: "1565926670559355040"
   pugVoiceChannelId: null
+  discussionChannelId: null

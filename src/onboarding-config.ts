@@ -12,6 +12,7 @@ const guildOnboardingSchema = z.object({
   guildId: snowflake,
   welcomeChannelId: snowflake.nullable(),
   pugVoiceChannelId: snowflake.nullable(),
+  discussionChannelId: snowflake.nullable(),
 });
 
 const memberOnboardingSchema = z.object({

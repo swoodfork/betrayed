@@ -14,6 +14,7 @@ export function buildPublicWelcome(member: WelcomeMember): string {
 export interface WelcomeActionsAvailable {
   raidApplication: boolean;
   pugVoice: boolean;
+  communityDiscussion: boolean;
 }
 
 export function buildDirectWelcome(
@@ -21,6 +22,7 @@ export function buildDirectWelcome(
   actions: WelcomeActionsAvailable = {
     raidApplication: false,
     pugVoice: false,
+    communityDiscussion: false,
   },
 ): string {
   const message = [
@@ -42,6 +44,12 @@ export function buildDirectWelcome(
     message.push(
       "",
       "Joining us for a PUG? Join any Betrayed voice channel first, then use **Move Me to PUG Voice** below.",
+    );
+  }
+  if (actions.communityDiscussion) {
+    message.push(
+      "",
+      "Here to look around and meet the community? Use **Explore Forever Discussion** below to jump into the conversation.",
     );
   }
   message.push(

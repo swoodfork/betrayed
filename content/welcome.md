@@ -22,6 +22,8 @@ Interested in joining the Betrayed raid team? Use **Apply to the Raid Team** bel
 
 Joining us for a PUG? Join any Betrayed voice channel first, then use **Move Me to PUG Voice** below.
 
+Here to look around and meet the community? Use **Explore Forever Discussion** below to jump into the conversation.
+
 We're happy to have you here. Enjoy the server!
 
 — **Zors Bot**

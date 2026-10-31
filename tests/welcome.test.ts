@@ -26,14 +26,16 @@ describe("welcome messages", () => {
     expect(message).not.toMatch(/automated (welcome )?message/i);
   });
 
-  it("explains raid application and PUG voice buttons when available", () => {
+  it("explains all available welcome actions", () => {
     const message = buildDirectWelcome(member, {
       raidApplication: true,
       pugVoice: true,
+      communityDiscussion: true,
     });
 
     expect(message).toContain("Apply to the Raid Team");
     expect(message).toContain("Move Me to PUG Voice");
+    expect(message).toContain("Explore Forever Discussion");
     expect(message).not.toMatch(/NSFW|optional channel access/i);
   });
 });

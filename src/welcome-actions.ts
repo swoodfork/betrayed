@@ -26,6 +26,7 @@ export function buildWelcomeActionComponents(
   scope: OnboardingScope,
   applicationChannelId: string | null,
   pugVoiceChannelId: string | null,
+  discussionChannelId: string | null,
 ): ActionRowBuilder<ButtonBuilder>[] {
   const buttons: ButtonBuilder[] = [];
   if (applicationChannelId) {
@@ -44,6 +45,16 @@ export function buildWelcomeActionComponents(
         .setCustomId(pugCustomId(scope))
         .setLabel("Move Me to PUG Voice")
         .setStyle(ButtonStyle.Primary),
+    );
+  }
+  if (discussionChannelId) {
+    buttons.push(
+      new ButtonBuilder()
+        .setLabel("Explore Forever Discussion")
+        .setStyle(ButtonStyle.Link)
+        .setURL(
+          `https://discord.com/channels/${guildId}/${discussionChannelId}`,
+        ),
     );
   }
   return buttons.length > 0

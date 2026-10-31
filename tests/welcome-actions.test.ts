@@ -9,10 +9,11 @@ describe("welcome actions", () => {
       "test",
       "223456789012345678",
       "323456789012345678",
+      "423456789012345678",
     ).map((row) => row.toJSON());
     const buttons = rows.flatMap((row) => row.components);
 
-    expect(buttons).toHaveLength(2);
+    expect(buttons).toHaveLength(3);
     expect(buttons).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -23,6 +24,10 @@ describe("welcome actions", () => {
           label: "Move Me to PUG Voice",
           custom_id: "zors-welcome:pug:test",
         }),
+        expect.objectContaining({
+          label: "Explore Forever Discussion",
+          url: "https://discord.com/channels/123456789012345678/423456789012345678",
+        }),
       ]),
     );
   });
@@ -32,6 +37,7 @@ describe("welcome actions", () => {
       buildWelcomeActionComponents(
         "123456789012345678",
         "production",
+        null,
         null,
         null,
       ),

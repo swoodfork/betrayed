@@ -278,19 +278,27 @@ async function welcomeMember(
       ? raidApplications[scope].applicationChannelId
       : null;
     const pugVoiceChannelId = onboarding[scope].pugVoiceChannelId;
+    const discussionChannelId =
+      onboarding[scope].discussionChannelId;
     const components = buildWelcomeActionComponents(
       member.guild.id,
       scope,
       applicationChannelId,
       pugVoiceChannelId,
+      discussionChannelId,
     );
     await member.send({
       content: buildDirectWelcome(welcomeMember, {
         raidApplication: applicationChannelId !== null,
         pugVoice: pugVoiceChannelId !== null,
+        communityDiscussion: discussionChannelId !== null,
       }),
       components,
     });
+    const actionCount = components[0]?.components.length ?? 0;
+    console.info(
+      `Sent ${scope} welcome DM with ${actionCount} action button(s).`,
+    );
   } catch (error) {
     console.warn(
       `Could not DM the new member ${member.user.id}. Their DMs may be closed.`,
