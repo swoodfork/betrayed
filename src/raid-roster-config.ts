@@ -8,6 +8,18 @@ import type { BotConfig } from "./config.js";
 
 const snowflake = z.string().regex(/^\d{17,20}$/);
 
+const classEmojiIdsSchema = z.object({
+  druid: snowflake,
+  hunter: snowflake,
+  mage: snowflake,
+  paladin: snowflake,
+  priest: snowflake,
+  rogue: snowflake,
+  shaman: snowflake,
+  warlock: snowflake,
+  warrior: snowflake,
+});
+
 const guildRaidRosterSchema = z.object({
   guildId: snowflake,
   officerRoleId: snowflake,
@@ -18,6 +30,7 @@ const guildRaidRosterSchema = z.object({
   rosterForumId: snowflake.nullable(),
   signupRequestForumId: snowflake.nullable(),
   archiveForumId: snowflake.nullable(),
+  classEmojiIds: classEmojiIdsSchema,
 });
 
 const raidRosterConfigSchema = z.object({

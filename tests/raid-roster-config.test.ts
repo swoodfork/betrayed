@@ -23,12 +23,20 @@ describe("raid roster bindings", () => {
       controlForumId: "1566348442467565601",
       rosterForumId: "1566348447605329950",
       signupRequestForumId: "1566348454358286348",
+      classEmojiIds: expect.objectContaining({
+        druid: "1566549314002616481",
+        warrior: "1566549334751977605",
+      }),
     });
     expect(isRaidRosterBindingComplete(rosters.test)).toBe(true);
     expect(rosters.production).toMatchObject({
       controlForumId: "1566350121598197901",
       rosterForumId: "1566350125121405020",
       signupRequestForumId: "1566350129055670444",
+      classEmojiIds: expect.objectContaining({
+        druid: "1566549406646276176",
+        warrior: "1566549430407266415",
+      }),
     });
     expect(isRaidRosterBindingComplete(rosters.production)).toBe(true);
   });

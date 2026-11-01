@@ -210,6 +210,27 @@ describe("raid roster state", () => {
     );
   });
 
+  it("uses configured custom class emoji markers with Unicode fallback", () => {
+    const document = roster();
+    document.draftRevision?.assignments.push(
+      assignment(memberOne, { kind: "group", group: 1, slot: 1 }),
+    );
+
+    const custom = buildRosterEmbed(document, {
+      classMarkers: {
+        druid: "<:zors_druid:1566549314002616481>",
+      },
+    }).toJSON();
+    const fallback = buildRosterEmbed(document).toJSON();
+
+    expect(custom.fields?.find(({ name }) => name === "⚔️ Group 1")?.value).toContain(
+      "<:zors_druid:1566549314002616481>",
+    );
+    expect(
+      fallback.fields?.find(({ name }) => name === "⚔️ Group 1")?.value,
+    ).toContain("🟧");
+  });
+
   it("validates class/spec combinations and fixed 20-player groups", () => {
     expect(() =>
       validateClassSpecialization("druid", "restoration"),

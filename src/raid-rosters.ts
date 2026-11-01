@@ -302,8 +302,10 @@ function attendanceIndicator(status?: AttendanceStatus): string {
 function assignmentLine(
   assignment: RosterAssignment,
   attendanceStatus?: AttendanceStatus,
+  classMarkers?: Readonly<Record<string, string>>,
 ): string {
   const marker =
+    classMarkers?.[assignment.classKey] ??
     classColorMarkers[
       assignment.classKey as keyof typeof wowForeverClassSpecializations
     ] ?? "◆";
@@ -333,6 +335,7 @@ interface RosterEmbedOptions {
   signupRequests?: readonly RaidSignupRequest[];
   attendanceConfirmations?: RaidSignupSheet["attendanceConfirmations"];
   singleColumnPlacements?: boolean;
+  classMarkers?: Readonly<Record<string, string>>;
 }
 
 export function buildRosterEmbed(
@@ -394,7 +397,7 @@ export function buildRosterEmbed(
       name: `⚔️ Group ${group}`,
       value: Array.from({ length: 5 }, (_, index) => {
         const assignment = bySlot.get(index + 1);
-        return `**${index + 1}.** ${assignment ? assignmentLine(assignment, attendanceByMember.get(assignment.memberId)) : "—"}`;
+        return `**${index + 1}.** ${assignment ? assignmentLine(assignment, attendanceByMember.get(assignment.memberId), options.classMarkers) : "—"}`;
       }).join("\n"),
       inline: !options.singleColumnPlacements,
     });
@@ -422,7 +425,7 @@ export function buildRosterEmbed(
       value: Array.from({ length: 5 }, (_, index) => {
         const slot = benchGroup * 5 + index + 1;
         const assignment = benchBySlot.get(slot);
-        return `**${index + 1}.** ${assignment ? assignmentLine(assignment, attendanceByMember.get(assignment.memberId)) : "—"}`;
+        return `**${index + 1}.** ${assignment ? assignmentLine(assignment, attendanceByMember.get(assignment.memberId), options.classMarkers) : "—"}`;
       }).join("\n"),
       inline: !options.singleColumnPlacements,
     });
@@ -474,7 +477,9 @@ export function buildRosterEmbed(
           name:
             index === 0 ? "📦 Overflow" : "📦 Overflow (continued)",
           value: [
-            ...chunk.map((assignment) => assignmentLine(assignment)),
+            ...chunk.map((assignment) =>
+              assignmentLine(assignment, undefined, options.classMarkers),
+            ),
             ...(remaining > 0 ? [`*and ${remaining} more*`] : []),
           ].join("\n"),
         });
@@ -746,7 +751,23 @@ export class RaidRosterService {
   private rosterPresentationEmbed(roster: RaidRosterDocument): EmbedBuilder {
     return buildRosterEmbed(roster, {
       signupRequests: this.signupRequestsForRoster(roster.rosterId),
+      classMarkers: this.classMarkersForGuild(roster.guildId),
     });
+  }
+
+  private classMarkersForGuild(
+    guildId: string,
+  ): Readonly<Record<string, string>> {
+    const binding = interactionBinding(guildId, this.config, this.rosterConfig);
+    if (!binding) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(binding.classEmojiIds).map(([classKey, emojiId]) => [
+        classKey,
+        `<:zors_${classKey}:${emojiId}>`,
+      ]),
+    );
   }
 
   private signupRequestsForSheet(raidId: string): RaidSignupRequest[] {
@@ -813,6 +834,7 @@ export class RaidRosterService {
       signupRequests: this.signupRequestsForSheet(signup.raidId),
       attendanceConfirmations: signup.attendanceConfirmations,
       singleColumnPlacements: true,
+      classMarkers: this.classMarkersForGuild(roster.guildId),
     }).setTitle(`📋 ${roster.name} — Signup View`);
     return signup.status === "cleared" ? [summary] : [summary, rosterView];
   }
@@ -1160,6 +1182,15 @@ export class RaidRosterService {
   ): Promise<number> {
     if (!isRaidRosterBindingComplete(binding)) {
       return 0;
+    }
+    const emojis = await guild.emojis.fetch();
+    const missingEmojiIds = Object.values(binding.classEmojiIds).filter(
+      (emojiId) => !emojis.has(emojiId),
+    );
+    if (missingEmojiIds.length > 0) {
+      throw new Error(
+        `The configured Zors class emoji set is incomplete in ${guild.name}.`,
+      );
     }
     const [controlForum, rosterForum, requestForum, archiveForum] =
       await Promise.all([
@@ -2070,6 +2101,7 @@ export class RaidRosterService {
             }),
           buildRosterEmbed(roster, {
             signupRequests: this.signupRequestsForRoster(roster.rosterId),
+            classMarkers: this.classMarkersForGuild(roster.guildId),
           }).setTitle(`📋 ${roster.name} — Deleted Snapshot`),
         ],
         files: [
@@ -2230,6 +2262,7 @@ export class RaidRosterService {
           buildRosterEmbed(roster, {
             includeOverflow: false,
             includeSignupRequests: false,
+            classMarkers: this.classMarkersForGuild(roster.guildId),
           }),
         ],
         flags: MessageFlags.Ephemeral,
@@ -4869,6 +4902,7 @@ export class RaidRosterService {
           archiveSummary,
           buildRosterEmbed(publishedRoster, {
             signupRequests: requests,
+            classMarkers: this.classMarkersForGuild(roster.guildId),
           }).setTitle(`📋 ${roster.name} — Archived Snapshot`),
         ],
         files: [

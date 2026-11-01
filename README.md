@@ -128,6 +128,13 @@ role immediately; attendance buttons never control channel access. Zors then
 sends new and approved assignments automatically. Group-to-Bench moves and
 removals ask the executor whether to notify, defaulting to silent; Group moves,
 Bench-to-Group moves, swaps, and class/spec-only edits do not notify members.
+Every class uses a guild-local `zors_<class>` custom emoji generated from the
+same solid-square template. Test and Production keep separate immutable emoji
+IDs, which are validated at startup before roster/signup projections refresh.
+The validated source PNGs live in `content/class-icons`. The guarded
+`src/planning/upload-class-emojis.ts` utility requires an explicit Test or
+Production scope, source directory, output binding file, and approved guild ID;
+reruns reuse exact emoji names instead of creating duplicates.
 
 `/zors-roster show` is contextual and intentionally has no roster or role
 option. Every roster Forum thread is durably mapped to exactly one roster ID,

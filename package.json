@@ -23,6 +23,7 @@
     "apply:test": "tsx src/planning/apply-test.ts",
     "cleanup:hash": "tsx src/planning/cleanup-hash.ts",
     "cleanup:test": "tsx src/planning/cleanup-test.ts",
+    "upload:class-emojis": "tsx src/planning/upload-class-emojis.ts",
     "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
