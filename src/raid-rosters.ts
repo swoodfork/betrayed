@@ -580,7 +580,19 @@ export function buildAttendanceFollowupControls(
         .setStyle(ButtonStyle.Danger),
     );
   }
+
   return row;
+}
+
+export function attendanceAssignmentCopy(
+  placement: "group" | "bench",
+  teamName: string,
+): { title: string; description: string } {
+  const spot = placement === "group" ? "raid" : "bench";
+  return {
+    title: `You have a finalized ${spot} spot on ${teamName}.`,
+    description: `You have a finalized ${spot} spot on this team.`,
+  };
 }
 
 function interactionBinding(
@@ -3328,23 +3340,33 @@ export class RaidRosterService {
           !responded.has(memberId) &&
           !notified.has(memberId),
       ) ?? [];
+    if (assignments.length === 0) {
+      return;
+    }
+    const teamRole = await guild.roles.fetch(roster.teamRoleId);
+    if (!teamRole) {
+      throw new Error("The roster's bound team role is unavailable.");
+    }
     const start = Math.floor(new Date(signup.startAt).getTime() / 1_000);
     const end = Math.floor(new Date(signup.endAt).getTime() / 1_000);
     const signupUrl = `https://discord.com/channels/${guild.id}/${signup.channelId}/${signup.messageId}`;
     const sentMemberIds: string[] = [];
     for (const assignment of assignments) {
+      if (assignment.placement.kind === "overflow") {
+        throw new Error("Overflow assignments cannot receive attendance DMs.");
+      }
       try {
         const user = await guild.client.users.fetch(assignment.memberId);
+        const copy = attendanceAssignmentCopy(
+          assignment.placement.kind,
+          teamRole.name,
+        );
         await user.send({
           embeds: [
             new EmbedBuilder()
-              .setTitle(`Raid Attendance — ${signup.name}`)
+              .setTitle(copy.title)
               .setColor(0x2ecc71)
-              .setDescription(
-                assignment.placement.kind === "group"
-                  ? "You have a finalized Raid spot in this raid."
-                  : "You have a finalized Bench spot in this raid.",
-              )
+              .setDescription(copy.description)
               .addFields(
                 { name: "Full Signup Name", value: signup.name },
                 {
@@ -3356,8 +3378,8 @@ export class RaidRosterService {
                   value: `${describePlacement(assignment.placement)} — ${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}`,
                 },
                 {
-                  name: "Team Role",
-                  value: `<@&${roster.teamRoleId}>`,
+                  name: "Team",
+                  value: teamRole.name,
                 },
                 {
                   name: "Signup Sheet",

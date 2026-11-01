@@ -455,6 +455,9 @@ Attendance DM controls are single-use. A confirmed response removes all
 buttons. Tentative and Not Attending responses replace the original controls
 with only their valid follow-up choices; choosing a final follow-up removes the
 remaining buttons and durably locks the response against replay.
+The DM title states whether the member has a finalized raid or bench spot on
+the named team. Team names render as plain text because guild role mentions do
+not resolve in private DMs.
 
 Finalized assignment-change DMs offer **Dispute this with Raid Coordinators**
 when a member is removed from the roster or moved from a Group to Bench. The

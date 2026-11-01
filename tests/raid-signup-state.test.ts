@@ -10,6 +10,7 @@ import {
   shiftSignupSevenDays,
 } from "../src/raid-signup-state.js";
 import {
+  attendanceAssignmentCopy,
   buildAttendanceFollowupControls,
   buildSignupSheetControls,
 } from "../src/raid-rosters.js";
@@ -114,6 +115,17 @@ describe("raid signup sheet state", () => {
 
     expect(declined).toEqual(["I can make it now"]);
     expect(tentative).toEqual(["I can make it", "I can not make it"]);
+  });
+
+  it("uses placement-specific team text in attendance DMs", () => {
+    expect(attendanceAssignmentCopy("group", "Zors 40 Team")).toEqual({
+      title: "You have a finalized raid spot on Zors 40 Team.",
+      description: "You have a finalized raid spot on this team.",
+    });
+    expect(attendanceAssignmentCopy("bench", "Zors 40 Team")).toEqual({
+      title: "You have a finalized bench spot on Zors 40 Team.",
+      description: "You have a finalized bench spot on this team.",
+    });
   });
 
   it("allows only valid single-use attendance transitions", () => {
