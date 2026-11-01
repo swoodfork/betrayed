@@ -1,0 +1,72 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
+import { parse } from "yaml";
+import { z } from "zod";
+
+import type { BotConfig } from "./config.js";
+
+const snowflake = z.string().regex(/^\d{17,20}$/);
+
+const guildRaidRosterSchema = z.object({
+  guildId: snowflake,
+  officerRoleId: snowflake,
+  raidCoordinatorRoleId: snowflake,
+  coordinatorChannelId: snowflake,
+  controlForumId: snowflake.nullable(),
+  rosterForumId: snowflake.nullable(),
+  signupRequestForumId: snowflake.nullable(),
+});
+
+const raidRosterConfigSchema = z.object({
+  version: z.literal(1),
+  test: guildRaidRosterSchema,
+  production: guildRaidRosterSchema,
+});
+
+export type RaidRosterConfig = z.infer<typeof raidRosterConfigSchema>;
+export type RaidRosterBinding = RaidRosterConfig["test"];
+
+export function isRaidRosterBindingComplete(
+  binding: RaidRosterBinding,
+): binding is RaidRosterBinding & {
+  controlForumId: string;
+  rosterForumId: string;
+  signupRequestForumId: string;
+} {
+  return Boolean(
+    binding.controlForumId &&
+      binding.rosterForumId &&
+      binding.signupRequestForumId,
+  );
+}
+
+export async function loadRaidRosterConfig(
+  config: BotConfig,
+): Promise<RaidRosterConfig> {
+  const file = await readFile(
+    path.resolve(process.cwd(), "config/raid-rosters.yaml"),
+    "utf8",
+  );
+  const rosterConfig = raidRosterConfigSchema.parse(parse(file));
+  if (
+    rosterConfig.test.guildId !== config.DISCORD_TEST_GUILD_ID ||
+    rosterConfig.production.guildId !== config.DISCORD_PRODUCTION_GUILD_ID
+  ) {
+    throw new Error("Raid roster guild bindings do not match the bot environment.");
+  }
+  for (const [scope, binding] of [
+    ["test", rosterConfig.test],
+    ["production", rosterConfig.production],
+  ] as const) {
+    const forumIds = [
+      binding.controlForumId,
+      binding.rosterForumId,
+      binding.signupRequestForumId,
+    ];
+    if (forumIds.some(Boolean) && !forumIds.every(Boolean)) {
+      throw new Error(`${scope} raid roster Forum bindings are incomplete.`);
+    }
+  }
+  return rosterConfig;
+}

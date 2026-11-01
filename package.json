@@ -18,6 +18,7 @@
     "apply:production": "tsx src/planning/apply-production.ts",
     "retire:production": "tsx src/planning/apply-production-retirement.ts",
     "snapshot:test": "tsx src/planning/snapshot-test.ts",
+    "snapshot:production": "tsx src/planning/snapshot-production.ts",
     "plan:hash": "tsx src/planning/plan-hash.ts",
     "apply:test": "tsx src/planning/apply-test.ts",
     "cleanup:hash": "tsx src/planning/cleanup-hash.ts",

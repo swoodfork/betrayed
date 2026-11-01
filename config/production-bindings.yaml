@@ -6,9 +6,9 @@ guild:
   name: Betrayed
 
 inventory:
-  file: COMMAND_LOG_PRODUCTION_FINAL.json
-  generatedAt: "2026-11-01T04:01:44.009Z"
-  sha256: "08a64b38739661e11b3f425fc3ca2b57ac7bb4d9c0b8778421a8ab2b5d4cad9f"
+  file: RAID_PHASE1_PRODUCTION_INVENTORY.json
+  generatedAt: "2026-11-01T07:16:53.777Z"
+  sha256: "945367983874b8909a7d8d5292dd0e803e696c4c96e38db502b193033f6dadd5"
 
 roleBindings:
   guild-master: "705314740330561587"
@@ -84,8 +84,11 @@ channelBindings:
   raid-application: "1566017296311525416"
   internal-affairs: "706535819028201512"
   zors-command-log: "1566301153258512414"
+  zors-raid-control: "1566350121598197901"
   officer-voice: "842327436749176832"
   coordinator-chat: "1182447751942918194"
+  raid-rosters: "1566350125121405020"
+  signup-requests: "1566350129055670444"
   raid-applicants: "1566017297007509618"
   coordinator-voice: "1565838673050734713"
   council-chat: "705238667492458507"

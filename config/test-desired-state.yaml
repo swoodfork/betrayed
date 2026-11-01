@@ -262,6 +262,45 @@ permissionProfiles:
       - roleKey: zors-bot
         allow: [ViewChannel, SendMessages, SendMessagesInThreads, EmbedLinks, ReadMessageHistory]
         deny: []
+  - key: raid-control-readonly
+    description: Officers can read; only the owner, Administrators, and Zors Bot can mutate raid control posts.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, CreatePublicThreads, EmbedLinks, ReadMessageHistory, UseApplicationCommands]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, CreatePublicThreads, EmbedLinks, ReadMessageHistory, UseApplicationCommands]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, ReadMessageHistory, UseApplicationCommands]
+        deny: [AddReactions, SendMessages, SendMessagesInThreads, CreatePublicThreads, CreatePrivateThreads, ManageMessages, ManageThreads]
+      - roleKey: zors-bot
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, CreatePublicThreads, EmbedLinks, ReadMessageHistory, ManageMessages, ManageThreads, UseApplicationCommands]
+        deny: []
+  - key: raid-management-readonly
+    description: Staff can read and use Zors controls; only the owner, Administrators, and Zors Bot can mutate posts.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, CreatePublicThreads, EmbedLinks, ReadMessageHistory, UseApplicationCommands]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, CreatePublicThreads, EmbedLinks, ReadMessageHistory, UseApplicationCommands]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, ReadMessageHistory, UseApplicationCommands]
+        deny: [AddReactions, SendMessages, SendMessagesInThreads, CreatePublicThreads, CreatePrivateThreads, ManageMessages, ManageThreads]
+      - roleKey: raid-coordinator
+        allow: [ViewChannel, ReadMessageHistory, UseApplicationCommands]
+        deny: [AddReactions, SendMessages, SendMessagesInThreads, CreatePublicThreads, CreatePrivateThreads, ManageMessages, ManageThreads]
+      - roleKey: zors-bot
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, CreatePublicThreads, EmbedLinks, ReadMessageHistory, ManageMessages, ManageThreads, UseApplicationCommands]
+        deny: []
   - key: council-private
     description: Only staff and Council members can view and participate.
     overwrites:
@@ -576,6 +615,13 @@ categories:
         permissionProfile: staff-private
         preserveHistory: true
         positionAfter: internal-affairs
+      - key: zors-raid-control
+        name: "🗄️zors-raid-control"
+        aliases: [zors-raid-control]
+        type: forum
+        permissionProfile: raid-control-readonly
+        preserveHistory: true
+        positionAfter: zors-command-log
       - key: officer-voice
         name: "🔊 Officer Chat"
         aliases:
@@ -598,13 +644,27 @@ categories:
         type: text
         permissionProfile: raid-coordinator-private
         preserveHistory: false
+      - key: raid-rosters
+        name: "📋raid-rosters"
+        aliases: [raid-rosters]
+        type: forum
+        permissionProfile: raid-management-readonly
+        preserveHistory: true
+        positionAfter: coordinator-chat
+      - key: signup-requests
+        name: "📨signup-requests"
+        aliases: [signup-requests]
+        type: forum
+        permissionProfile: raid-management-readonly
+        preserveHistory: true
+        positionAfter: raid-rosters
       - key: raid-applicants
         name: "📨raid-applicants"
         aliases: ["Raid Applicants", "raid-applicants"]
         type: forum
         permissionProfile: raid-applicants-private
         preserveHistory: true
-        positionAfter: coordinator-chat
+        positionAfter: signup-requests
       - key: coordinator-voice
         name: "🔊 Coordinator Chat"
         aliases:

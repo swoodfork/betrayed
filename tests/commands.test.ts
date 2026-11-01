@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   zorsCommand,
   zorsOwnerCommand,
+  zorsRosterCommand,
 } from "../src/commands.js";
 
 describe("Zors Bot command registration", () => {
@@ -108,5 +109,41 @@ describe("Zors Bot command registration", () => {
       "audit-permissions",
       "export-inventory",
     ]);
+  });
+
+  it("registers roster management separately without changing /zors", () => {
+    const rosterCommand = zorsRosterCommand.toJSON();
+    const create = rosterCommand.options?.find(
+      (option) =>
+        option.type === ApplicationCommandOptionType.Subcommand &&
+        option.name === "create",
+    );
+
+    expect(rosterCommand.name).toBe("zors-roster");
+    expect(rosterCommand.options?.map((option) => option.name)).toEqual([
+      "create",
+      "show",
+      "finalize",
+      "revert",
+      "bump",
+      "archive",
+      "help",
+    ]);
+    expect(create?.options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "team-role",
+          type: ApplicationCommandOptionType.Role,
+        }),
+        expect.objectContaining({
+          name: "team-channel",
+          channel_types: [
+            ChannelType.GuildText,
+            ChannelType.GuildAnnouncement,
+          ],
+        }),
+      ]),
+    );
+    expect(zorsCommand.toJSON().name).toBe("zors");
   });
 });

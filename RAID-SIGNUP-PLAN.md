@@ -76,14 +76,15 @@ pass.
 Use a command group rather than adding many unrelated top-level commands:
 
 ```text
-/zors roster create
-/zors roster edit
-/zors roster show
-/zors roster bump
-/zors roster archive
+/zors-roster create
+/zors-roster show
+/zors-roster finalize
+/zors-roster revert
+/zors-roster bump
+/zors-roster archive
 ```
 
-`/zors roster create` starts an ephemeral builder:
+`/zors-roster create` starts an ephemeral builder:
 
 1. Verify that the command is running inside the configured
    `📋raid-rosters` Forum control post or a roster post.
@@ -162,7 +163,7 @@ Each roster post maintains two versions:
 
 An initial roster starts as Draft. A dated signup may be attached to it, but the
 signup remains **Awaiting roster finalization** and sends no DMs until a Raid
-Coordinator runs `/zors roster finalize` or presses **Finalize** in that roster
+Coordinator runs `/zors-roster finalize` or presses **Finalize** in that roster
 post.
 
 Initial finalization:
@@ -220,7 +221,7 @@ Placement changes affect attendance automation as follows:
 - Removing a member stops future reminders but preserves their historical raid
   record.
 
-`/zors roster revert` or **Revert Draft** discards the entire working revision
+`/zors-roster revert` or **Revert Draft** discards the entire working revision
 and restores the last finalized snapshot without sending change or attendance
 DMs. A roster with no previous finalized snapshot cannot revert; it can only be
 edited, finalized, or archived.
@@ -312,7 +313,7 @@ Each saved 20-player or 40-player roster has one post in the private
 between Forum posts to view and operate different raid teams. Recommended
 Forum tags are `20-player`, `40-player`, `Active`, and `Archived`.
 
-`/zors roster bump` or the post's **Bump** button should:
+`/zors-roster bump` or the post's **Bump** button should:
 
 1. Re-render the roster's starter display from canonical state.
 2. Add a compact bot-authored bump reply so the same Forum post returns to the
@@ -329,21 +330,21 @@ editing, bumping, or archiving the coordinator presentation cannot destroy it.
 Use a second command group:
 
 ```text
-/zors raid create
-/zors raid show
-/zors raid refresh
-/zors raid publish
-/zors raid bump
-/zors raid resend
-/zors raid cancel
-/zors raid close
+/zors-raid create
+/zors-raid show
+/zors-raid refresh
+/zors-raid publish
+/zors-raid bump
+/zors-raid resend
+/zors-raid cancel
+/zors-raid close
 ```
 
-`/zors raid create` is limited to Raid Coordinator, Officer, Administrator, and
+`/zors-raid create` is limited to Raid Coordinator, Officer, Administrator, and
 the configured server owner. It starts an ephemeral wizard:
 
 1. Select a saved roster. If none exists, stop and direct the coordinator to
-   `/zors roster create`.
+   `/zors-roster create`.
 2. Enter the raid name.
 3. Enter the calendar date as `YYYY-MM-DD`.
 4. Select the start hour.
@@ -435,7 +436,7 @@ assigned group or Bench. Rejected applicants disappear from Pending Approval.
 The durable request history remains in its read-only `📨signup-requests` post
 and the canonical Officer-only control record.
 
-An authorized coordinator or Officer can run `/zors raid publish` in another
+An authorized coordinator or Officer can run `/zors-raid publish` in another
 channel to manifest a synchronized copy:
 
 1. Zors shows a paginated ephemeral list of active signups.
@@ -448,7 +449,7 @@ mirrors. Anyone who can see a particular projection can use its **Request to
 Join This Raid** button. All projections use the same signup and roster IDs;
 they are not separate signups.
 
-`/zors raid bump` shows the paginated active-signup list. After the executor
+`/zors-raid bump` shows the paginated active-signup list. After the executor
 selects a signup, Zors bumps **every currently bound projection** in its own
 existing channel. It never moves all copies into the command channel and never
 removes a copy merely because another copy was bumped.
@@ -885,11 +886,11 @@ and delivery history.
 
 ## Failure Handling
 
-- If the signup message was deleted, `/zors raid refresh` creates a replacement
+- If the signup message was deleted, `/zors-raid refresh` creates a replacement
   and updates the canonical binding.
 - If one mirrored signup projection was deleted, remove only that projection's
   stale binding; the underlying signup and other projections remain active.
-- If the roster presentation was deleted, `/zors roster bump` recreates it.
+- If the roster presentation was deleted, `/zors-roster bump` recreates it.
 - If a roster command or control is used outside `📋raid-rosters` or one of its
   child posts, reject it before showing any builder.
 - If a selected team role name does not contain the roster's `20` or `40`
@@ -1011,7 +1012,7 @@ only behind an explicit Test-guild configuration.
 
 - Add immutable `🗄️zors-raid-control`, `📨signup-requests`, and
   `📋raid-rosters` Forum bindings in their specified category order.
-- Add `/zors roster` command group.
+- Add the separate `/zors-roster` command.
 - Restrict every roster builder and control to `📋raid-rosters` and its posts.
 - Add fixed 20-player and 40-player formats.
 - Add ten Bench slots and unnumbered non-alerting Overflow.
@@ -1035,11 +1036,11 @@ only behind an explicit Test-guild configuration.
 
 ### Phase 3: Raid creation and live sheet
 
-- Add `/zors raid create`.
+- Add `/zors-raid create`.
 - Require one saved roster.
 - Validate date and hourly time selections.
 - Create the raid control post and primary sheet in the roster's team channel.
-- Add `/zors raid publish` with a paginated active-signup selector.
+- Add `/zors-raid publish` with a paginated active-signup selector.
 - Support synchronized public recruiting mirrors.
 - Add roster and signup projection bump controls.
 - Immediately DM grouped and Bench members when the attached roster is already

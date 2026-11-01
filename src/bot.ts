@@ -32,6 +32,11 @@ import {
   handleRaidApplicationInteraction,
 } from "./raid-applications.js";
 import {
+  isRaidRosterBindingComplete,
+  loadRaidRosterConfig,
+} from "./raid-roster-config.js";
+import { RaidRosterService } from "./raid-rosters.js";
+import {
   loadStaffCommandConfig,
   type StaffCommandConfig,
 } from "./staff-command-config.js";
@@ -211,17 +216,22 @@ async function handleAuditedZorsCommand(
   getInventory: (guild: Guild) => Promise<GuildInventory>,
   onboarding: MemberOnboardingConfig,
   staffCommands: StaffCommandConfig,
+  raidRosters: RaidRosterService,
 ): Promise<void> {
   let commandError: unknown;
   try {
-    await handleZorsCommand(
-      interaction,
-      config,
-      client,
-      getInventory,
-      onboarding,
-      staffCommands,
-    );
+    if (interaction.commandName === "zors-roster") {
+      await raidRosters.handleCommand(interaction);
+    } else {
+      await handleZorsCommand(
+        interaction,
+        config,
+        client,
+        getInventory,
+        onboarding,
+        staffCommands,
+      );
+    }
   } catch (error) {
     commandError = error;
     throw error;
@@ -369,6 +379,10 @@ export function createBot(config: BotConfig): Client {
   const onboarding = loadMemberOnboardingConfig(config);
   const staffCommands = loadStaffCommandConfig(config);
   const raidApplications = loadRaidApplicationConfig(config);
+  const raidRosterConfig = loadRaidRosterConfig(config);
+  const raidRosters = raidRosterConfig.then(
+    (rosterConfig) => new RaidRosterService(config, rosterConfig),
+  );
   const publicWelcome = createPublicWelcomePicker();
 
   const getInventory = (guild: Guild): Promise<GuildInventory> => {
@@ -401,10 +415,18 @@ export function createBot(config: BotConfig): Client {
     }
 
     try {
-      const [onboardingConfig, , raidApplicationConfig] = await Promise.all([
+      const [
+        onboardingConfig,
+        ,
+        raidApplicationConfig,
+        rosterConfig,
+        rosterService,
+      ] = await Promise.all([
         onboarding,
         staffCommands,
         raidApplications,
+        raidRosterConfig,
+        raidRosters,
       ]);
       await readyClient.guilds.fetch(config.DISCORD_TEST_GUILD_ID);
       await registerGuildCommands(config, config.DISCORD_TEST_GUILD_ID);
@@ -456,6 +478,30 @@ export function createBot(config: BotConfig): Client {
             "Production guild is unavailable for raid applications.",
           );
         }
+        if (isRaidRosterBindingComplete(rosterConfig.test)) {
+          const testRosters = await rosterService.configureGuild(
+            testGuild,
+            rosterConfig.test,
+          );
+          console.info(
+            `Reconstructed ${testRosters} Betrayed Test raid roster(s) from Discord.`,
+          );
+        }
+        if (isRaidRosterBindingComplete(rosterConfig.production)) {
+          const productionGuild = readyClient.guilds.cache.get(
+            config.DISCORD_PRODUCTION_GUILD_ID,
+          );
+          if (!productionGuild) {
+            throw new Error("Production guild is unavailable for raid rosters.");
+          }
+          const productionRosters = await rosterService.configureGuild(
+            productionGuild,
+            rosterConfig.production,
+          );
+          console.info(
+            `Reconstructed ${productionRosters} production raid roster(s) from Discord.`,
+          );
+        }
         const productionApplications = await configureRaidApplicationGuild(
           productionGuild,
           raidApplicationConfig.production,
@@ -485,11 +531,16 @@ export function createBot(config: BotConfig): Client {
         onboardingConfig,
         staffCommandConfig,
         raidApplicationConfig,
+        rosterService,
       ] = await Promise.all([
         onboarding,
         staffCommands,
         raidApplications,
+        raidRosters,
       ]);
+      if (await rosterService.handleInteraction(interaction)) {
+        return;
+      }
       if (
         await handleRaidApplicationInteraction(
           interaction,
@@ -528,6 +579,7 @@ export function createBot(config: BotConfig): Client {
         getInventory,
         onboardingConfig,
         staffCommandConfig,
+        rosterService,
       );
     } catch (error) {
       console.error("Failed to process a Zors Bot interaction.", error);

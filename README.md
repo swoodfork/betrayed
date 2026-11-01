@@ -10,6 +10,7 @@ Zors Bot is being developed test-guild-first. The current milestone provides:
 - An interactive welcome DM with raid application and PUG Voice actions
 - Administrator/Officer voice move commands with source-channel join behavior
 - Database-free Discord-native raid applications (disabled until channels are approved and bound)
+- Durable Discord-native 20/40-player raid rosters with Draft/Finalize/Revert
 - Guarded desired-state planning and explicitly approved production reconstruction
 
 Production inventory commands remain disabled unless
@@ -93,10 +94,27 @@ while allowing Guild Master, Discord Admin, Officer, and Zors Bot to publish.
 The Test guild has Community enabled so it can mirror the announcement channel;
 `📌server-rules` is its rules channel and `👋welcome` receives Community updates.
 
-Every `/zors` and `/zors-owner` invocation is audited to the private
+Every `/zors`, `/zors-owner`, and `/zors-roster` invocation is audited to the private
 `📜zors-command-log` channel in the Officer category. Audit entries include the
 executor, source channel, supplied option values, response or error, and a
 successful, partially successful, or failed outcome.
+
+`/zors-roster` is a separate audited command surface for roster management.
+The permanent Roster Control post and all roster posts live in
+`📋raid-rosters`. Builders use Discord member, class, specialization, group,
+slot, Bench, and Overflow selectors. Every saved revision is stored as a
+versioned JSON attachment in the Officer-visible `🗄️zors-raid-control` Forum,
+then reconstructed at startup; no Render filesystem or database is required.
+Officers and Raid Coordinators can use Zors controls but cannot manually create,
+reply to, react to, edit, delete, or manage roster/request Forum posts.
+
+Roster controls support Add Member, Move Member, Swap Members, Change Spec,
+Remove Member, Finalize, Revert Draft, Bump, and Archive. Both formats reserve
+ten numbered Bench positions and an unnumbered Overflow list. Finalization
+validates the team role, team channel, members, placements, and class/spec
+combinations, then sends change DMs only to affected members. Acknowledgements
+and reported issues are persisted; issues are forwarded to
+`🔐coordinator-affairs` without rolling back the finalized roster.
 
 `💤 sleep` is the only voice channel in the final `🌙 AFK/Inactive 🌙` category and is
 intended for Discord's inactive-member destination. Select it manually under
@@ -278,6 +296,17 @@ Test cleanup is a separate command. A cleanup target must be ID/name-bound and p
 
 `config/production-bindings.yaml` binds the approved desired state to one
 production guild, one hashed inventory, and immutable existing resource IDs.
+
+Create a fresh sanitized inventory only after explicitly repeating the
+Production guild ID. This read-only snapshot includes aggregate role-member
+counts but never member identities:
+
+```powershell
+$env:ZORS_ENV_FILE = "C:\env\.env"
+npx tsx src/planning/snapshot-production.ts `
+  --output temp\BETRAYED_PRODUCTION_INVENTORY.json `
+  --approve-production-guild-id YOUR_PRODUCTION_GUILD_ID
+```
 
 Generate and hash a non-deleting production reconstruction plan:
 

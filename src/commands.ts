@@ -219,6 +219,75 @@ export const zorsOwnerCommand = new SlashCommandBuilder()
       .setDescription("Export the complete sanitized server inventory"),
   );
 
+export const zorsRosterCommand = new SlashCommandBuilder()
+  .setName("zors-roster")
+  .setDescription("Build and manage durable raid rosters")
+  .addSubcommand((command) =>
+    command
+      .setName("create")
+      .setDescription("Create a roster from the permanent Roster Control post")
+      .addStringOption((option) =>
+        option
+          .setName("name")
+          .setDescription("Roster name shown in the Forum")
+          .setMinLength(1)
+          .setMaxLength(100)
+          .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("size")
+          .setDescription("Fixed roster format")
+          .addChoices(
+            { name: "20-player — four groups", value: "20" },
+            { name: "40-player — eight groups", value: "40" },
+          )
+          .setRequired(true),
+      )
+      .addRoleOption((option) =>
+        option
+          .setName("team-role")
+          .setDescription("Role assigned to this raid team")
+          .setRequired(true),
+      )
+      .addChannelOption((option) =>
+        option
+          .setName("team-channel")
+          .setDescription("Primary role-private signup channel")
+          .addChannelTypes(
+            ChannelType.GuildText,
+            ChannelType.GuildAnnouncement,
+          )
+          .setRequired(true),
+      ),
+  )
+  .addSubcommand((command) =>
+    command.setName("show").setDescription("Show this roster's current state"),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("finalize")
+      .setDescription("Publish this roster's working Draft"),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("revert")
+      .setDescription("Discard the Draft and restore the finalized snapshot"),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("bump")
+      .setDescription("Refresh this roster in its current Forum"),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("archive")
+      .setDescription("Archive a roster with no outstanding Draft"),
+  )
+  .addSubcommand((command) =>
+    command.setName("help").setDescription("Explain Zors roster controls"),
+  );
+
 export async function registerGuildCommands(
   config: BotConfig,
   guildId: string,
@@ -227,6 +296,7 @@ export async function registerGuildCommands(
   const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
     zorsCommand.toJSON(),
     zorsOwnerCommand.toJSON(),
+    zorsRosterCommand.toJSON(),
   ];
 
   await rest.put(

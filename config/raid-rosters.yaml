@@ -1,0 +1,19 @@
+version: 1
+
+test:
+  guildId: "1565530049229234268"
+  officerRoleId: "1565788368997187645"
+  raidCoordinatorRoleId: "1565792630640738394"
+  coordinatorChannelId: "1565822706639966281"
+  controlForumId: "1566348442467565601"
+  rosterForumId: "1566348447605329950"
+  signupRequestForumId: "1566348454358286348"
+
+production:
+  guildId: "705235406974615603"
+  officerRoleId: "705314605378830367"
+  raidCoordinatorRoleId: "1030904868451389551"
+  coordinatorChannelId: "1182447751942918194"
+  controlForumId: "1566350121598197901"
+  rosterForumId: "1566350125121405020"
+  signupRequestForumId: "1566350129055670444"
