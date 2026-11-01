@@ -141,7 +141,7 @@ attendance is handled by cycle-specific Zors DMs. Each DM includes the full
 signup name, Discord-localized raid date and time, roster spot, and a direct
 signup-sheet link. **I will be at raid** records a durable confirmation;
 **Tentative** and **I cannot attend** require an explanation and forward the
-response to `🔐coordinator-affairs`. Overflow members may request a spot,
+response to `📨raider-responses`. Overflow members may request a spot,
 including with a different spec.
 
 Rescind never silently removes a Group or Bench assignment. If the member
@@ -194,7 +194,10 @@ field because guild role mentions cannot resolve inside a private DM.
 When Finalize removes a member from the roster or moves a member from a Group
 to Bench, the assignment-change DM includes **Dispute this with Raid
 Coordinators**. The single-use modal forwards the member's message, previous
-and new placement, roster revision, and roster link to Coordinator Affairs.
+and new placement, roster revision, and roster link to Raider Responses.
+Automated attendance responses, withdrawal explanations, assignment issues,
+and roster disputes are delivered to the protected, bot-managed
+`📨raider-responses` channel instead of `🔐coordinator-affairs`.
 Declined members retain an **I can make it now** follow-up action. Tentative
 members retain **I can make it** and **I can not make it** actions; either change
 updates the signup indicator and alerts the officer core. Finalizing a changed

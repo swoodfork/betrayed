@@ -6,9 +6,9 @@ guild:
   name: Betrayed
 
 inventory:
-  file: ROSTER_ARCHIVE_FINAL_PRODUCTION_INVENTORY.json
-  generatedAt: "2026-11-01T09:09:37.891Z"
-  sha256: "b0db74da255c1700ba116ce832f1d2a8e9b00e8821b8e0c2823828e59b3713a1"
+  file: RAIDER_RESPONSES_PRODUCTION_FINAL.json
+  generatedAt: "2026-11-01T11:45:40.153Z"
+  sha256: "df00e1f854090e10792574b35e191a72adc566ccf06b143f24f3db2780e19e75"
 
 roleBindings:
   guild-master: "705314740330561587"
@@ -88,8 +88,9 @@ channelBindings:
   officer-voice: "842327436749176832"
   coordinator-chat: "1182447751942918194"
   raid-rosters: "1566350125121405020"
-  signup-requests: "1566350129055670444"
   roster-archives: "1566377479591952405"
+  raider-responses: "1566417906831593534"
+  signup-requests: "1566350129055670444"
   raid-applicants: "1566017297007509618"
   coordinator-voice: "1565838673050734713"
   council-chat: "705238667492458507"

@@ -13,6 +13,7 @@ const guildRaidRosterSchema = z.object({
   officerRoleId: snowflake,
   raidCoordinatorRoleId: snowflake,
   coordinatorChannelId: snowflake,
+  responseChannelId: snowflake,
   controlForumId: snowflake.nullable(),
   rosterForumId: snowflake.nullable(),
   signupRequestForumId: snowflake.nullable(),

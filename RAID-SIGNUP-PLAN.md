@@ -226,7 +226,7 @@ The DM contains:
 
 **Acknowledge with issues** opens a modal for the member to describe the issue.
 Zors records the acknowledgement and posts the issue to
-`🔐coordinator-affairs` with links to the roster and affected signup. A dispute
+`📨raider-responses` with links to the roster and affected signup. A dispute
 does not reject or roll back the finalized roster; coordinators resolve it
 through a later Draft revision.
 
@@ -291,7 +291,7 @@ the attached roster post's separate **Signup Requests** section. This section
 lists pending applicants with their submitted class/spec and is distinct from
 Overflow, which remains an approved roster placement. Coordinators see the new
 post directly in `📨signup-requests`, so Zors does not send a duplicate alert
-to `🔐coordinator-affairs`. Accept and reject decisions DM the applicant.
+to `📨raider-responses`. Accept and reject decisions DM the applicant.
 
 To stage an approval, the coordinator presses **Move Member** in the roster
 post and selects an entry marked **Signup Request**. Zors reuses the stored
@@ -462,7 +462,7 @@ not resolve in private DMs.
 Finalized assignment-change DMs offer **Dispute this with Raid Coordinators**
 when a member is removed from the roster or moved from a Group to Bench. The
 single-use modal forwards the member's explanation and the Before/After roster
-context to Coordinator Affairs without rolling back the finalized roster.
+context to Raider Responses without rolling back the finalized roster.
 
 The **Pending Approval** section is rendered on the primary sheet and every
 mirror so members and staff can see that a request is waiting without opening
@@ -603,6 +603,8 @@ Create three private Forum channels with increasingly separated purposes:
   🔐coordinator-affairs
   📋raid-rosters
   🗃️roster-archives
+  📨raider-responses
+  🗃️roster-archives
   📨signup-requests
 ```
 
@@ -613,7 +615,10 @@ Officers receive read-only access; only the owner and Zors Bot are intentionally
 allowed to create, edit, reply, react, delete, or manage its posts. Raid
 Coordinators cannot view this lower-level storage Forum.
 
-`📋raid-rosters` sits directly beneath `🔐coordinator-affairs`. It uses the
+`📨raider-responses` sits directly beneath `🗃️roster-archives` as a
+bot-managed, read-only feed for attendance responses, withdrawal explanations,
+assignment issues, and roster disputes. `📋raid-rosters` remains directly
+beneath `🔐coordinator-affairs`. It uses the
 Raid Coordinator section permissions and contains one presentation post per saved
 20-player or 40-player roster plus one permanent Roster Control post. Roster
 commands and components validate that their channel's parent is this configured
@@ -945,7 +950,7 @@ and delivery history.
 - If roster-change DM delivery fails, finalize the roster but mark the affected
   acknowledgement unavailable and show it in the roster post.
 - If an acknowledgement includes issues, persist the issue before notifying
-  `🔐coordinator-affairs`; failure to notify must not discard the issue.
+  `📨raider-responses`; failure to notify must not discard the issue.
 - If a member leaves the guild, mark the slot unavailable and notify the
   coordinator; do not silently assign another member.
 - If a roster changes after a raid is created, refresh every active attached
@@ -1032,7 +1037,7 @@ and delivery history.
 - Verify active reminders continue from the previous finalized revision while a
   new Draft is edited.
 - Verify only changed members receive assignment-change DMs and that submitted
-  issues appear in `🔐coordinator-affairs`.
+  issues appear in `📨raider-responses`.
 - Restart the Render worker between stages and confirm recovery.
 - Confirm the live signup sheet remains accurate.
 - Confirm team-role-only primary visibility and a public recruiting mirror.
@@ -1159,7 +1164,7 @@ The first production release is complete only when:
 - Finalize updates every attached signup and sends before/after assignment DMs
   only to affected members.
 - Assignment DMs support Acknowledge and Acknowledge with issues; submitted
-  issues are persisted and forwarded to `🔐coordinator-affairs`.
+  issues are persisted and forwarded to `📨raider-responses`.
 - Raid creation is impossible until a saved roster is selected.
 - Every signup is attached to exactly one roster.
 - A dated raid can be created with hourly start/end selections.

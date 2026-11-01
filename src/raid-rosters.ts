@@ -3689,9 +3689,9 @@ export class RaidRosterService {
     if (!binding) {
       throw new Error("The roster server binding is unavailable.");
     }
-    const channel = await guild.channels.fetch(binding.coordinatorChannelId);
+    const channel = await guild.channels.fetch(binding.responseChannelId);
     if (!channel?.isSendable()) {
-      throw new Error("The coordinator channel cannot receive attendance responses.");
+      throw new Error("Raider Responses cannot receive attendance responses.");
     }
     const start = Math.floor(new Date(signup.startAt).getTime() / 1_000);
     const end = Math.floor(new Date(signup.endAt).getTime() / 1_000);
@@ -3963,9 +3963,9 @@ export class RaidRosterService {
       if (!binding) {
         throw new Error("The roster server binding is unavailable.");
       }
-      const channel = await guild.channels.fetch(binding.coordinatorChannelId);
+      const channel = await guild.channels.fetch(binding.responseChannelId);
       if (!channel?.isSendable()) {
-        throw new Error("Coordinator Affairs cannot receive roster disputes.");
+        throw new Error("Raider Responses cannot receive roster disputes.");
       }
       const previousAcknowledgements = structuredClone(
         roster.acknowledgements,
@@ -4104,9 +4104,9 @@ export class RaidRosterService {
       issue,
     });
     await this.persist(guild, roster);
-    const channel = await guild.channels.fetch(binding.coordinatorChannelId);
+    const channel = await guild.channels.fetch(binding.responseChannelId);
     if (!channel?.isSendable()) {
-      throw new Error("Coordinator Affairs cannot receive roster issues.");
+      throw new Error("Raider Responses cannot receive roster issues.");
     }
     await channel.send({
       embeds: [
