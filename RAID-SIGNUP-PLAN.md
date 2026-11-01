@@ -134,8 +134,10 @@ Use hierarchical buttons and dropdowns instead:
 
 - **Add Member**: member select, class select, filtered spec select, then
   placement.
-- **Move Member**: select Group, Bench, or Overflow; select the member; select
-  the destination.
+- **Move Member**: select an existing roster member or pending Signup Request,
+  then select Group, Bench, or Overflow and the destination. Existing members
+  use their current class/spec; pending requests carry their submitted
+  class/spec into the Draft without prompting again.
 - **Swap Members**: select the first member and second occupied position, then
   preview the swap.
 - **Change Spec**: select the member, class, and filtered spec.
@@ -265,21 +267,25 @@ Each request post contains:
   appropriate.
 
 Creating the request post refreshes the signup's Pending Approval sections and
-the attached roster post's pending count. Coordinators see the new post directly
-in `📨signup-requests`, so Zors does not send a duplicate alert to
-`🔐coordinator-affairs`. Accept and reject decisions DM the applicant.
+the attached roster post's separate **Signup Requests** section. This section
+lists pending applicants with their submitted class/spec and is distinct from
+Overflow, which remains an approved roster placement. Coordinators see the new
+post directly in `📨signup-requests`, so Zors does not send a duplicate alert
+to `🔐coordinator-affairs`. Accept and reject decisions DM the applicant.
 
-When accepting, the coordinator:
+To stage an approval, the coordinator presses **Move Member** in the roster
+post and selects an entry marked **Signup Request**. Zors reuses the stored
+member and class/spec, then the coordinator:
 
-1. May change the requested class/spec.
-2. Chooses an open group/position, one of ten Bench positions, or Overflow.
-3. Reviews the resulting roster.
-4. Confirms adding the applicant to the working Draft.
+1. Chooses an open group/position, one of ten Bench positions, or Overflow.
+2. Reviews the resulting roster.
+3. Confirms adding the applicant to the working Draft.
 
 Zors marks the request **Accepted — awaiting roster finalization**, adds the
 member to the Draft, and sends a decision DM explaining that the assignment is
 pending Finalize. It does not update active signup sheets or send attendance
-confirmations yet.
+confirmations yet. If the coordinator needs a different class/spec, the normal
+**Change Spec** control remains available after the request enters the Draft.
 
 On Finalize, Zors assigns the team role, publishes the roster change, sends the
 member's assignment-change DM, refreshes every attached signup, and sends
@@ -298,13 +304,14 @@ later move a Bench or Overflow member into a group through the roster editor.
 Overflow members appear on roster and signup displays but receive no automated
 attendance DMs until a finalized revision moves them into a group or Bench.
 
-The roster editor has two addition paths:
+The roster editor has two entry paths:
 
 - **Add Discord Member** uses a Discord member select, followed by class, spec,
   and placement.
-- **Add from Signup Requests** provides a paginated dropdown of pending request
-  posts. Discord selects allow at most 25 options, so the builder must paginate
-  rather than silently omit older requests.
+- **Move Member** shows roster members and pending Signup Requests. Request
+  options are visibly prefixed and include their submitted class/spec. Discord
+  selects allow at most 25 options, so both member and request menus paginate
+  rather than silently omitting entries.
 
 ### 4. Publish or bump the roster
 
@@ -1124,6 +1131,9 @@ The first production release is complete only when:
 - Coordinators see Pending Approval on the sheets and roster pane, can read the
   request posts directly, and can use Zors to edit a request's spec, reject it,
   or accept it into a chosen slot, Bench, or Overflow.
+- The roster pane keeps Signup Requests separate from Overflow. Move Member can
+  stage a pending request into Group, Bench, or Overflow while reusing the
+  applicant's submitted class/spec.
 - Accepted requests enter the working Draft. Finalize assigns the team role and
   publishes the addition; Revert returns Draft-only acceptances to Pending.
 - Finalized grouped and Bench additions receive Immediate plus only future

@@ -88,6 +88,8 @@ interface EditSession {
   classKey?: string;
   specKey?: string;
   placement?: RosterPlacement;
+  memberStage?: "member" | "member-first" | "member-second";
+  memberPage?: number;
 }
 
 interface StorageMetadata {
@@ -300,23 +302,30 @@ export function buildRosterEmbed(roster: RaidRosterDocument): EmbedBuilder {
     });
 }
 
-function rosterControls(
+export function buildRosterControls(
   roster: RaidRosterDocument,
 ): ActionRowBuilder<ButtonBuilder>[] {
   if (roster.status === "archived") {
     return [];
   }
-  const control = (action: string, label: string, style: ButtonStyle) =>
-    new ButtonBuilder()
+  const control = (
+    action: string,
+    label: string,
+    style: ButtonStyle,
+    emoji?: string,
+  ) => {
+    const button = new ButtonBuilder()
       .setCustomId(`${customIdPrefix}:control:${action}:${roster.rosterId}`)
       .setLabel(label)
       .setStyle(style);
+    return emoji ? button.setEmoji(emoji) : button;
+  };
   return [
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       control("add", "Add Member", ButtonStyle.Primary),
-      control("move", "Move Member", ButtonStyle.Secondary),
-      control("swap", "Swap Members", ButtonStyle.Secondary),
-      control("spec", "Change Spec", ButtonStyle.Secondary),
+      control("move", "Move Member", ButtonStyle.Primary),
+      control("swap", "Swap Members", ButtonStyle.Secondary, "🟨"),
+      control("spec", "Change Spec", ButtonStyle.Secondary, "🟨"),
       control("remove", "Remove Member", ButtonStyle.Danger),
     ),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -557,7 +566,7 @@ export class RaidRosterService {
       }
       await presentationStarter.edit({
         embeds: [buildRosterEmbed(roster)],
-        components: rosterControls(roster),
+        components: buildRosterControls(roster),
         allowedMentions: { parse: [] },
       });
       this.scheduleWarning(guild, roster);
@@ -622,7 +631,7 @@ export class RaidRosterService {
     }
     await presentationStarter.edit({
       embeds: [buildRosterEmbed(validated)],
-      components: rosterControls(validated),
+      components: buildRosterControls(validated),
       allowedMentions: { parse: [] },
     });
     this.rosters.set(validated.rosterId, structuredClone(validated));
@@ -792,7 +801,7 @@ export class RaidRosterService {
       name: name.slice(0, 100),
       message: {
         embeds: [buildRosterEmbed(placeholder)],
-        components: rosterControls(placeholder),
+        components: buildRosterControls(placeholder),
         allowedMentions: { parse: [] },
       },
       reason: `Zors roster presentation ${rosterId}`,
@@ -1060,6 +1069,87 @@ export class RaidRosterService {
     );
   }
 
+  private async rosterMemberPicker(
+    session: EditSession,
+    roster: RaidRosterDocument,
+    guild: Guild,
+    stage: "member" | "member-first" | "member-second",
+    requestedPage = 0,
+  ): Promise<
+    Array<
+      | ActionRowBuilder<StringSelectMenuBuilder>
+      | ActionRowBuilder<ButtonBuilder>
+    >
+  > {
+    const assignments = sortedAssignments(roster).filter(
+      ({ memberId }) =>
+        stage !== "member-second" || memberId !== session.memberId,
+    );
+    if (assignments.length === 0) {
+      throw new Error(
+        stage === "member-second"
+          ? "There is no second roster member available to swap."
+          : "This roster does not have any members to select.",
+      );
+    }
+    const pageCount = Math.ceil(assignments.length / 25);
+    const page = Math.min(Math.max(requestedPage, 0), pageCount - 1);
+    session.memberStage = stage;
+    session.memberPage = page;
+    const pageAssignments = assignments.slice(page * 25, page * 25 + 25);
+    const members = await Promise.all(
+      pageAssignments.map(({ memberId }) =>
+        guild.members.fetch(memberId).catch(() => null),
+      ),
+    );
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId(sessionCustomId(stage, session.id))
+      .setPlaceholder(
+        pageCount > 1
+          ? `Roster member — page ${page + 1} of ${pageCount}`
+          : "Choose a roster member",
+      )
+      .addOptions(
+        pageAssignments.map((assignment, index) => {
+          const member = members[index];
+          return {
+            label: (member?.displayName ?? `Member ${assignment.memberId}`).slice(
+              0,
+              100,
+            ),
+            value: assignment.memberId,
+            description: `${describePlacement(assignment.placement)} • ${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}`.slice(
+              0,
+              100,
+            ),
+          };
+        }),
+      );
+    const rows: Array<
+      | ActionRowBuilder<StringSelectMenuBuilder>
+      | ActionRowBuilder<ButtonBuilder>
+    > = [
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu),
+    ];
+    if (pageCount > 1) {
+      rows.push(
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(sessionCustomId("member-page-prev", session.id))
+            .setLabel("Previous")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page === 0),
+          new ButtonBuilder()
+            .setCustomId(sessionCustomId("member-page-next", session.id))
+            .setLabel("Next")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page === pageCount - 1),
+        ),
+      );
+    }
+    return rows;
+  }
+
   private classPicker(
     session: EditSession,
   ): ActionRowBuilder<StringSelectMenuBuilder> {
@@ -1207,18 +1297,22 @@ export class RaidRosterService {
       roster,
       interaction.user.id,
     );
+    const memberStage = action === "swap" ? "member-first" : "member";
+    const components =
+      action === "add"
+        ? [this.memberPicker(session, "member", "Member to add")]
+        : await this.rosterMemberPicker(
+            session,
+            roster,
+            guild,
+            memberStage,
+          );
     await interaction.reply({
       content:
         action === "add"
           ? "Choose the Discord member to add."
           : "Choose a member already on this roster.",
-      components: [
-        this.memberPicker(
-          session,
-          action === "swap" ? "member-first" : "member",
-          action === "add" ? "Member to add" : "Roster member",
-        ),
-      ],
+      components,
       flags: MessageFlags.Ephemeral,
     });
   }
@@ -1250,16 +1344,37 @@ export class RaidRosterService {
       });
       return;
     }
+  }
+
+  private async handleRosterMemberSelection(
+    interaction: StringSelectMenuInteraction,
+    stage: "member" | "member-first" | "member-second",
+    session: EditSession,
+    roster: RaidRosterDocument,
+  ): Promise<void> {
+    const selectedId = interaction.values[0];
+    if (!selectedId) {
+      throw new Error("Choose one roster member.");
+    }
+    const rosterMemberIds = new Set(
+      (activeRevision(roster)?.assignments ?? []).map(({ memberId }) => memberId),
+    );
     if (!rosterMemberIds.has(selectedId)) {
-      throw new Error("Choose a member who is already on this roster.");
+      throw new Error("That member is no longer assigned to this roster.");
     }
     if (stage === "member-first") {
       session.memberId = selectedId;
+      if (!interaction.guild) {
+        throw new Error("Roster controls require a guild.");
+      }
       await interaction.update({
         content: "Choose the second roster member.",
-        components: [
-          this.memberPicker(session, "member-second", "Second roster member"),
-        ],
+        components: await this.rosterMemberPicker(
+          session,
+          roster,
+          interaction.guild,
+          "member-second",
+        ),
       });
       return;
     }
@@ -1293,6 +1408,29 @@ export class RaidRosterService {
     }
   }
 
+  private async handleRosterMemberPage(
+    interaction: ButtonInteraction,
+    direction: "prev" | "next",
+    session: EditSession,
+  ): Promise<void> {
+    const roster = this.rosters.get(session.rosterId);
+    if (!roster || !interaction.guild || !session.memberStage) {
+      throw new Error("That roster member picker is no longer available.");
+    }
+    const nextPage =
+      (session.memberPage ?? 0) + (direction === "next" ? 1 : -1);
+    await interaction.update({
+      content: interaction.message.content,
+      components: await this.rosterMemberPicker(
+        session,
+        roster,
+        interaction.guild,
+        session.memberStage,
+        nextPage,
+      ),
+    });
+  }
+
   private async handleStringSelection(
     interaction: StringSelectMenuInteraction,
     stage: string,
@@ -1305,6 +1443,19 @@ export class RaidRosterService {
     const selected = interaction.values[0];
     if (!selected) {
       throw new Error("Choose one option.");
+    }
+    if (
+      stage === "member" ||
+      stage === "member-first" ||
+      stage === "member-second"
+    ) {
+      await this.handleRosterMemberSelection(
+        interaction,
+        stage,
+        session,
+        roster,
+      );
+      return;
     }
     if (stage === "class") {
       session.classKey = selected;
@@ -1669,6 +1820,17 @@ export class RaidRosterService {
       }
       if (stage === "confirm" && interaction.isButton()) {
         await this.confirmSession(interaction, session);
+        return true;
+      }
+      if (
+        interaction.isButton() &&
+        (stage === "member-page-prev" || stage === "member-page-next")
+      ) {
+        await this.handleRosterMemberPage(
+          interaction,
+          stage === "member-page-next" ? "next" : "prev",
+          session,
+        );
         return true;
       }
       if (interaction.isUserSelectMenu()) {

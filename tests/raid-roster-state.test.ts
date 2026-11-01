@@ -14,6 +14,7 @@ import {
 } from "../src/raid-roster-state.js";
 import {
   buildRosterEmbed,
+  buildRosterControls,
   isMatchingTeamRoleName,
 } from "../src/raid-rosters.js";
 
@@ -241,5 +242,21 @@ describe("raid roster state", () => {
     expect(embed.fields?.[0]?.value).toContain(
       "🟧 <@223456789012345678>",
     );
+  });
+
+  it("uses blue movement and gold-marked swap/spec controls", () => {
+    const controls = buildRosterControls(roster())
+      .flatMap((row) => row.components)
+      .map((button) => button.toJSON());
+
+    expect(
+      controls.find(({ label }) => label === "Move Member")?.style,
+    ).toBe(1);
+    expect(
+      controls.find(({ label }) => label === "Swap Members")?.emoji?.name,
+    ).toBe("🟨");
+    expect(
+      controls.find(({ label }) => label === "Change Spec")?.emoji?.name,
+    ).toBe("🟨");
   });
 });

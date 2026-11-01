@@ -116,6 +116,11 @@ combinations, then sends change DMs only to affected members. Acknowledgements
 and reported issues are persisted; issues are forwarded to
 `🔐coordinator-affairs` without rolling back the finalized roster.
 
+Move, Swap, Change Spec, and Remove use roster-only member menus rather than
+Discord-wide member pickers. Rosters larger than Discord's 25-option select
+limit are paginated. Add Member intentionally retains Discord's searchable
+server member picker because it selects someone not yet assigned to the roster.
+
 Roster creation remains one `/zors-roster create` command. Its team-role field
 uses autocomplete and shows only roles containing `20 Team` or `40 Team`
 matching the selected format. Discord modals cannot contain role or channel
