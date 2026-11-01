@@ -587,11 +587,14 @@ export function buildAttendanceFollowupControls(
 export function attendanceAssignmentCopy(
   placement: "group" | "bench",
   teamName: string,
+  requestApproved = false,
 ): { title: string; description: string } {
   const spot = placement === "group" ? "raid" : "bench";
   return {
     title: `You have a finalized ${spot} spot on ${teamName}.`,
-    description: `You have a finalized ${spot} spot on this team.`,
+    description: requestApproved
+      ? "Your spot request was approved by the raid coordinators."
+      : `You have a finalized ${spot} spot on this team.`,
   };
 }
 
@@ -1844,6 +1847,7 @@ export class RaidRosterService {
         assignment,
       ]) ?? [],
     );
+    const approvedRequestMemberIds = new Set<string>();
     for (const request of activeRequests) {
       const assignment = finalizedAssignmentsByMember.get(request.applicantId);
       const shouldResolve =
@@ -1854,6 +1858,9 @@ export class RaidRosterService {
         continue;
       }
       const approved = assignment !== undefined;
+      if (approved && request.status === "draft-accepted") {
+        approvedRequestMemberIds.add(request.applicantId);
+      }
       await this.persistSignupRequest(guild, {
         ...request,
         status: approved ? "approved" : "pending",
@@ -1890,6 +1897,7 @@ export class RaidRosterService {
           refreshedSignup,
           roster,
           assignedMemberIds,
+          approvedRequestMemberIds,
         );
       }
     }
@@ -3344,6 +3352,7 @@ export class RaidRosterService {
     signup: RaidSignupSheet,
     roster: RaidRosterDocument,
     memberIds?: ReadonlySet<string>,
+    approvedRequestMemberIds?: ReadonlySet<string>,
   ): Promise<void> {
     const responded = new Set(
       signup.attendanceConfirmations.map(({ memberId }) => memberId),
@@ -3377,6 +3386,7 @@ export class RaidRosterService {
         const copy = attendanceAssignmentCopy(
           assignment.placement.kind,
           teamRole.name,
+          approvedRequestMemberIds?.has(assignment.memberId),
         );
         await user.send({
           embeds: [

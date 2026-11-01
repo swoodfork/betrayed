@@ -126,6 +126,13 @@ describe("raid signup sheet state", () => {
       title: "You have a finalized bench spot on Zors 40 Team.",
       description: "You have a finalized bench spot on this team.",
     });
+    expect(
+      attendanceAssignmentCopy("group", "Zors 40 Team", true),
+    ).toEqual({
+      title: "You have a finalized raid spot on Zors 40 Team.",
+      description:
+        "Your spot request was approved by the raid coordinators.",
+    });
   });
 
   it("allows only valid single-use attendance transitions", () => {
