@@ -124,15 +124,28 @@ so Zors resolves the current thread and refuses the command from the control
 post or any unrelated channel. This compact response shows Groups and Bench
 only; the persistent roster post remains the complete view.
 
-Members can run `/zors-roster request` anywhere in an approved guild, choose an
-active roster, and submit a class/spec combination. Zors creates one durable,
-private post in `📨signup-requests` and projects the pending request into the
-roster post without mixing it into approved Overflow. Move Member lists both
-assigned members and pending requests. Selecting a request reuses its submitted
-class/spec and asks only for Group, Bench, or Overflow placement. The request
-remains pending finalization in the working Draft; Finalize approves it and
-assigns the roster's team role, while Revert returns it to Pending. Staff can
-also reject a still-pending request from its private post.
+After a roster has a finalized revision, a coordinator runs `/zors-raid create`
+inside its roster post. Zors creates one reusable signup sheet in the roster's
+bound team channel. Members request a spot from that sheet, choose class/spec,
+and receive one durable private request post in `📨signup-requests`. Members
+already assigned to a Group or Bench cannot request another spot because their
+attendance is handled by Zors DM confirmations. Overflow members may request a
+spot, including with a different spec.
+
+Pending requests are projected into the roster and signup sheet without being
+mixed into approved Overflow. Move Member lists assigned members and pending
+requests. Selecting a request reuses its submitted class/spec and asks only for
+Group, Bench, or Overflow placement. If the applicant is already in Overflow,
+approval moves that one assignment instead of duplicating the member. Finalize
+approves staged requests and assigns the team role; Revert returns them to
+Pending. Staff can reject a still-pending request from its private post.
+
+Close Signup disables new requests but preserves current requests for staff to
+finish processing. A closed sheet offers **Restart +7 Days** and **Restart with
+New Schedule**. Restart clears that sheet's remaining pending requests, keeps
+the finalized roster—including Group, Bench, and Overflow—then reopens the same
+sheet for its next cycle. Restart refuses while a request is staged in a roster
+Draft, requiring staff to Finalize or Revert first.
 
 Move, Swap, Change Spec, and Remove use roster-only member menus rather than
 Discord-wide member pickers. Rosters larger than Discord's 25-option select

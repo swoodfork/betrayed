@@ -9,7 +9,6 @@ import {
 } from "discord.js";
 
 import type { BotConfig } from "./config.js";
-import { wowForeverClassSpecializations } from "./raid-applications.js";
 
 function addChannelCommand(
   command: SlashCommandSubcommandBuilder,
@@ -264,39 +263,6 @@ export const zorsRosterCommand = new SlashCommandBuilder()
       ),
   )
   .addSubcommand((command) =>
-    command
-      .setName("request")
-      .setDescription("Request to join a saved raid roster")
-      .addStringOption((option) =>
-        option
-          .setName("roster")
-          .setDescription("Roster you want to join")
-          .setAutocomplete(true)
-          .setRequired(true),
-      )
-      .addStringOption((option) =>
-        option
-          .setName("wow-class")
-          .setDescription("Your World of Warcraft class")
-          .addChoices(
-            ...Object.entries(wowForeverClassSpecializations).map(
-              ([value, definition]) => ({
-                name: definition.label,
-                value,
-              }),
-            ),
-          )
-          .setRequired(true),
-      )
-      .addStringOption((option) =>
-        option
-          .setName("specialization")
-          .setDescription("Your requested specialization")
-          .setAutocomplete(true)
-          .setRequired(true),
-      ),
-  )
-  .addSubcommand((command) =>
     command.setName("show").setDescription("Show this roster's current state"),
   )
   .addSubcommand((command) =>
@@ -318,6 +284,55 @@ export const zorsRosterCommand = new SlashCommandBuilder()
     command.setName("help").setDescription("Explain Zors roster controls"),
   );
 
+const hourlyChoices = Array.from({ length: 24 }, (_, hour) => ({
+  name: new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    hour12: true,
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(2026, 0, 1, hour))),
+  value: String(hour),
+}));
+
+export const zorsRaidCommand = new SlashCommandBuilder()
+  .setName("zors-raid")
+  .setDescription("Create and manage reusable raid signup sheets")
+  .addSubcommand((command) =>
+    command
+      .setName("create")
+      .setDescription("Create a signup sheet for this finalized roster")
+      .addStringOption((option) =>
+        option
+          .setName("name")
+          .setDescription("Raid name shown on the signup sheet")
+          .setMinLength(1)
+          .setMaxLength(100)
+          .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("date")
+          .setDescription("Raid date in YYYY-MM-DD format")
+          .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("start-hour")
+          .setDescription("Raid start hour in PDT")
+          .addChoices(...hourlyChoices)
+          .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("end-hour")
+          .setDescription("Raid end hour in PDT")
+          .addChoices(...hourlyChoices)
+          .setRequired(true),
+      ),
+  )
+  .addSubcommand((command) =>
+    command.setName("help").setDescription("Explain raid signup sheets"),
+  );
+
 export async function registerGuildCommands(
   config: BotConfig,
   guildId: string,
@@ -327,6 +342,7 @@ export async function registerGuildCommands(
     zorsCommand.toJSON(),
     zorsOwnerCommand.toJSON(),
     zorsRosterCommand.toJSON(),
+    zorsRaidCommand.toJSON(),
   ];
 
   await rest.put(

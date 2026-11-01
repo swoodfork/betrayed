@@ -77,11 +77,11 @@ Use a command group rather than adding many unrelated top-level commands:
 
 ```text
 /zors-roster create
-/zors-roster request
 /zors-roster show
 /zors-roster finalize
 /zors-roster revert
 /zors-roster archive
+/zors-raid create
 ```
 
 `/zors-roster create` starts an ephemeral builder:
@@ -113,8 +113,9 @@ slot is the person Zors will DM.
 
 Roster lifecycle commands must refuse to run outside the configured
 `📋raid-rosters` Forum and its child posts, even when the caller has
-permission. The member-facing `/zors-roster request` command may run anywhere
-in either approved guild and uses active-roster autocomplete. Zors should
+permission. Signup requests originate only from a reusable signup sheet in the
+roster's bound team channel; there is no member-facing slash-command fallback.
+Zors should
 create one permanent **Roster Control** post during setup so the first roster
 can be created without exposing a builder in a public channel. Every roster
 post then contains interactive controls for Add Member, Move Member, Swap
@@ -1026,27 +1027,30 @@ only behind an explicit Test-guild configuration.
 - Persist and reconstruct roster control posts.
 - Render roster presentation messages in place.
 
-### Phase 2: Signup requests
+### Phase 2: Signup requests and reusable sheet
 
-- Implemented `/zors-roster request` as the reusable intake path until dated
-  signup sheets add their Request button.
+- `/zors-raid create` creates one durable signup sheet from inside a finalized
+  roster post and publishes it in the roster's bound team channel.
+- Requests originate only from the sheet's **Request a Spot** button.
+- Group and Bench members cannot create requests; they use attendance DMs.
+- Overflow members may request a Group/Bench spot and may submit a different
+  spec without creating a duplicate roster assignment.
 - One durable, staff-visible Forum post is created per request.
 - Pending and Draft-accepted applicants are projected separately in the roster
-  pane; contextual Show intentionally omits both requests and Overflow.
+  pane and sheet; contextual Show intentionally omits requests and Overflow.
 - Move Member accepts a pending request into Group, Bench, or Overflow while
   reusing the submitted class/spec.
 - Finalize approves staged requests and assigns the team role; Revert restores
   them to Pending.
-- Staff can reject a pending request from its private request post.
-- Remaining work in the dated-signup phase is to invoke this same intake from a
-  signup-sheet button and refresh every attached live sheet.
+- Close disables new requests but keeps existing requests visible.
+- Restart either advances exactly seven days or accepts a custom date/hour,
+  clears remaining pending requests, preserves the roster, and reopens the same
+  sheet.
+- Restart refuses while Draft-accepted requests still require Finalize/Revert.
 
 ### Phase 3: Raid creation and live sheet
 
-- Add `/zors-raid create`.
-- Require one saved roster.
-- Validate date and hourly time selections.
-- Create the raid control post and primary sheet in the roster's team channel.
+- Extend the durable sheet with attendance-confirmation state.
 - Add `/zors-raid publish` with a paginated active-signup selector.
 - Support synchronized public recruiting mirrors.
 - Add signup projection bump controls.

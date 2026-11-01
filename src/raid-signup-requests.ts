@@ -13,10 +13,17 @@ export const raidSignupRequestSchema = z
     requestId: z.string().uuid(),
     guildId: snowflake,
     rosterId: z.string().uuid(),
+    raidId: z.string().uuid(),
     applicantId: snowflake,
     classKey: z.string().min(1),
     specKey: z.string().min(1),
-    status: z.enum(["pending", "draft-accepted", "approved", "rejected"]),
+    status: z.enum([
+      "pending",
+      "draft-accepted",
+      "approved",
+      "rejected",
+      "cleared",
+    ]),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
     threadId: snowflake.nullable(),
@@ -61,6 +68,8 @@ function statusLabel(status: RaidSignupRequest["status"]): string {
       return "🟢 Approved";
     case "rejected":
       return "🔴 Rejected";
+    case "cleared":
+      return "⚫ Cleared for the next signup cycle";
   }
 }
 
@@ -92,6 +101,7 @@ export function buildRaidSignupRequestEmbed(
       { name: "Request ID", value: request.requestId },
       { name: "Guild ID", value: request.guildId },
       { name: "Roster ID", value: request.rosterId },
+      { name: "Raid ID", value: request.raidId },
       { name: "Applicant ID", value: request.applicantId },
       { name: "Class Key", value: request.classKey, inline: true },
       { name: "Spec Key", value: request.specKey, inline: true },
@@ -122,6 +132,7 @@ export function raidSignupRequestFromEmbed(
     requestId: value("Request ID"),
     guildId: value("Guild ID"),
     rosterId: value("Roster ID"),
+    raidId: value("Raid ID"),
     applicantId: value("Applicant ID"),
     classKey: value("Class Key"),
     specKey: value("Spec Key"),

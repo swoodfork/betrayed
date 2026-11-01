@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   zorsCommand,
   zorsOwnerCommand,
+  zorsRaidCommand,
   zorsRosterCommand,
 } from "../src/commands.js";
 
@@ -118,16 +119,10 @@ describe("Zors Bot command registration", () => {
         option.type === ApplicationCommandOptionType.Subcommand &&
         option.name === "create",
     );
-    const request = rosterCommand.options?.find(
-      (option) =>
-        option.type === ApplicationCommandOptionType.Subcommand &&
-        option.name === "request",
-    );
 
     expect(rosterCommand.name).toBe("zors-roster");
     expect(rosterCommand.options?.map((option) => option.name)).toEqual([
       "create",
-      "request",
       "show",
       "finalize",
       "revert",
@@ -150,16 +145,10 @@ describe("Zors Bot command registration", () => {
         }),
       ]),
     );
-    expect(request?.options).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ name: "roster", autocomplete: true }),
-        expect.objectContaining({ name: "wow-class", choices: expect.any(Array) }),
-        expect.objectContaining({
-          name: "specialization",
-          autocomplete: true,
-        }),
-      ]),
-    );
     expect(zorsCommand.toJSON().name).toBe("zors");
+    expect(zorsRaidCommand.toJSON().options?.map(({ name }) => name)).toEqual([
+      "create",
+      "help",
+    ]);
   });
 });

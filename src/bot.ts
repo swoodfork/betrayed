@@ -222,6 +222,8 @@ async function handleAuditedZorsCommand(
   try {
     if (interaction.commandName === "zors-roster") {
       await raidRosters.handleCommand(interaction);
+    } else if (interaction.commandName === "zors-raid") {
+      await raidRosters.handleRaidCommand(interaction);
     } else {
       await handleZorsCommand(
         interaction,

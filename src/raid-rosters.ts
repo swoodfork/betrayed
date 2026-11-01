@@ -57,12 +57,20 @@ import {
   raidSignupRequestSchema,
   type RaidSignupRequest,
 } from "./raid-signup-requests.js";
+import {
+  pdtDateHour,
+  raidSignupSheetSchema,
+  shiftSignupSevenDays,
+  type RaidSignupSheet,
+} from "./raid-signup-state.js";
 import { wowForeverClassSpecializations } from "./raid-applications.js";
 
 const customIdPrefix = "zors-roster";
 const storageEmbedTitle = "Zors Raid Roster Storage";
 const controlPanelEmbedTitle = "Zors Roster Control";
 const storageAttachmentName = "zors-roster-state.json";
+const signupStorageEmbedTitle = "Zors Raid Signup Storage";
+const signupStorageAttachmentName = "zors-raid-signup-state.json";
 const draftWarningDelayMs = 30 * 60 * 1_000;
 const sessionLifetimeMs = 15 * 60 * 1_000;
 
@@ -98,6 +106,15 @@ interface EditSession {
   memberStage?: "member" | "member-first" | "member-second";
   memberPage?: number;
   signupRequestId?: string;
+}
+
+interface SignupSession {
+  id: string;
+  raidId: string;
+  userId: string;
+  expiresAt: number;
+  classKey?: string;
+  specKey?: string;
 }
 
 interface StorageMetadata {
@@ -149,6 +166,40 @@ function storageEmbed(
       { name: "Latest Revision Message", value: latestRevisionMessageId },
     )
     .setFooter({ text: "Canonical Zors roster state; do not edit." });
+}
+
+function signupStorageMetadataFromEmbed(
+  embed: { title?: string | null; fields?: readonly { name: string; value: string }[] },
+): { raidId: string; latestRevisionMessageId: string } | null {
+  if (embed.title !== signupStorageEmbedTitle) {
+    return null;
+  }
+  const version = fieldValue(embed, "Schema Version");
+  const raidId = fieldValue(embed, "Raid ID");
+  const latestRevisionMessageId = fieldValue(embed, "Latest Revision Message");
+  if (
+    version !== "1" ||
+    !raidId?.match(/^[0-9a-f-]{36}$/i) ||
+    !latestRevisionMessageId?.match(/^\d{17,20}$/)
+  ) {
+    return null;
+  }
+  return { raidId, latestRevisionMessageId };
+}
+
+function signupStorageEmbed(
+  raidId: string,
+  latestRevisionMessageId: string,
+): EmbedBuilder {
+  return new EmbedBuilder()
+    .setTitle(signupStorageEmbedTitle)
+    .setColor(0x2c3e50)
+    .addFields(
+      { name: "Schema Version", value: "1", inline: true },
+      { name: "Raid ID", value: raidId },
+      { name: "Latest Revision Message", value: latestRevisionMessageId },
+    )
+    .setFooter({ text: "Canonical Zors raid signup state; do not edit." });
 }
 
 function classLabel(classKey: string): string {
@@ -385,6 +436,25 @@ export function buildRosterControls(
   ];
 }
 
+export function buildDraftWarningControls(
+  rosterId: string,
+): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`${customIdPrefix}:control:continue:${rosterId}`)
+      .setLabel("Continue Drafting")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`${customIdPrefix}:control:finalize:${rosterId}`)
+      .setLabel("Finalize")
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`${customIdPrefix}:control:revert:${rosterId}`)
+      .setLabel("Revert Draft")
+      .setStyle(ButtonStyle.Danger),
+  );
+}
+
 function interactionBinding(
   guildId: string | null,
   config: BotConfig,
@@ -426,6 +496,9 @@ export class RaidRosterService {
   private readonly warningTimers = new Map<string, NodeJS.Timeout>();
   private readonly signupRequests = new Map<string, RaidSignupRequest>();
   private readonly signupRequestThreadIds = new Map<string, string>();
+  private readonly signupSheets = new Map<string, RaidSignupSheet>();
+  private readonly signupSessions = new Map<string, SignupSession>();
+  private readonly pendingSignupSubmissions = new Set<string>();
 
   public constructor(
     private readonly config: BotConfig,
@@ -455,6 +528,199 @@ export class RaidRosterService {
   private rosterPresentationEmbed(roster: RaidRosterDocument): EmbedBuilder {
     return buildRosterEmbed(roster, {
       signupRequests: this.signupRequestsForRoster(roster.rosterId),
+    });
+  }
+
+  private signupRequestsForSheet(raidId: string): RaidSignupRequest[] {
+    return [...this.signupRequests.values()]
+      .filter(
+        (request) =>
+          request.raidId === raidId &&
+          (request.status === "pending" ||
+            request.status === "draft-accepted"),
+      )
+      .sort(
+        (left, right) =>
+          new Date(left.createdAt).getTime() -
+          new Date(right.createdAt).getTime(),
+      );
+  }
+
+  private signupSheetEmbeds(
+    signup: RaidSignupSheet,
+    roster: RaidRosterDocument,
+  ): EmbedBuilder[] {
+    const start = Math.floor(new Date(signup.startAt).getTime() / 1_000);
+    const end = Math.floor(new Date(signup.endAt).getTime() / 1_000);
+    const summary = new EmbedBuilder()
+      .setTitle(`🗓️ ${signup.name}`)
+      .setColor(signup.status === "open" ? 0x2ecc71 : 0x7f8c8d)
+      .setDescription(
+        [
+          `**Status:** ${signup.status === "open" ? "🟢 Open" : "⚫ Closed"}`,
+          `**Team:** <@&${roster.teamRoleId}>`,
+          `**Starts:** <t:${start}:F> (<t:${start}:R>)`,
+          `**Ends:** <t:${end}:t>`,
+          `**Cycle:** ${signup.cycle}`,
+          "",
+          signup.status === "open"
+            ? "Members who are not already in a Group or Bench may use **Request a Spot**."
+            : "This signup is closed. Existing requests remain visible until the sheet is restarted.",
+        ].join("\n"),
+      )
+      .setFooter({ text: `Raid signup ${signup.raidId}` });
+    const publishedRoster: RaidRosterDocument = roster.finalizedRevision
+      ? {
+          ...structuredClone(roster),
+          status: "finalized",
+          draftRevision: null,
+        }
+      : roster;
+    const rosterView = buildRosterEmbed(publishedRoster, {
+      includeOverflow: false,
+      signupRequests: this.signupRequestsForSheet(signup.raidId),
+    }).setTitle(`📋 ${roster.name} — Signup View`);
+    return [summary, rosterView];
+  }
+
+  private signupSheetComponents(
+    signup: RaidSignupSheet,
+  ): ActionRowBuilder<ButtonBuilder>[] {
+    if (signup.status === "open") {
+      return [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`${customIdPrefix}:raid:request:${signup.raidId}`)
+            .setLabel("Request a Spot")
+            .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder()
+            .setCustomId(`${customIdPrefix}:raid:close:${signup.raidId}`)
+            .setLabel("Close Signup")
+            .setStyle(ButtonStyle.Secondary),
+        ),
+      ];
+    }
+    return [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`${customIdPrefix}:raid:restart-seven:${signup.raidId}`)
+          .setLabel("Restart +7 Days")
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId(`${customIdPrefix}:raid:restart-custom:${signup.raidId}`)
+          .setLabel("Restart with New Schedule")
+          .setStyle(ButtonStyle.Primary),
+      ),
+    ];
+  }
+
+  private async fetchStoredSignupSheet(
+    thread: AnyThreadChannel,
+    metadata: { raidId: string; latestRevisionMessageId: string },
+  ): Promise<RaidSignupSheet> {
+    const revisionMessage = await thread.messages.fetch(
+      metadata.latestRevisionMessageId,
+    );
+    const attachment = revisionMessage.attachments.find(
+      (entry) => entry.name === signupStorageAttachmentName,
+    );
+    if (!attachment) {
+      throw new Error(
+        `Raid signup ${metadata.raidId} latest revision has no state attachment.`,
+      );
+    }
+    const response = await fetch(attachment.url);
+    if (!response.ok) {
+      throw new Error(
+        `Could not download raid signup ${metadata.raidId}: ${response.status}.`,
+      );
+    }
+    const text = await response.text();
+    if (text.length > 1_000_000) {
+      throw new Error(`Raid signup ${metadata.raidId} state exceeds 1 MB.`);
+    }
+    const signup = raidSignupSheetSchema.parse(JSON.parse(text));
+    if (
+      signup.raidId !== metadata.raidId ||
+      signup.controlThreadId !== thread.id
+    ) {
+      throw new Error(
+        `Raid signup ${metadata.raidId} storage metadata is inconsistent.`,
+      );
+    }
+    return signup;
+  }
+
+  private async persistSignupSheet(
+    guild: Guild,
+    signup: RaidSignupSheet,
+  ): Promise<void> {
+    const validated = raidSignupSheetSchema.parse(signup);
+    const roster = this.rosters.get(validated.rosterId);
+    if (!roster) {
+      throw new Error("The signup sheet's roster is unavailable.");
+    }
+    const control = await guild.channels.fetch(validated.controlThreadId);
+    if (!control?.isThread()) {
+      throw new Error("The signup sheet storage thread is unavailable.");
+    }
+    if (control.archived) {
+      await control.setArchived(false, "Write Zors raid signup revision");
+    }
+    const revisionMessage = await control.send({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(`Raid Signup Cycle ${validated.cycle}`)
+          .setColor(0x2c3e50)
+          .setDescription(
+            `State snapshot for ${validated.name} at <t:${Math.floor(Date.now() / 1_000)}:F>.`,
+          ),
+      ],
+      files: [
+        new AttachmentBuilder(
+          Buffer.from(`${JSON.stringify(validated, null, 2)}\n`, "utf8"),
+          { name: signupStorageAttachmentName },
+        ),
+      ],
+      allowedMentions: { parse: [] },
+    });
+    const storageStarter = await control.fetchStarterMessage();
+    if (!storageStarter) {
+      throw new Error("The signup sheet storage starter is unavailable.");
+    }
+    await storageStarter.edit({
+      embeds: [signupStorageEmbed(validated.raidId, revisionMessage.id)],
+    });
+    const channel = await guild.channels.fetch(validated.channelId);
+    if (!channel?.isTextBased()) {
+      throw new Error("The signup sheet channel is unavailable.");
+    }
+    const message = await channel.messages.fetch(validated.messageId);
+    await message.edit({
+      embeds: this.signupSheetEmbeds(validated, roster),
+      components: this.signupSheetComponents(validated),
+      allowedMentions: { parse: [] },
+    });
+    this.signupSheets.set(validated.raidId, structuredClone(validated));
+  }
+
+  private async refreshSignupSheetPresentation(
+    guild: Guild,
+    signup: RaidSignupSheet,
+  ): Promise<void> {
+    const roster = this.rosters.get(signup.rosterId);
+    if (!roster) {
+      throw new Error("The signup sheet's roster is unavailable.");
+    }
+    const channel = await guild.channels.fetch(signup.channelId);
+    if (!channel?.isTextBased()) {
+      throw new Error("The signup sheet channel is unavailable.");
+    }
+    const message = await channel.messages.fetch(signup.messageId);
+    await message.edit({
+      embeds: this.signupSheetEmbeds(signup, roster),
+      components: this.signupSheetComponents(signup),
+      allowedMentions: { parse: [] },
     });
   }
 
@@ -530,6 +796,10 @@ export class RaidRosterService {
       components: buildRosterControls(roster),
       allowedMentions: { parse: [] },
     });
+    const signup = this.signupSheets.get(validated.raidId);
+    if (signup) {
+      await this.refreshSignupSheetPresentation(guild, signup);
+    }
   }
 
   private async authorize(
@@ -737,6 +1007,35 @@ export class RaidRosterService {
       this.scheduleWarning(guild, roster);
       reconstructed += 1;
     }
+    for (const thread of controlThreads.values()) {
+      const starter = await thread.fetchStarterMessage();
+      const metadata = starter?.embeds[0]
+        ? signupStorageMetadataFromEmbed(starter.embeds[0].toJSON())
+        : null;
+      if (!metadata) {
+        continue;
+      }
+      const signup = await this.fetchStoredSignupSheet(thread, metadata);
+      if (signup.guildId !== guild.id || !this.rosters.has(signup.rosterId)) {
+        throw new Error(
+          `Raid signup ${signup.raidId} references an unavailable guild or roster.`,
+        );
+      }
+      this.signupSheets.set(signup.raidId, signup);
+      const channel = await guild.channels.fetch(signup.channelId);
+      if (!channel?.isTextBased()) {
+        throw new Error(`Raid signup ${signup.raidId} channel is unavailable.`);
+      }
+      const message = await channel.messages.fetch(signup.messageId);
+      await message.edit({
+        embeds: this.signupSheetEmbeds(
+          signup,
+          this.rosters.get(signup.rosterId)!,
+        ),
+        components: this.signupSheetComponents(signup),
+        allowedMentions: { parse: [] },
+      });
+    }
     return reconstructed;
   }
 
@@ -799,6 +1098,21 @@ export class RaidRosterService {
       components: buildRosterControls(validated),
       allowedMentions: { parse: [] },
     });
+    for (const signup of this.signupSheets.values()) {
+      if (signup.rosterId !== validated.rosterId) {
+        continue;
+      }
+      const channel = await guild.channels.fetch(signup.channelId);
+      if (!channel?.isTextBased()) {
+        throw new Error("A linked signup sheet channel is unavailable.");
+      }
+      const message = await channel.messages.fetch(signup.messageId);
+      await message.edit({
+        embeds: this.signupSheetEmbeds(signup, validated),
+        components: this.signupSheetComponents(signup),
+        allowedMentions: { parse: [] },
+      });
+    }
     this.rosters.set(validated.rosterId, structuredClone(validated));
     this.rosterIdByThread.set(validated.presentationThreadId, validated.rosterId);
     this.scheduleWarning(guild, validated);
@@ -843,18 +1157,9 @@ export class RaidRosterService {
     }
     const warning = await thread.send({
       content:
-        "⚠️ This roster Draft has been inactive for 30 minutes. Finalize it or revert it to the last finalized snapshot.",
+        "⚠️ This roster Draft has been inactive for 30 minutes. Continue drafting, finalize it, or revert it to the last finalized snapshot.",
       components: [
-        new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`${customIdPrefix}:control:finalize:${roster.rosterId}`)
-            .setLabel("Finalize")
-            .setStyle(ButtonStyle.Success),
-          new ButtonBuilder()
-            .setCustomId(`${customIdPrefix}:control:revert:${roster.rosterId}`)
-            .setLabel("Revert Draft")
-            .setStyle(ButtonStyle.Danger),
-        ),
+        buildDraftWarningControls(roster.rosterId),
       ],
       allowedMentions: { parse: [] },
     });
@@ -990,79 +1295,6 @@ export class RaidRosterService {
     return roster;
   }
 
-  private async createSignupRequest(
-    interaction: ChatInputCommandInteraction,
-    binding: RaidRosterBinding & { signupRequestForumId: string },
-  ): Promise<void> {
-    const guild = interaction.guild;
-    if (!guild) {
-      throw new Error("Signup requests must be created inside Betrayed.");
-    }
-    const rosterId = interaction.options.getString("roster", true);
-    const roster = this.rosters.get(rosterId);
-    if (!roster || roster.guildId !== guild.id || roster.status === "archived") {
-      throw new Error("Choose an active roster from the autocomplete list.");
-    }
-    const classKey = interaction.options.getString("wow-class", true);
-    const specKey = interaction.options.getString("specialization", true);
-    validateClassSpecialization(classKey, specKey);
-    if (
-      (activeRevision(roster)?.assignments ?? []).some(
-        ({ memberId }) => memberId === interaction.user.id,
-      )
-    ) {
-      throw new Error("You are already assigned to this roster.");
-    }
-    const duplicate = [...this.signupRequests.values()].find(
-      (request) =>
-        request.rosterId === rosterId &&
-        request.applicantId === interaction.user.id &&
-        (request.status === "pending" ||
-          request.status === "draft-accepted"),
-    );
-    if (duplicate) {
-      throw new Error("You already have an active request for this roster.");
-    }
-
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const forum = await guild.channels.fetch(binding.signupRequestForumId);
-    if (!forum || forum.type !== ChannelType.GuildForum) {
-      throw new Error("The configured Signup Requests channel is not a Forum.");
-    }
-    const now = new Date().toISOString();
-    const request = raidSignupRequestSchema.parse({
-      schemaVersion: 1,
-      requestId: randomUUID(),
-      guildId: guild.id,
-      rosterId,
-      applicantId: interaction.user.id,
-      classKey,
-      specKey,
-      status: "pending",
-      createdAt: now,
-      updatedAt: now,
-      threadId: null,
-      decidedBy: null,
-      decisionAt: null,
-    });
-    const member = await guild.members.fetch(interaction.user.id);
-    const thread = await forum.threads.create({
-      name: `${member.displayName} — ${roster.name}`.slice(0, 100),
-      message: {
-        embeds: [buildRaidSignupRequestEmbed(request, roster.name)],
-        components: this.signupRequestComponents(request),
-        allowedMentions: { parse: [] },
-      },
-      reason: `Zors signup request ${request.requestId}`,
-    });
-    request.threadId = thread.id;
-    this.signupRequestThreadIds.set(request.requestId, thread.id);
-    await this.persistSignupRequest(guild, request);
-    await interaction.editReply(
-      `Your request for **${roster.name}** was submitted with **${classLabel(classKey)} / ${specLabel(classKey, specKey)}**.`,
-    );
-  }
-
   private async finalize(
     guild: Guild,
     roster: RaidRosterDocument,
@@ -1097,21 +1329,42 @@ export class RaidRosterService {
       }),
     );
     const warningId = roster.warningMessageId;
-    const stagedRequests = this.signupRequestsForRoster(roster.rosterId).filter(
-      ({ status }) => status === "draft-accepted",
+    const activeRequests = this.signupRequestsForRoster(roster.rosterId);
+    const draftAssignmentsByMember = new Map(
+      draft.assignments.map((assignment) => [assignment.memberId, assignment]),
     );
-    if (stagedRequests.length > 0 && !role.editable) {
+    const willApproveRequest = activeRequests.some((request) => {
+      const assignment = draftAssignmentsByMember.get(request.applicantId);
+      return (
+        assignment !== undefined &&
+        (request.status === "draft-accepted" ||
+          assignment.placement.kind === "group" ||
+          assignment.placement.kind === "bench")
+      );
+    });
+    if (willApproveRequest && !role.editable) {
       throw new Error(
         "Zors cannot assign the bound team role. Move the Zors role above it and grant Manage Roles.",
       );
     }
     const diff = finalizeRoster(roster, editorId);
     await this.persist(guild, roster);
-    const finalizedMemberIds = new Set(
-      roster.finalizedRevision?.assignments.map(({ memberId }) => memberId) ?? [],
+    const finalizedAssignmentsByMember = new Map(
+      roster.finalizedRevision?.assignments.map((assignment) => [
+        assignment.memberId,
+        assignment,
+      ]) ?? [],
     );
-    for (const request of stagedRequests) {
-      const approved = finalizedMemberIds.has(request.applicantId);
+    for (const request of activeRequests) {
+      const assignment = finalizedAssignmentsByMember.get(request.applicantId);
+      const shouldResolve =
+        request.status === "draft-accepted" ||
+        assignment?.placement.kind === "group" ||
+        assignment?.placement.kind === "bench";
+      if (!shouldResolve) {
+        continue;
+      }
+      const approved = assignment !== undefined;
       if (approved) {
         const member = await guild.members.fetch(request.applicantId);
         await member.roles.add(
@@ -1179,17 +1432,12 @@ export class RaidRosterService {
       throw new Error("Raid rosters are not enabled in this server.");
     }
     const subcommand = interaction.options.getSubcommand();
-    if (subcommand === "request") {
-      await this.createSignupRequest(interaction, binding);
-      return;
-    }
     await this.authorize(interaction, binding);
     if (subcommand === "help") {
       await interaction.reply({
         content: [
           "**Zors roster commands**",
           "`/zors-roster create` — Create one roster from the Roster Control post.",
-          "`/zors-roster request` — Request to join an active roster.",
           "`/zors-roster show` — Show the current roster state.",
           "`/zors-roster finalize` — Publish the working Draft.",
           "`/zors-roster revert` — Restore the last finalized snapshot.",
@@ -1243,6 +1491,121 @@ export class RaidRosterService {
     throw new Error("Unknown Zors roster command.");
   }
 
+  public async handleRaidCommand(
+    interaction: ChatInputCommandInteraction,
+  ): Promise<void> {
+    const binding = interactionBinding(
+      interaction.guildId,
+      this.config,
+      this.rosterConfig,
+    );
+    if (!binding || !isRaidRosterBindingComplete(binding)) {
+      throw new Error("Raid signups are not enabled in this server.");
+    }
+    await this.authorize(interaction, binding);
+    const subcommand = interaction.options.getSubcommand();
+    if (subcommand === "help") {
+      await interaction.reply({
+        content: [
+          "**Zors raid signup commands**",
+          "`/zors-raid create` — Create one reusable signup sheet from inside a finalized roster post.",
+          "Members request open spots from the sheet itself; Group and Bench members use DM attendance confirmations instead.",
+          "Close preserves current requests. Restart clears requests and either advances seven days or accepts a new schedule.",
+        ].join("\n"),
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    if (subcommand !== "create") {
+      throw new Error("Unknown Zors raid signup command.");
+    }
+    const guild = interaction.guild;
+    if (!guild) {
+      throw new Error("Raid signup commands require a guild.");
+    }
+    const roster = await this.rosterFromCommand(interaction);
+    if (!roster.finalizedRevision) {
+      throw new Error("Finalize this roster before creating its signup sheet.");
+    }
+    const existing = [...this.signupSheets.values()].find(
+      (signup) => signup.rosterId === roster.rosterId,
+    );
+    if (existing) {
+      throw new Error(
+        `This roster already has a reusable signup sheet in <#${existing.channelId}>. Close and restart that sheet instead.`,
+      );
+    }
+
+    const name = interaction.options.getString("name", true).trim();
+    const date = interaction.options.getString("date", true);
+    const startHour = Number(
+      interaction.options.getString("start-hour", true),
+    );
+    const endHour = Number(interaction.options.getString("end-hour", true));
+    const startAt = pdtDateHour(date, startHour);
+    let endAt = pdtDateHour(date, endHour);
+    if (new Date(endAt) <= new Date(startAt)) {
+      endAt = new Date(
+        new Date(endAt).getTime() + 24 * 60 * 60 * 1_000,
+      ).toISOString();
+    }
+
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const [teamChannel, controlForum] = await Promise.all([
+      guild.channels.fetch(roster.teamChannelId),
+      guild.channels.fetch(binding.controlForumId),
+    ]);
+    if (!teamChannel?.isSendable()) {
+      throw new Error("The roster's team channel cannot receive signup sheets.");
+    }
+    if (!controlForum || controlForum.type !== ChannelType.GuildForum) {
+      throw new Error("The configured raid control channel is not a Forum.");
+    }
+    const placeholderMessage = await teamChannel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(`🗓️ ${name}`)
+          .setDescription("Zors is creating this signup sheet."),
+      ],
+      allowedMentions: { parse: [] },
+    });
+    const raidId = randomUUID();
+    const controlThread = await controlForum.threads.create({
+      name: `Raid Signup — ${name}`.slice(0, 100),
+      message: {
+        embeds: [
+          new EmbedBuilder()
+            .setTitle(signupStorageEmbedTitle)
+            .setDescription(`Initializing raid signup ${raidId}.`),
+        ],
+        allowedMentions: { parse: [] },
+      },
+      reason: `Zors raid signup storage ${raidId}`,
+    });
+    const now = new Date().toISOString();
+    const signup = raidSignupSheetSchema.parse({
+      schemaVersion: 1,
+      raidId,
+      guildId: guild.id,
+      rosterId: roster.rosterId,
+      name,
+      startAt,
+      endAt,
+      status: "open",
+      cycle: 1,
+      channelId: teamChannel.id,
+      messageId: placeholderMessage.id,
+      controlThreadId: controlThread.id,
+      createdAt: now,
+      createdBy: interaction.user.id,
+      updatedAt: now,
+    });
+    await this.persistSignupSheet(guild, signup);
+    await interaction.editReply(
+      `Created **${name}** in <#${teamChannel.id}>.`,
+    );
+  }
+
   public async handleAutocomplete(
     interaction: AutocompleteInteraction,
   ): Promise<boolean> {
@@ -1260,36 +1623,6 @@ export class RaidRosterService {
     }
     const focusedOption = interaction.options.getFocused(true);
     const focused = String(focusedOption.value).toLowerCase();
-    if (focusedOption.name === "roster") {
-      const choices = [...this.rosters.values()]
-        .filter(
-          (roster) =>
-            roster.guildId === interaction.guildId &&
-            roster.status !== "archived" &&
-            roster.name.toLowerCase().includes(focused),
-        )
-        .sort((left, right) => left.name.localeCompare(right.name))
-        .slice(0, 25)
-        .map((roster) => ({ name: roster.name, value: roster.rosterId }));
-      await interaction.respond(choices);
-      return true;
-    }
-    if (focusedOption.name === "specialization") {
-      const classKey = interaction.options.getString("wow-class");
-      const definition =
-        wowForeverClassSpecializations[
-          classKey as keyof typeof wowForeverClassSpecializations
-        ];
-      const choices = (definition?.specializations ?? [])
-        .filter(
-          ([key, label]) =>
-            key.includes(focused) || label.toLowerCase().includes(focused),
-        )
-        .slice(0, 25)
-        .map(([value, name]) => ({ name, value }));
-      await interaction.respond(choices);
-      return true;
-    }
     if (focusedOption.name !== "team-role") {
       return false;
     }
@@ -1487,6 +1820,70 @@ export class RaidRosterService {
     );
   }
 
+  private requireSignupSession(
+    sessionId: string,
+    userId: string,
+  ): SignupSession {
+    const session = this.signupSessions.get(sessionId);
+    if (!session || session.userId !== userId || session.expiresAt < Date.now()) {
+      this.signupSessions.delete(sessionId);
+      throw new Error("That signup request expired. Press Request a Spot again.");
+    }
+    return session;
+  }
+
+  private signupClassPicker(
+    session: SignupSession,
+  ): ActionRowBuilder<StringSelectMenuBuilder> {
+    return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(
+          `${customIdPrefix}:raid-session:class:${session.id}`,
+        )
+        .setPlaceholder("Choose your requested class")
+        .addOptions(
+          Object.entries(wowForeverClassSpecializations).map(
+            ([value, definition]) => ({ label: definition.label, value }),
+          ),
+        ),
+    );
+  }
+
+  private signupSpecPicker(
+    session: SignupSession,
+  ): ActionRowBuilder<StringSelectMenuBuilder> {
+    const definition =
+      wowForeverClassSpecializations[
+        session.classKey as keyof typeof wowForeverClassSpecializations
+      ];
+    if (!definition) {
+      throw new Error("Choose a valid class.");
+    }
+    return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`${customIdPrefix}:raid-session:spec:${session.id}`)
+        .setPlaceholder("Choose your requested specialization")
+        .addOptions(
+          definition.specializations.map(([value, label]) => ({ value, label })),
+        ),
+    );
+  }
+
+  private signupSubmitButtons(
+    session: SignupSession,
+  ): ActionRowBuilder<ButtonBuilder> {
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${customIdPrefix}:raid-session:submit:${session.id}`)
+        .setLabel("Submit Request")
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`${customIdPrefix}:raid-session:cancel:${session.id}`)
+        .setLabel("Cancel")
+        .setStyle(ButtonStyle.Secondary),
+    );
+  }
+
   private placementPicker(
     session: EditSession,
     roster: RaidRosterDocument,
@@ -1575,9 +1972,22 @@ export class RaidRosterService {
     if (!guild) {
       throw new Error("Roster controls require a guild.");
     }
-    if (["finalize", "revert", "archive"].includes(action)) {
+    if (["continue", "finalize", "revert", "archive"].includes(action)) {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      if (action === "finalize") {
+      if (action === "continue") {
+        if (!roster.draftRevision) {
+          throw new Error("This roster no longer has a Draft.");
+        }
+        const warningId = roster.warningMessageId;
+        roster.draftRevision.editedAt = new Date().toISOString();
+        roster.draftRevision.editedBy = interaction.user.id;
+        roster.warningMessageId = null;
+        await this.persist(guild, roster);
+        await this.deleteWarning(guild, roster, warningId);
+        await interaction.editReply(
+          "Draft preserved. The 30-minute inactivity timer has restarted.",
+        );
+      } else if (action === "finalize") {
         const diff = await this.finalize(guild, roster, interaction.user.id);
         await interaction.editReply(
           `Finalized the Draft; ${diff.length} member assignment(s) changed.`,
@@ -1884,16 +2294,40 @@ export class RaidRosterService {
           throw new Error("That signup request is no longer pending.");
         }
         const nextRoster = structuredClone(roster);
-        addRosterAssignment(
-          nextRoster,
-          {
-            memberId: session.memberId,
-            classKey: session.classKey,
-            specKey: session.specKey,
-            placement: session.placement,
-          },
-          interaction.user.id,
-        );
+        const existingAssignment = (
+          activeRevision(nextRoster)?.assignments ?? []
+        ).find(({ memberId }) => memberId === session.memberId);
+        if (existingAssignment) {
+          if (existingAssignment.placement.kind !== "overflow") {
+            throw new Error(
+              "That applicant is already assigned to a Group or Bench.",
+            );
+          }
+          changeRosterSpecialization(
+            nextRoster,
+            session.memberId,
+            session.classKey,
+            session.specKey,
+            interaction.user.id,
+          );
+          moveRosterAssignment(
+            nextRoster,
+            session.memberId,
+            session.placement,
+            interaction.user.id,
+          );
+        } else {
+          addRosterAssignment(
+            nextRoster,
+            {
+              memberId: session.memberId,
+              classKey: session.classKey,
+              specKey: session.specKey,
+              placement: session.placement,
+            },
+            interaction.user.id,
+          );
+        }
         const nextRequest: RaidSignupRequest = {
           ...request,
           status: "draft-accepted",
@@ -2171,6 +2605,341 @@ export class RaidRosterService {
     );
   }
 
+  private isGroupOrBenchMember(
+    roster: RaidRosterDocument,
+    memberId: string,
+  ): boolean {
+    return (
+      roster.finalizedRevision?.assignments.some(
+        (assignment) =>
+          assignment.memberId === memberId &&
+          (assignment.placement.kind === "group" ||
+            assignment.placement.kind === "bench"),
+      ) ?? false
+    );
+  }
+
+  private async beginSheetSignup(
+    interaction: ButtonInteraction,
+    signup: RaidSignupSheet,
+  ): Promise<void> {
+    if (
+      signup.status !== "open" ||
+      signup.channelId !== interaction.channelId ||
+      signup.messageId !== interaction.message.id
+    ) {
+      throw new Error("This signup sheet is no longer open.");
+    }
+    const roster = this.rosters.get(signup.rosterId);
+    if (!roster) {
+      throw new Error("This signup sheet's roster is unavailable.");
+    }
+    if (this.isGroupOrBenchMember(roster, interaction.user.id)) {
+      throw new Error(
+        "You are already assigned to a Group or Bench. Your attendance is handled through Zors DM confirmations.",
+      );
+    }
+    const duplicate = this.signupRequestsForSheet(signup.raidId).find(
+      ({ applicantId }) => applicantId === interaction.user.id,
+    );
+    if (duplicate) {
+      throw new Error("You already have an active request on this signup sheet.");
+    }
+    const session: SignupSession = {
+      id: randomUUID(),
+      raidId: signup.raidId,
+      userId: interaction.user.id,
+      expiresAt: Date.now() + sessionLifetimeMs,
+    };
+    this.signupSessions.set(session.id, session);
+    await interaction.reply({
+      content: "Choose the class you want to play for this raid.",
+      components: [this.signupClassPicker(session)],
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  private async handleSignupSelection(
+    interaction: StringSelectMenuInteraction,
+    stage: "class" | "spec",
+    session: SignupSession,
+  ): Promise<void> {
+    const selected = interaction.values[0];
+    if (!selected) {
+      throw new Error("Choose one option.");
+    }
+    if (stage === "class") {
+      session.classKey = selected;
+      delete session.specKey;
+      await interaction.update({
+        content: "Choose the specialization you want to play.",
+        components: [this.signupSpecPicker(session)],
+      });
+      return;
+    }
+    session.specKey = selected;
+    if (!session.classKey) {
+      throw new Error("Choose a class before choosing a specialization.");
+    }
+    validateClassSpecialization(session.classKey, session.specKey);
+    await interaction.update({
+      content: `Submit **${classLabel(session.classKey)} / ${specLabel(session.classKey, session.specKey)}** for this signup?`,
+      components: [this.signupSubmitButtons(session)],
+    });
+  }
+
+  private async submitSheetSignup(
+    interaction: ButtonInteraction,
+    session: SignupSession,
+    binding: RaidRosterBinding & { signupRequestForumId: string },
+  ): Promise<void> {
+    const signup = this.signupSheets.get(session.raidId);
+    const guild = interaction.guild;
+    if (!signup || signup.status !== "open" || !guild) {
+      throw new Error("This signup sheet is no longer open.");
+    }
+    const roster = this.rosters.get(signup.rosterId);
+    if (!roster || !session.classKey || !session.specKey) {
+      throw new Error("The signup request is incomplete.");
+    }
+    validateClassSpecialization(session.classKey, session.specKey);
+    if (this.isGroupOrBenchMember(roster, interaction.user.id)) {
+      throw new Error(
+        "You are now assigned to a Group or Bench and cannot create a signup request.",
+      );
+    }
+    if (
+      this.signupRequestsForSheet(signup.raidId).some(
+        ({ applicantId }) => applicantId === interaction.user.id,
+      )
+    ) {
+      throw new Error("You already have an active request on this signup sheet.");
+    }
+    const submissionKey = `${signup.raidId}:${interaction.user.id}`;
+    if (this.pendingSignupSubmissions.has(submissionKey)) {
+      throw new Error("Your signup request is already being submitted.");
+    }
+    this.pendingSignupSubmissions.add(submissionKey);
+    try {
+      await interaction.deferUpdate();
+      const forum = await guild.channels.fetch(binding.signupRequestForumId);
+      if (!forum || forum.type !== ChannelType.GuildForum) {
+        throw new Error("The configured Signup Requests channel is not a Forum.");
+      }
+      const now = new Date().toISOString();
+      const request = raidSignupRequestSchema.parse({
+        schemaVersion: 1,
+        requestId: randomUUID(),
+        guildId: guild.id,
+        rosterId: roster.rosterId,
+        raidId: signup.raidId,
+        applicantId: interaction.user.id,
+        classKey: session.classKey,
+        specKey: session.specKey,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now,
+        threadId: null,
+        decidedBy: null,
+        decisionAt: null,
+      });
+      const member = await guild.members.fetch(interaction.user.id);
+      const thread = await forum.threads.create({
+        name: `${member.displayName} — ${signup.name}`.slice(0, 100),
+        message: {
+          embeds: [buildRaidSignupRequestEmbed(request, roster.name)],
+          components: this.signupRequestComponents(request),
+          allowedMentions: { parse: [] },
+        },
+        reason: `Zors signup request ${request.requestId}`,
+      });
+      request.threadId = thread.id;
+      this.signupRequestThreadIds.set(request.requestId, thread.id);
+      await this.persistSignupRequest(guild, request);
+      this.signupSessions.delete(session.id);
+      await interaction.editReply({
+        content: `✅ Requested **${classLabel(request.classKey)} / ${specLabel(request.classKey, request.specKey)}** for **${signup.name}**.`,
+        components: [],
+      });
+    } finally {
+      this.pendingSignupSubmissions.delete(submissionKey);
+    }
+  }
+
+  private async clearSheetRequests(
+    guild: Guild,
+    signup: RaidSignupSheet,
+  ): Promise<number> {
+    const requests = [...this.signupRequests.values()].filter(
+      (request) => request.raidId === signup.raidId,
+    );
+    if (requests.some(({ status }) => status === "draft-accepted")) {
+      throw new Error(
+        "Finalize or revert the roster Draft before restarting this signup sheet.",
+      );
+    }
+    let cleared = 0;
+    for (const request of requests) {
+      if (request.status === "pending") {
+        await this.persistSignupRequest(guild, {
+          ...request,
+          status: "cleared",
+          updatedAt: new Date().toISOString(),
+          decidedBy: null,
+          decisionAt: null,
+        });
+        cleared += 1;
+      }
+      const threadId = this.signupRequestThreadIds.get(request.requestId);
+      const thread = threadId ? await guild.channels.fetch(threadId) : null;
+      if (thread?.isThread()) {
+        await thread.setArchived(true, "Clear request for restarted signup");
+      }
+    }
+    return cleared;
+  }
+
+  private async restartSignupSheet(
+    guild: Guild,
+    signup: RaidSignupSheet,
+    restarted: RaidSignupSheet,
+  ): Promise<number> {
+    if (signup.status !== "closed") {
+      throw new Error("Close this signup sheet before restarting it.");
+    }
+    const cleared = await this.clearSheetRequests(guild, signup);
+    await this.persistSignupSheet(guild, restarted);
+    return cleared;
+  }
+
+  private async handleRaidControlButton(
+    interaction: ButtonInteraction,
+    action: string,
+    raidId: string,
+    binding: RaidRosterBinding,
+  ): Promise<void> {
+    const signup = this.signupSheets.get(raidId);
+    if (!signup) {
+      throw new Error("That signup sheet is unavailable.");
+    }
+    if (action === "request") {
+      await this.beginSheetSignup(interaction, signup);
+      return;
+    }
+    await this.authorize(interaction, binding);
+    const guild = interaction.guild;
+    if (!guild) {
+      throw new Error("Signup controls require a guild.");
+    }
+    if (action === "close") {
+      if (signup.status !== "open") {
+        throw new Error("This signup sheet is already closed.");
+      }
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await this.persistSignupSheet(guild, {
+        ...signup,
+        status: "closed",
+        updatedAt: new Date().toISOString(),
+      });
+      await interaction.editReply(
+        "Closed the signup. Existing requests remain visible until Restart.",
+      );
+      return;
+    }
+    if (action === "restart-seven") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const restarted = shiftSignupSevenDays(signup);
+      const cleared = await this.restartSignupSheet(guild, signup, restarted);
+      await interaction.editReply(
+        `Restarted the sheet seven days later and cleared ${cleared} pending request(s).`,
+      );
+      return;
+    }
+    if (action === "restart-custom") {
+      if (signup.status !== "closed") {
+        throw new Error("Close this signup sheet before restarting it.");
+      }
+      const localStart = new Date(
+        new Date(signup.startAt).getTime() - 7 * 60 * 60 * 1_000,
+      );
+      const localEnd = new Date(
+        new Date(signup.endAt).getTime() - 7 * 60 * 60 * 1_000,
+      );
+      await interaction.showModal(
+        new ModalBuilder()
+          .setCustomId(`${customIdPrefix}:raid-restart:${signup.raidId}`)
+          .setTitle("Restart Signup with New Schedule")
+          .addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(
+              new TextInputBuilder()
+                .setCustomId("date")
+                .setLabel("Date (YYYY-MM-DD)")
+                .setStyle(TextInputStyle.Short)
+                .setValue(localStart.toISOString().slice(0, 10))
+                .setRequired(true),
+            ),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(
+              new TextInputBuilder()
+                .setCustomId("start-hour")
+                .setLabel("Start hour PDT (0-23)")
+                .setStyle(TextInputStyle.Short)
+                .setValue(String(localStart.getUTCHours()))
+                .setRequired(true),
+            ),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(
+              new TextInputBuilder()
+                .setCustomId("end-hour")
+                .setLabel("End hour PDT (0-23)")
+                .setStyle(TextInputStyle.Short)
+                .setValue(String(localEnd.getUTCHours()))
+                .setRequired(true),
+            ),
+          ),
+      );
+      return;
+    }
+    throw new Error("Unknown raid signup control.");
+  }
+
+  private async handleRaidRestartModal(
+    interaction: ModalSubmitInteraction,
+    raidId: string,
+    binding: RaidRosterBinding,
+  ): Promise<void> {
+    await this.authorize(interaction, binding);
+    const signup = this.signupSheets.get(raidId);
+    const guild = interaction.guild;
+    if (!signup || !guild) {
+      throw new Error("That signup sheet is unavailable.");
+    }
+    const date = interaction.fields.getTextInputValue("date").trim();
+    const startHour = Number(
+      interaction.fields.getTextInputValue("start-hour").trim(),
+    );
+    const endHour = Number(
+      interaction.fields.getTextInputValue("end-hour").trim(),
+    );
+    const startAt = pdtDateHour(date, startHour);
+    let endAt = pdtDateHour(date, endHour);
+    if (new Date(endAt) <= new Date(startAt)) {
+      endAt = new Date(
+        new Date(endAt).getTime() + 24 * 60 * 60 * 1_000,
+      ).toISOString();
+    }
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const cleared = await this.restartSignupSheet(guild, signup, {
+      ...signup,
+      startAt,
+      endAt,
+      status: "open",
+      cycle: signup.cycle + 1,
+      updatedAt: new Date().toISOString(),
+    });
+    await interaction.editReply(
+      `Restarted the sheet with the new schedule and cleared ${cleared} pending request(s).`,
+    );
+  }
+
   public async handleInteraction(interaction: Interaction): Promise<boolean> {
     if (
       !(
@@ -2212,6 +2981,49 @@ export class RaidRosterService {
     );
     if (!binding || !isRaidRosterBindingComplete(binding)) {
       throw new Error("Raid roster controls are not enabled in this server.");
+    }
+    if (parts[1] === "raid" && interaction.isButton()) {
+      await this.handleRaidControlButton(
+        interaction,
+        parts[2] ?? "",
+        parts[3] ?? "",
+        binding,
+      );
+      return true;
+    }
+    if (parts[1] === "raid-session") {
+      const stage = parts[2] ?? "";
+      const session = this.requireSignupSession(
+        parts[3] ?? "",
+        interaction.user.id,
+      );
+      if (stage === "cancel" && interaction.isButton()) {
+        this.signupSessions.delete(session.id);
+        await interaction.update({
+          content: "Signup request cancelled.",
+          components: [],
+        });
+        return true;
+      }
+      if (stage === "submit" && interaction.isButton()) {
+        await this.submitSheetSignup(interaction, session, binding);
+        return true;
+      }
+      if (
+        interaction.isStringSelectMenu() &&
+        (stage === "class" || stage === "spec")
+      ) {
+        await this.handleSignupSelection(interaction, stage, session);
+        return true;
+      }
+    }
+    if (parts[1] === "raid-restart" && interaction.isModalSubmit()) {
+      await this.handleRaidRestartModal(
+        interaction,
+        parts[2] ?? "",
+        binding,
+      );
+      return true;
     }
     if (
       parts[1] === "request" &&

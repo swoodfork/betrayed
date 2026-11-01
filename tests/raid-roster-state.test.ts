@@ -15,6 +15,7 @@ import {
 import {
   buildRosterEmbed,
   buildRosterControls,
+  buildDraftWarningControls,
   isMatchingTeamRoleName,
 } from "../src/raid-rosters.js";
 import {
@@ -263,6 +264,7 @@ describe("raid roster state", () => {
       requestId: "c6a13cc8-39ce-48fc-a220-63b6e1313252",
       guildId: document.guildId,
       rosterId: document.rosterId,
+      raidId: "d6a13cc8-39ce-48fc-a220-63b6e1313252",
       applicantId: memberTwo,
       classKey: "mage",
       specKey: "frost",
@@ -307,6 +309,7 @@ describe("raid roster state", () => {
       requestId: "c6a13cc8-39ce-48fc-a220-63b6e1313252",
       guildId: "423456789012345678",
       rosterId: "b6a13cc8-39ce-48fc-a220-63b6e1313252",
+      raidId: "d6a13cc8-39ce-48fc-a220-63b6e1313252",
       applicantId: memberOne,
       classKey: "druid",
       specKey: "restoration",
@@ -340,5 +343,17 @@ describe("raid roster state", () => {
       controls.find(({ label }) => label === "Change Spec")?.style,
     ).toBe(1);
     expect(controls.map(({ label }) => label)).not.toContain("Bump");
+  });
+
+  it("orders Draft warning actions as continue, finalize, then revert", () => {
+    const controls = buildDraftWarningControls(roster().rosterId)
+      .components
+      .map((button) => button.toJSON());
+
+    expect(controls.map(({ label }) => label)).toEqual([
+      "Continue Drafting",
+      "Finalize",
+      "Revert Draft",
+    ]);
   });
 });
