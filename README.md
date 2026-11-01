@@ -90,6 +90,10 @@ Channels in Welcome to Betrayed are public-readable but staff-published.
 `📌server-guide`, `👋welcome`, and `📝raid-application` deny member messages
 while allowing Guild Master, Discord Admin, Officer, and Zors Bot to publish.
 
+`💤 Sleep` is the final channel in `🔊 Raid Voice 🔊` and is intended for
+Discord's inactive-member destination. Select it manually under **Server
+Settings → Overview → Inactive Channel** and choose the desired timeout.
+
 Stop the bot with `Ctrl+C`.
 
 ## Raid applications

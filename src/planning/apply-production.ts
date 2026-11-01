@@ -15,6 +15,7 @@ import { parse } from "yaml";
 import { loadConfig } from "../config.js";
 import {
   authorizeProductionApply,
+  productionConvergenceHash,
   productionPlanHash,
 } from "./production-apply-policy.js";
 import { positionImmediatelyAfter } from "./channel-position.js";
@@ -519,7 +520,10 @@ async function main(): Promise<void> {
       bindings,
       currentInventory,
     );
-    if (productionPlanHash(livePlan) !== approvedHash) {
+    if (
+      productionConvergenceHash(livePlan) !==
+      productionConvergenceHash(plan)
+    ) {
       throw new Error(
         "Production drifted after planning. Export and approve a new plan.",
       );

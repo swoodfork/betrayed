@@ -6,9 +6,9 @@ guild:
   name: Betrayed
 
 inventory:
-  file: MATURE_PRODUCTION_FINAL.json
-  generatedAt: "2026-10-31T23:46:50.312Z"
-  sha256: "cef0256fd1c82f379473bc8e5d1f5c770e5ac14a4c8c0846b2f28c3eaf63227d"
+  file: SLEEP_PRODUCTION_FINAL.json
+  generatedAt: "2026-11-01T00:15:16.691Z"
+  sha256: "0bf6148ed69057853f52d3d44a3194008e3bb43dfbe16454458f0b42c5eb13e5"
 
 roleBindings:
   guild-master: "705314740330561587"
@@ -125,6 +125,7 @@ channelBindings:
   raid-voice-6: "1565838754453655622"
   raid-voice-7: "1565838755447705660"
   raid-voice-8: "1565838756274110514"
+  sleep: "1566244166248304792"
   copy-pasta: "905136377543426098"
 
 retirementCandidates: {}
