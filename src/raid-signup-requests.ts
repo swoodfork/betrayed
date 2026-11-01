@@ -23,6 +23,7 @@ export const raidSignupRequestSchema = z
       "approved",
       "rejected",
       "cleared",
+      "withdrawn",
     ]),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
@@ -70,6 +71,8 @@ function statusLabel(status: RaidSignupRequest["status"]): string {
       return "🔴 Rejected";
     case "cleared":
       return "⚫ Cleared for the next signup cycle";
+    case "withdrawn":
+      return "⚪ Withdrawn by applicant";
   }
 }
 
@@ -84,6 +87,8 @@ export function buildRaidSignupRequestEmbed(
         ? 0x2ecc71
         : request.status === "rejected"
           ? 0xe74c3c
+          : request.status === "withdrawn"
+            ? 0x7f8c8d
           : request.status === "draft-accepted"
             ? 0x3498db
             : 0xf1c40f,

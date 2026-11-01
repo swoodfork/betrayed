@@ -144,7 +144,7 @@ describe("raid signup sheet state", () => {
       row.components.map((button) => button.toJSON().label),
     );
 
-    expect(openLabels).toEqual(["Request a Spot"]);
+    expect(openLabels).toEqual(["Request a Spot", "Rescind Request"]);
     expect(closedLabels).toEqual([]);
   });
 });

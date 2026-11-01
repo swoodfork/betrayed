@@ -131,8 +131,11 @@ only; the persistent roster post remains the complete view.
 
 After a roster has a finalized revision, a coordinator runs `/zors-signup create`
 inside its roster post. Zors creates one reusable signup sheet in the roster's
-bound team channel. Members request a spot from that sheet, choose class/spec,
-and receive one durable private request post in `📨signup-requests`. Members
+bound team channel. Members can **Request a Spot** or **Rescind Request** from
+that sheet. A new request collects class/spec and creates one durable private
+request post in `📨signup-requests`. Rescinding a pending request marks it
+withdrawn, removes it from active request displays, and archives its private
+request post. Members
 already assigned to a Group or Bench cannot request another spot because their
 attendance is handled by cycle-specific Zors DMs. Each DM includes the full
 signup name, Discord-localized raid date and time, roster spot, and a direct
@@ -140,6 +143,12 @@ signup-sheet link. **I will be at raid** records a durable confirmation;
 **Tentative** and **I cannot attend** require an explanation and forward the
 response to `🔐coordinator-affairs`. Overflow members may request a spot,
 including with a different spec.
+
+Rescind never silently removes a Group or Bench assignment. If the member
+already has a finalized spot or is staged into a roster Draft, Zors asks whether
+they intend to withdraw from the raid and requires an explanation. The roster
+spot remains in place, the attendance status becomes **Not Attending**, and a
+detailed message is sent to Raid Coordinators for staff follow-up.
 
 Pending requests are projected into the roster and signup sheet without being
 mixed into approved Overflow. Move Member lists assigned members and pending

@@ -543,6 +543,10 @@ export function buildSignupSheetControls(
         .setCustomId(`${customIdPrefix}:raid:request:${signup.raidId}`)
         .setLabel("Request a Spot")
         .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`${customIdPrefix}:raid:rescind:${signup.raidId}`)
+        .setLabel("Rescind Request")
+        .setStyle(ButtonStyle.Secondary),
     ),
   ];
 }
@@ -3471,7 +3475,7 @@ export class RaidRosterService {
     if (!roster) {
       throw new Error("The roster server binding is unavailable.");
     }
-    const assignment = roster.finalizedRevision?.assignments.find(
+    const assignment = activeRevision(roster)?.assignments.find(
       ({ memberId: assignedMemberId }) => assignedMemberId === memberId,
     );
     if (!assignment) {
@@ -3604,9 +3608,11 @@ export class RaidRosterService {
       throw new Error("This attendance follow-up is stale.");
     }
     const roster = this.rosters.get(signup.rosterId);
-    const assignment = roster?.finalizedRevision?.assignments.find(
+    const assignment = roster
+      ? activeRevision(roster)?.assignments.find(
       ({ memberId: assignedMemberId }) => assignedMemberId === memberId,
-    );
+        )
+      : undefined;
     if (!roster || !assignment) {
       throw new Error("This member no longer has a finalized roster spot.");
     }
@@ -3824,6 +3830,93 @@ export class RaidRosterService {
             assignment.placement.kind === "bench"),
       ) ?? false
     );
+  }
+
+  private async beginRescindRequest(
+    interaction: ButtonInteraction,
+    signup: RaidSignupSheet,
+  ): Promise<void> {
+    if (
+      signup.status !== "open" ||
+      signup.channelId !== interaction.channelId ||
+      signup.messageId !== interaction.message.id
+    ) {
+      throw new Error("This signup sheet is no longer open.");
+    }
+    const guild = interaction.guild;
+    const roster = this.rosters.get(signup.rosterId);
+    if (!guild || !roster) {
+      throw new Error("This signup sheet's roster is unavailable.");
+    }
+    const request = this.signupRequestsForSheet(signup.raidId).find(
+      ({ applicantId }) => applicantId === interaction.user.id,
+    );
+    const assignment = activeRevision(roster)?.assignments.find(
+      ({ memberId, placement }) =>
+        memberId === interaction.user.id &&
+        (placement.kind === "group" || placement.kind === "bench"),
+    );
+    if (request?.status === "pending") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const now = new Date().toISOString();
+      await this.persistSignupRequest(guild, {
+        ...request,
+        status: "withdrawn",
+        updatedAt: now,
+        decidedBy: interaction.user.id,
+        decisionAt: now,
+      });
+      if (request.threadId) {
+        const thread = await guild.channels.fetch(request.threadId);
+        if (!thread?.isThread()) {
+          throw new Error("The withdrawn signup request thread is unavailable.");
+        }
+        if (!thread.archived) {
+          await thread.setArchived(true, "Applicant rescinded signup request");
+        }
+      }
+      if (!assignment) {
+        await interaction.editReply(
+          "Your signup request was rescinded and removed from the active request list.",
+        );
+        return;
+      }
+    }
+    if (assignment || request?.status === "draft-accepted") {
+      const withdrawalPrompt = {
+        content:
+          "You already have a Group or Bench spot. Are you trying to withdraw from this raid? Zors will keep your roster spot in place and ask you to explain the withdrawal to the Raid Coordinators.",
+        components: [
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+              .setCustomId(
+                `${customIdPrefix}:raid:withdraw-confirm:${signup.raidId}:${interaction.user.id}`,
+              )
+              .setLabel("Yes, Withdraw from Raid")
+              .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+              .setCustomId(
+                `${customIdPrefix}:raid:withdraw-cancel:${signup.raidId}:${interaction.user.id}`,
+              )
+              .setLabel("Cancel")
+              .setStyle(ButtonStyle.Secondary),
+          ),
+        ],
+      };
+      if (interaction.deferred) {
+        await interaction.editReply(withdrawalPrompt);
+      } else {
+        await interaction.reply({
+          ...withdrawalPrompt,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      return;
+    }
+    await interaction.reply({
+      content: "You do not have an active signup request to rescind.",
+      flags: MessageFlags.Ephemeral,
+    });
   }
 
   private async beginSheetSignup(
@@ -4138,6 +4231,7 @@ export class RaidRosterService {
     action: string,
     raidId: string,
     binding: CompleteRaidRosterBinding,
+    memberId?: string,
   ): Promise<void> {
     const signup = this.signupSheets.get(raidId);
     if (!signup) {
@@ -4148,6 +4242,61 @@ export class RaidRosterService {
     }
     if (action === "request") {
       await this.beginSheetSignup(interaction, signup);
+      return;
+    }
+    if (action === "rescind") {
+      await this.beginRescindRequest(interaction, signup);
+      return;
+    }
+    if (action === "withdraw-cancel") {
+      if (interaction.user.id !== memberId) {
+        throw new Error("This withdrawal prompt belongs to another member.");
+      }
+      await interaction.update({
+        content: "Raid withdrawal cancelled. Your roster spot was not changed.",
+        components: [],
+      });
+      return;
+    }
+    if (action === "withdraw-confirm") {
+      if (interaction.user.id !== memberId) {
+        throw new Error("This withdrawal prompt belongs to another member.");
+      }
+      const roster = this.rosters.get(signup.rosterId);
+      const assignment = roster
+        ? activeRevision(roster)?.assignments.find(
+            ({ memberId: assignedMemberId, placement }) =>
+              assignedMemberId === memberId &&
+              (placement.kind === "group" || placement.kind === "bench"),
+          )
+        : undefined;
+      const stagedRequest = this.signupRequestsForSheet(signup.raidId).find(
+        (request) =>
+          request.applicantId === memberId &&
+          request.status === "draft-accepted",
+      );
+      if (!assignment && !stagedRequest) {
+        throw new Error(
+          "You no longer have a Group or Bench spot to withdraw from.",
+        );
+      }
+      await interaction.showModal(
+        new ModalBuilder()
+          .setCustomId(
+            `${customIdPrefix}:attend-response:declined:${signup.raidId}:${signup.cycle}:${memberId}`,
+          )
+          .setTitle("Withdraw from Raid")
+          .addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(
+              new TextInputBuilder()
+                .setCustomId("reason")
+                .setLabel("Why do you need to miss this raid?")
+                .setStyle(TextInputStyle.Paragraph)
+                .setMaxLength(1_000)
+                .setRequired(true),
+            ),
+          ),
+      );
       return;
     }
     await this.authorize(interaction, binding);
@@ -4426,6 +4575,7 @@ export class RaidRosterService {
         parts[2] ?? "",
         parts[3] ?? "",
         binding,
+        parts[4],
       );
       return true;
     }

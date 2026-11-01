@@ -1062,6 +1062,11 @@ only behind an explicit Test-guild configuration.
 - Finalize approves staged requests and assigns the team role; Revert restores
   them to Pending.
 - Close disables new requests but keeps existing requests visible.
+- Open signup sheets offer Request a Spot and Rescind Request. Rescinding a
+  pending request marks its durable request withdrawn and removes it from active
+  projections. If the member already has a Group/Bench assignment or a staged
+  Draft spot, Rescind requires a withdrawal explanation and alerts coordinators
+  without automatically removing the roster assignment.
 - Restart first writes an immutable cycle snapshot to
   `🗃️roster-archives`, then either advances exactly seven days or accepts a
   custom date/hour, clears requests, preserves the roster, and reopens the same

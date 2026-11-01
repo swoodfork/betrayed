@@ -369,6 +369,15 @@ describe("raid roster state", () => {
 
     expect(raidSignupRequestFromEmbed(embed)).toEqual(request);
     expect(() =>
+      raidSignupRequestSchema.parse({ ...request, status: "withdrawn" }),
+    ).not.toThrow();
+    expect(
+      buildRaidSignupRequestEmbed(
+        { ...request, status: "withdrawn" },
+        "Sunday 20",
+      ).toJSON().description,
+    ).toContain("Withdrawn by applicant");
+    expect(() =>
       raidSignupRequestSchema.parse({ ...request, specKey: "invalid" }),
     ).toThrow();
   });
