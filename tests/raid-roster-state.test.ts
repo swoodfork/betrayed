@@ -17,6 +17,12 @@ import {
   buildRosterControls,
   isMatchingTeamRoleName,
 } from "../src/raid-rosters.js";
+import {
+  buildRaidSignupRequestEmbed,
+  raidSignupRequestFromEmbed,
+  raidSignupRequestSchema,
+  type RaidSignupRequest,
+} from "../src/raid-signup-requests.js";
 
 const ownerId = "123456789012345678";
 const memberOne = "223456789012345678";
@@ -239,11 +245,84 @@ describe("raid roster state", () => {
       "🪑 Bench 1",
       "🪑 Bench 2",
       "\u200b",
+      "📨 Signup Requests",
       "📦 Overflow",
     ]);
     expect(embed.fields?.[0]?.value).toContain(
       "🟧 <@223456789012345678>",
     );
+  });
+
+  it("restarts Bench 2 display numbering and reduces contextual show output", () => {
+    const document = roster();
+    document.draftRevision?.assignments.push(
+      assignment(memberOne, { kind: "bench", slot: 6 }),
+    );
+    const request: RaidSignupRequest = {
+      schemaVersion: 1,
+      requestId: "c6a13cc8-39ce-48fc-a220-63b6e1313252",
+      guildId: document.guildId,
+      rosterId: document.rosterId,
+      applicantId: memberTwo,
+      classKey: "mage",
+      specKey: "frost",
+      status: "pending",
+      createdAt: "2026-11-01T00:00:00.000Z",
+      updatedAt: "2026-11-01T00:00:00.000Z",
+      threadId: "923456789012345678",
+      decidedBy: null,
+      decisionAt: null,
+    };
+
+    const persistent = buildRosterEmbed(document, {
+      signupRequests: [request],
+    }).toJSON();
+    const benchTwo = persistent.fields?.find(
+      ({ name }) => name === "🪑 Bench 2",
+    );
+    expect(benchTwo?.value).toContain(
+      "**1.** 🟧 <@223456789012345678>",
+    );
+    expect(
+      persistent.fields?.find(({ name }) => name === "📨 Signup Requests")
+        ?.value,
+    ).toContain(`<@${memberTwo}>`);
+
+    const reduced = buildRosterEmbed(document, {
+      includeOverflow: false,
+      includeSignupRequests: false,
+      signupRequests: [request],
+    }).toJSON();
+    expect(reduced.fields?.map(({ name }) => name)).not.toContain(
+      "📦 Overflow",
+    );
+    expect(reduced.fields?.map(({ name }) => name)).not.toContain(
+      "📨 Signup Requests",
+    );
+  });
+
+  it("round-trips strict signup request storage embeds", () => {
+    const request = raidSignupRequestSchema.parse({
+      schemaVersion: 1,
+      requestId: "c6a13cc8-39ce-48fc-a220-63b6e1313252",
+      guildId: "423456789012345678",
+      rosterId: "b6a13cc8-39ce-48fc-a220-63b6e1313252",
+      applicantId: memberOne,
+      classKey: "druid",
+      specKey: "restoration",
+      status: "pending",
+      createdAt: "2026-11-01T00:00:00.000Z",
+      updatedAt: "2026-11-01T00:00:00.000Z",
+      threadId: "923456789012345678",
+      decidedBy: null,
+      decisionAt: null,
+    });
+    const embed = buildRaidSignupRequestEmbed(request, "Sunday 20").toJSON();
+
+    expect(raidSignupRequestFromEmbed(embed)).toEqual(request);
+    expect(() =>
+      raidSignupRequestSchema.parse({ ...request, specKey: "invalid" }),
+    ).toThrow();
   });
 
   it("uses blue member-management controls", () => {

@@ -111,7 +111,8 @@ reply to, react to, edit, delete, or manage roster/request Forum posts.
 Roster controls support Add Member, Move Member, Swap Members, Change Spec,
 Remove Member, Finalize, Revert Draft, and Archive. Both formats reserve
 ten numbered Bench positions, displayed as two five-slot columns, and an
-unnumbered Overflow list. Finalization
+unnumbered Overflow list. Bench 2 restarts its visible numbering at 1 while
+retaining distinct internal slots 6–10. Finalization
 validates the team role, team channel, members, placements, and class/spec
 combinations, then sends change DMs only to affected members. Acknowledgements
 and reported issues are persisted; issues are forwarded to
@@ -120,7 +121,18 @@ and reported issues are persisted; issues are forwarded to
 `/zors-roster show` is contextual and intentionally has no roster or role
 option. Every roster Forum thread is durably mapped to exactly one roster ID,
 so Zors resolves the current thread and refuses the command from the control
-post or any unrelated channel.
+post or any unrelated channel. This compact response shows Groups and Bench
+only; the persistent roster post remains the complete view.
+
+Members can run `/zors-roster request` anywhere in an approved guild, choose an
+active roster, and submit a class/spec combination. Zors creates one durable,
+private post in `📨signup-requests` and projects the pending request into the
+roster post without mixing it into approved Overflow. Move Member lists both
+assigned members and pending requests. Selecting a request reuses its submitted
+class/spec and asks only for Group, Bench, or Overflow placement. The request
+remains pending finalization in the working Draft; Finalize approves it and
+assigns the roster's team role, while Revert returns it to Pending. Staff can
+also reject a still-pending request from its private post.
 
 Move, Swap, Change Spec, and Remove use roster-only member menus rather than
 Discord-wide member pickers. Rosters larger than Discord's 25-option select

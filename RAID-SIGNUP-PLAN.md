@@ -77,6 +77,7 @@ Use a command group rather than adding many unrelated top-level commands:
 
 ```text
 /zors-roster create
+/zors-roster request
 /zors-roster show
 /zors-roster finalize
 /zors-roster revert
@@ -110,12 +111,15 @@ The raid-team role identifies the team and is automatically assigned when a
 coordinator approves a signup request. The individual member assigned to each
 slot is the person Zors will DM.
 
-Roster commands must refuse to run outside the configured `📋raid-rosters`
-Forum and its child posts, even when the caller has permission. Zors should
+Roster lifecycle commands must refuse to run outside the configured
+`📋raid-rosters` Forum and its child posts, even when the caller has
+permission. The member-facing `/zors-roster request` command may run anywhere
+in either approved guild and uses active-roster autocomplete. Zors should
 create one permanent **Roster Control** post during setup so the first roster
 can be created without exposing a builder in a public channel. Every roster
-post then contains interactive controls for Edit, Add Member, Pending Requests,
-Bump, Finalize, Revert, Create Signup, and Archive. Slash commands remain
+post then contains interactive controls for Add Member, Move Member, Swap
+Members, Change Spec, Remove Member, Finalize, Revert, and Archive. Slash
+commands remain
 available as a fallback inside the protected Forum.
 
 Every roster command run inside a roster post is bound to that post's one roster
@@ -1024,13 +1028,18 @@ only behind an explicit Test-guild configuration.
 
 ### Phase 2: Signup requests
 
-- Add the public **Request to Join This Raid** workflow.
-- Create one read-only coordinator-visible Forum post per request.
-- Show Pending Approval on every projection and the roster pane.
-- Add class/spec editing, accept, and reject controls.
-- Add automatic team-role assignment.
-- Add coordinator-selected group slot or Bench placement.
-- Refresh the canonical roster and all attached active signup sheets.
+- Implemented `/zors-roster request` as the reusable intake path until dated
+  signup sheets add their Request button.
+- One durable, staff-visible Forum post is created per request.
+- Pending and Draft-accepted applicants are projected separately in the roster
+  pane; contextual Show intentionally omits both requests and Overflow.
+- Move Member accepts a pending request into Group, Bench, or Overflow while
+  reusing the submitted class/spec.
+- Finalize approves staged requests and assigns the team role; Revert restores
+  them to Pending.
+- Staff can reject a pending request from its private request post.
+- Remaining work in the dated-signup phase is to invoke this same intake from a
+  signup-sheet button and refresh every attached live sheet.
 
 ### Phase 3: Raid creation and live sheet
 

@@ -9,6 +9,7 @@ import {
 } from "discord.js";
 
 import type { BotConfig } from "./config.js";
+import { wowForeverClassSpecializations } from "./raid-applications.js";
 
 function addChannelCommand(
   command: SlashCommandSubcommandBuilder,
@@ -259,6 +260,39 @@ export const zorsRosterCommand = new SlashCommandBuilder()
             ChannelType.GuildText,
             ChannelType.GuildAnnouncement,
           )
+          .setRequired(true),
+      ),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("request")
+      .setDescription("Request to join a saved raid roster")
+      .addStringOption((option) =>
+        option
+          .setName("roster")
+          .setDescription("Roster you want to join")
+          .setAutocomplete(true)
+          .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("wow-class")
+          .setDescription("Your World of Warcraft class")
+          .addChoices(
+            ...Object.entries(wowForeverClassSpecializations).map(
+              ([value, definition]) => ({
+                name: definition.label,
+                value,
+              }),
+            ),
+          )
+          .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("specialization")
+          .setDescription("Your requested specialization")
+          .setAutocomplete(true)
           .setRequired(true),
       ),
   )

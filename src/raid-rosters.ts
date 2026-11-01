@@ -45,11 +45,18 @@ import {
   revertRoster,
   rosterSizeSchema,
   swapRosterAssignments,
+  validateClassSpecialization,
   type RaidRosterDocument,
   type RosterAssignment,
   type RosterDiff,
   type RosterPlacement,
 } from "./raid-roster-state.js";
+import {
+  buildRaidSignupRequestEmbed,
+  raidSignupRequestFromEmbed,
+  raidSignupRequestSchema,
+  type RaidSignupRequest,
+} from "./raid-signup-requests.js";
 import { wowForeverClassSpecializations } from "./raid-applications.js";
 
 const customIdPrefix = "zors-roster";
@@ -90,6 +97,7 @@ interface EditSession {
   placement?: RosterPlacement;
   memberStage?: "member" | "member-first" | "member-second";
   memberPage?: number;
+  signupRequestId?: string;
 }
 
 interface StorageMetadata {
@@ -192,7 +200,16 @@ function sortedAssignments(
   });
 }
 
-export function buildRosterEmbed(roster: RaidRosterDocument): EmbedBuilder {
+interface RosterEmbedOptions {
+  includeOverflow?: boolean;
+  includeSignupRequests?: boolean;
+  signupRequests?: readonly RaidSignupRequest[];
+}
+
+export function buildRosterEmbed(
+  roster: RaidRosterDocument,
+  options: RosterEmbedOptions = {},
+): EmbedBuilder {
   const assignments = sortedAssignments(roster);
   const revision = activeRevision(roster);
   const status =
@@ -270,7 +287,7 @@ export function buildRosterEmbed(roster: RaidRosterDocument): EmbedBuilder {
       value: Array.from({ length: 5 }, (_, index) => {
         const slot = benchGroup * 5 + index + 1;
         const assignment = benchBySlot.get(slot);
-        return `**${slot}.** ${assignment ? assignmentLine(assignment) : "—"}`;
+        return `**${index + 1}.** ${assignment ? assignmentLine(assignment) : "—"}`;
       }).join("\n"),
       inline: true,
     });
@@ -281,27 +298,50 @@ export function buildRosterEmbed(roster: RaidRosterDocument): EmbedBuilder {
     inline: true,
   });
 
-  const overflow = assignments.filter(
-    (assignment) => assignment.placement.kind === "overflow",
-  );
-  const visibleOverflow = overflow.slice(0, 30);
-  if (visibleOverflow.length === 0) {
-    embed.addFields({ name: "📦 Overflow", value: "—" });
-  } else {
-    for (let index = 0; index < visibleOverflow.length; index += 10) {
-      const chunk = visibleOverflow.slice(index, index + 10);
-      const remaining =
-        index + 10 >= visibleOverflow.length
-          ? overflow.length - visibleOverflow.length
-          : 0;
-      embed.addFields({
-        name:
-          index === 0 ? "📦 Overflow" : "📦 Overflow (continued)",
-        value: [
-          ...chunk.map(assignmentLine),
-          ...(remaining > 0 ? [`*and ${remaining} more*`] : []),
-        ].join("\n"),
-      });
+  if (options.includeSignupRequests !== false) {
+    const requests = (options.signupRequests ?? []).filter(
+      ({ status }) => status === "pending" || status === "draft-accepted",
+    );
+    embed.addFields({
+      name: "📨 Signup Requests",
+      value:
+        requests.length === 0
+          ? "—"
+          : [
+              ...requests.slice(0, 10).map(
+                (request) =>
+                  `<@${request.applicantId}> — **${classLabel(request.classKey)} / ${specLabel(request.classKey, request.specKey)}**${request.status === "draft-accepted" ? " — awaiting Finalize" : ""}`,
+              ),
+              ...(requests.length > 10
+                ? [`*and ${requests.length - 10} more*`]
+                : []),
+            ].join("\n"),
+    });
+  }
+
+  if (options.includeOverflow !== false) {
+    const overflow = assignments.filter(
+      (assignment) => assignment.placement.kind === "overflow",
+    );
+    const visibleOverflow = overflow.slice(0, 30);
+    if (visibleOverflow.length === 0) {
+      embed.addFields({ name: "📦 Overflow", value: "—" });
+    } else {
+      for (let index = 0; index < visibleOverflow.length; index += 10) {
+        const chunk = visibleOverflow.slice(index, index + 10);
+        const remaining =
+          index + 10 >= visibleOverflow.length
+            ? overflow.length - visibleOverflow.length
+            : 0;
+        embed.addFields({
+          name:
+            index === 0 ? "📦 Overflow" : "📦 Overflow (continued)",
+          value: [
+            ...chunk.map(assignmentLine),
+            ...(remaining > 0 ? [`*and ${remaining} more*`] : []),
+          ].join("\n"),
+        });
+      }
     }
   }
   return embed
@@ -384,6 +424,8 @@ export class RaidRosterService {
   private readonly controlPanelByGuild = new Map<string, string>();
   private readonly sessions = new Map<string, EditSession>();
   private readonly warningTimers = new Map<string, NodeJS.Timeout>();
+  private readonly signupRequests = new Map<string, RaidSignupRequest>();
+  private readonly signupRequestThreadIds = new Map<string, string>();
 
   public constructor(
     private readonly config: BotConfig,
@@ -393,6 +435,101 @@ export class RaidRosterService {
   private rosterForThread(threadId: string): RaidRosterDocument | null {
     const rosterId = this.rosterIdByThread.get(threadId);
     return rosterId ? this.rosters.get(rosterId) ?? null : null;
+  }
+
+  private signupRequestsForRoster(rosterId: string): RaidSignupRequest[] {
+    return [...this.signupRequests.values()]
+      .filter(
+        (request) =>
+          request.rosterId === rosterId &&
+          (request.status === "pending" ||
+            request.status === "draft-accepted"),
+      )
+      .sort(
+        (left, right) =>
+          new Date(left.createdAt).getTime() -
+          new Date(right.createdAt).getTime(),
+      );
+  }
+
+  private rosterPresentationEmbed(roster: RaidRosterDocument): EmbedBuilder {
+    return buildRosterEmbed(roster, {
+      signupRequests: this.signupRequestsForRoster(roster.rosterId),
+    });
+  }
+
+  private signupRequestComponents(
+    request: RaidSignupRequest,
+  ): ActionRowBuilder<ButtonBuilder>[] {
+    const roster = this.rosters.get(request.rosterId);
+    const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setLabel("Open Roster")
+        .setStyle(ButtonStyle.Link)
+        .setURL(
+          `https://discord.com/channels/${request.guildId}/${roster?.presentationThreadId ?? request.guildId}`,
+        ),
+    );
+    if (request.status === "pending") {
+      buttons.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`${customIdPrefix}:request:reject:${request.requestId}`)
+          .setLabel("Reject Request")
+          .setStyle(ButtonStyle.Danger),
+      );
+    }
+    return [buttons];
+  }
+
+  private async persistSignupRequest(
+    guild: Guild,
+    request: RaidSignupRequest,
+  ): Promise<void> {
+    const validated = raidSignupRequestSchema.parse(request);
+    const threadId =
+      validated.threadId ??
+      this.signupRequestThreadIds.get(validated.requestId);
+    if (!threadId) {
+      throw new Error("The signup request thread is unavailable.");
+    }
+    const thread = await guild.channels.fetch(threadId);
+    if (!thread?.isThread()) {
+      throw new Error("The signup request thread is unavailable.");
+    }
+    if (thread.archived) {
+      await thread.setArchived(false, "Update Zors signup request");
+    }
+    const starter = await thread.fetchStarterMessage();
+    if (!starter) {
+      throw new Error("The signup request starter message is unavailable.");
+    }
+    const roster = this.rosters.get(validated.rosterId);
+    if (!roster) {
+      throw new Error("The signup request roster is unavailable.");
+    }
+    await starter.edit({
+      embeds: [buildRaidSignupRequestEmbed(validated, roster.name)],
+      components: this.signupRequestComponents(validated),
+      allowedMentions: { parse: [] },
+    });
+    this.signupRequests.set(validated.requestId, structuredClone(validated));
+    this.signupRequestThreadIds.set(validated.requestId, threadId);
+
+    const presentation = await guild.channels.fetch(
+      roster.presentationThreadId,
+    );
+    if (!presentation?.isThread()) {
+      throw new Error("The roster presentation thread is unavailable.");
+    }
+    const presentationStarter = await presentation.fetchStarterMessage();
+    if (!presentationStarter) {
+      throw new Error("The roster presentation starter message is unavailable.");
+    }
+    await presentationStarter.edit({
+      embeds: [this.rosterPresentationEmbed(roster)],
+      components: buildRosterControls(roster),
+      allowedMentions: { parse: [] },
+    });
   }
 
   private async authorize(
@@ -531,11 +668,31 @@ export class RaidRosterService {
       throw new Error("One or more configured raid roster channels are not Forums.");
     }
     this.bindingsByGuild.set(guild.id, binding);
-    const [controlThreads, rosterThreads] = await Promise.all([
+    const [controlThreads, rosterThreads, requestThreads] = await Promise.all([
       allForumThreads(controlForum),
       allForumThreads(rosterForum),
+      allForumThreads(requestForum),
     ]);
     await this.ensureControlPanel(guild, binding, rosterThreads);
+
+    for (const thread of requestThreads.values()) {
+      const starter = await thread.fetchStarterMessage();
+      const embed = starter?.embeds[0]?.toJSON();
+      if (!embed || embed.title !== "Zors Raid Signup Request") {
+        continue;
+      }
+      const request = raidSignupRequestFromEmbed(embed);
+      if (
+        !request ||
+        (request.threadId !== null && request.threadId !== thread.id) ||
+        request.guildId !== guild.id
+      ) {
+        throw new Error(`Signup request thread ${thread.id} has invalid storage.`);
+      }
+      request.threadId = thread.id;
+      this.signupRequests.set(request.requestId, request);
+      this.signupRequestThreadIds.set(request.requestId, thread.id);
+    }
 
     let reconstructed = 0;
     for (const thread of controlThreads.values()) {
@@ -573,7 +730,7 @@ export class RaidRosterService {
         );
       }
       await presentationStarter.edit({
-        embeds: [buildRosterEmbed(roster)],
+        embeds: [this.rosterPresentationEmbed(roster)],
         components: buildRosterControls(roster),
         allowedMentions: { parse: [] },
       });
@@ -638,7 +795,7 @@ export class RaidRosterService {
       throw new Error("The roster presentation starter message is unavailable.");
     }
     await presentationStarter.edit({
-      embeds: [buildRosterEmbed(validated)],
+      embeds: [this.rosterPresentationEmbed(validated)],
       components: buildRosterControls(validated),
       allowedMentions: { parse: [] },
     });
@@ -808,7 +965,7 @@ export class RaidRosterService {
     const presentationThread = await rosterForum.threads.create({
       name: name.slice(0, 100),
       message: {
-        embeds: [buildRosterEmbed(placeholder)],
+        embeds: [this.rosterPresentationEmbed(placeholder)],
         components: buildRosterControls(placeholder),
         allowedMentions: { parse: [] },
       },
@@ -831,6 +988,79 @@ export class RaidRosterService {
       );
     }
     return roster;
+  }
+
+  private async createSignupRequest(
+    interaction: ChatInputCommandInteraction,
+    binding: RaidRosterBinding & { signupRequestForumId: string },
+  ): Promise<void> {
+    const guild = interaction.guild;
+    if (!guild) {
+      throw new Error("Signup requests must be created inside Betrayed.");
+    }
+    const rosterId = interaction.options.getString("roster", true);
+    const roster = this.rosters.get(rosterId);
+    if (!roster || roster.guildId !== guild.id || roster.status === "archived") {
+      throw new Error("Choose an active roster from the autocomplete list.");
+    }
+    const classKey = interaction.options.getString("wow-class", true);
+    const specKey = interaction.options.getString("specialization", true);
+    validateClassSpecialization(classKey, specKey);
+    if (
+      (activeRevision(roster)?.assignments ?? []).some(
+        ({ memberId }) => memberId === interaction.user.id,
+      )
+    ) {
+      throw new Error("You are already assigned to this roster.");
+    }
+    const duplicate = [...this.signupRequests.values()].find(
+      (request) =>
+        request.rosterId === rosterId &&
+        request.applicantId === interaction.user.id &&
+        (request.status === "pending" ||
+          request.status === "draft-accepted"),
+    );
+    if (duplicate) {
+      throw new Error("You already have an active request for this roster.");
+    }
+
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const forum = await guild.channels.fetch(binding.signupRequestForumId);
+    if (!forum || forum.type !== ChannelType.GuildForum) {
+      throw new Error("The configured Signup Requests channel is not a Forum.");
+    }
+    const now = new Date().toISOString();
+    const request = raidSignupRequestSchema.parse({
+      schemaVersion: 1,
+      requestId: randomUUID(),
+      guildId: guild.id,
+      rosterId,
+      applicantId: interaction.user.id,
+      classKey,
+      specKey,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+      threadId: null,
+      decidedBy: null,
+      decisionAt: null,
+    });
+    const member = await guild.members.fetch(interaction.user.id);
+    const thread = await forum.threads.create({
+      name: `${member.displayName} — ${roster.name}`.slice(0, 100),
+      message: {
+        embeds: [buildRaidSignupRequestEmbed(request, roster.name)],
+        components: this.signupRequestComponents(request),
+        allowedMentions: { parse: [] },
+      },
+      reason: `Zors signup request ${request.requestId}`,
+    });
+    request.threadId = thread.id;
+    this.signupRequestThreadIds.set(request.requestId, thread.id);
+    await this.persistSignupRequest(guild, request);
+    await interaction.editReply(
+      `Your request for **${roster.name}** was submitted with **${classLabel(classKey)} / ${specLabel(classKey, specKey)}**.`,
+    );
   }
 
   private async finalize(
@@ -867,8 +1097,36 @@ export class RaidRosterService {
       }),
     );
     const warningId = roster.warningMessageId;
+    const stagedRequests = this.signupRequestsForRoster(roster.rosterId).filter(
+      ({ status }) => status === "draft-accepted",
+    );
+    if (stagedRequests.length > 0 && !role.editable) {
+      throw new Error(
+        "Zors cannot assign the bound team role. Move the Zors role above it and grant Manage Roles.",
+      );
+    }
     const diff = finalizeRoster(roster, editorId);
     await this.persist(guild, roster);
+    const finalizedMemberIds = new Set(
+      roster.finalizedRevision?.assignments.map(({ memberId }) => memberId) ?? [],
+    );
+    for (const request of stagedRequests) {
+      const approved = finalizedMemberIds.has(request.applicantId);
+      if (approved) {
+        const member = await guild.members.fetch(request.applicantId);
+        await member.roles.add(
+          role,
+          `Approved through Zors signup request ${request.requestId}`,
+        );
+      }
+      await this.persistSignupRequest(guild, {
+        ...request,
+        status: approved ? "approved" : "pending",
+        updatedAt: new Date().toISOString(),
+        decidedBy: approved ? editorId : null,
+        decisionAt: approved ? new Date().toISOString() : null,
+      });
+    }
     await this.deleteWarning(guild, roster, warningId);
     await this.sendAssignmentChanges(guild, roster, diff);
     return diff;
@@ -880,8 +1138,20 @@ export class RaidRosterService {
     editorId: string,
   ): Promise<void> {
     const warningId = roster.warningMessageId;
+    const stagedRequests = this.signupRequestsForRoster(roster.rosterId).filter(
+      ({ status }) => status === "draft-accepted",
+    );
     revertRoster(roster, editorId);
     await this.persist(guild, roster);
+    for (const request of stagedRequests) {
+      await this.persistSignupRequest(guild, {
+        ...request,
+        status: "pending",
+        updatedAt: new Date().toISOString(),
+        decidedBy: null,
+        decisionAt: null,
+      });
+    }
     await this.deleteWarning(guild, roster, warningId);
   }
 
@@ -908,13 +1178,18 @@ export class RaidRosterService {
     if (!binding || !isRaidRosterBindingComplete(binding)) {
       throw new Error("Raid rosters are not enabled in this server.");
     }
-    await this.authorize(interaction, binding);
     const subcommand = interaction.options.getSubcommand();
+    if (subcommand === "request") {
+      await this.createSignupRequest(interaction, binding);
+      return;
+    }
+    await this.authorize(interaction, binding);
     if (subcommand === "help") {
       await interaction.reply({
         content: [
           "**Zors roster commands**",
           "`/zors-roster create` — Create one roster from the Roster Control post.",
+          "`/zors-roster request` — Request to join an active roster.",
           "`/zors-roster show` — Show the current roster state.",
           "`/zors-roster finalize` — Publish the working Draft.",
           "`/zors-roster revert` — Restore the last finalized snapshot.",
@@ -936,7 +1211,12 @@ export class RaidRosterService {
     }
     if (subcommand === "show") {
       await interaction.reply({
-        embeds: [buildRosterEmbed(roster)],
+        embeds: [
+          buildRosterEmbed(roster, {
+            includeOverflow: false,
+            includeSignupRequests: false,
+          }),
+        ],
         flags: MessageFlags.Ephemeral,
         allowedMentions: { parse: [] },
       });
@@ -966,10 +1246,7 @@ export class RaidRosterService {
   public async handleAutocomplete(
     interaction: AutocompleteInteraction,
   ): Promise<boolean> {
-    if (
-      interaction.commandName !== "zors-roster" ||
-      interaction.options.getFocused(true).name !== "team-role"
-    ) {
+    if (interaction.commandName !== "zors-roster") {
       return false;
     }
     const binding = interactionBinding(
@@ -981,7 +1258,41 @@ export class RaidRosterService {
       await interaction.respond([]);
       return true;
     }
-    const focused = interaction.options.getFocused().toLowerCase();
+    const focusedOption = interaction.options.getFocused(true);
+    const focused = String(focusedOption.value).toLowerCase();
+    if (focusedOption.name === "roster") {
+      const choices = [...this.rosters.values()]
+        .filter(
+          (roster) =>
+            roster.guildId === interaction.guildId &&
+            roster.status !== "archived" &&
+            roster.name.toLowerCase().includes(focused),
+        )
+        .sort((left, right) => left.name.localeCompare(right.name))
+        .slice(0, 25)
+        .map((roster) => ({ name: roster.name, value: roster.rosterId }));
+      await interaction.respond(choices);
+      return true;
+    }
+    if (focusedOption.name === "specialization") {
+      const classKey = interaction.options.getString("wow-class");
+      const definition =
+        wowForeverClassSpecializations[
+          classKey as keyof typeof wowForeverClassSpecializations
+        ];
+      const choices = (definition?.specializations ?? [])
+        .filter(
+          ([key, label]) =>
+            key.includes(focused) || label.toLowerCase().includes(focused),
+        )
+        .slice(0, 25)
+        .map(([value, name]) => ({ name, value }));
+      await interaction.respond(choices);
+      return true;
+    }
+    if (focusedOption.name !== "team-role") {
+      return false;
+    }
     const requestedSize = interaction.options.getString("size");
     const size = requestedSize
       ? rosterSizeSchema.parse(Number(requestedSize))
@@ -1064,20 +1375,38 @@ export class RaidRosterService {
       ({ memberId }) =>
         stage !== "member-second" || memberId !== session.memberId,
     );
-    if (assignments.length === 0) {
+    const selectable = [
+      ...assignments.map((assignment) => ({
+        memberId: assignment.memberId,
+        value: assignment.memberId,
+        description: `${describePlacement(assignment.placement)} • ${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}`,
+        request: false,
+      })),
+      ...(session.action === "move" && stage === "member"
+        ? this.signupRequestsForRoster(roster.rosterId)
+            .filter(({ status }) => status === "pending")
+            .map((request) => ({
+              memberId: request.applicantId,
+              value: `request:${request.requestId}`,
+              description: `Signup Request • ${classLabel(request.classKey)} / ${specLabel(request.classKey, request.specKey)}`,
+              request: true,
+            }))
+        : []),
+    ];
+    if (selectable.length === 0) {
       throw new Error(
         stage === "member-second"
           ? "There is no second roster member available to swap."
-          : "This roster does not have any members to select.",
+          : "This roster does not have any members or pending requests to select.",
       );
     }
-    const pageCount = Math.ceil(assignments.length / 25);
+    const pageCount = Math.ceil(selectable.length / 25);
     const page = Math.min(Math.max(requestedPage, 0), pageCount - 1);
     session.memberStage = stage;
     session.memberPage = page;
-    const pageAssignments = assignments.slice(page * 25, page * 25 + 25);
+    const pageItems = selectable.slice(page * 25, page * 25 + 25);
     const members = await Promise.all(
-      pageAssignments.map(({ memberId }) =>
+      pageItems.map(({ memberId }) =>
         guild.members.fetch(memberId).catch(() => null),
       ),
     );
@@ -1089,18 +1418,12 @@ export class RaidRosterService {
           : "Choose a roster member",
       )
       .addOptions(
-        pageAssignments.map((assignment, index) => {
+        pageItems.map((item, index) => {
           const member = members[index];
           return {
-            label: (member?.displayName ?? `Member ${assignment.memberId}`).slice(
-              0,
-              100,
-            ),
-            value: assignment.memberId,
-            description: `${describePlacement(assignment.placement)} • ${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}`.slice(
-              0,
-              100,
-            ),
+            label: `${item.request ? "[Request] " : ""}${member?.displayName ?? `Member ${item.memberId}`}`.slice(0, 100),
+            value: item.value,
+            description: item.description.slice(0, 100),
           };
         }),
       );
@@ -1220,6 +1543,9 @@ export class RaidRosterService {
     if (session.memberId) {
       parts.push(`**Member:** <@${session.memberId}>`);
     }
+    if (session.signupRequestId) {
+      parts.push("**Source:** Signup Request");
+    }
     if (session.secondMemberId) {
       parts.push(`**Second member:** <@${session.secondMemberId}>`);
     }
@@ -1305,6 +1631,30 @@ export class RaidRosterService {
     const selectedId = interaction.values[0];
     if (!selectedId) {
       throw new Error("Choose one Discord member.");
+    }
+    if (
+      session.action === "move" &&
+      stage === "member" &&
+      selectedId.startsWith("request:")
+    ) {
+      const requestId = selectedId.slice("request:".length);
+      const request = this.signupRequests.get(requestId);
+      if (
+        !request ||
+        request.rosterId !== roster.rosterId ||
+        request.status !== "pending"
+      ) {
+        throw new Error("That signup request is no longer pending.");
+      }
+      session.signupRequestId = request.requestId;
+      session.memberId = request.applicantId;
+      session.classKey = request.classKey;
+      session.specKey = request.specKey;
+      await interaction.update({
+        content: "Choose where to place this signup request.",
+        components: [this.placementPicker(session, roster)],
+      });
+      return;
     }
     const rosterMemberIds = new Set(
       (activeRevision(roster)?.assignments ?? []).map(({ memberId }) => memberId),
@@ -1525,6 +1875,47 @@ export class RaidRosterService {
       if (!session.placement) {
         throw new Error("Choose the new placement before confirming.");
       }
+      if (session.signupRequestId) {
+        if (!session.classKey || !session.specKey) {
+          throw new Error("The signup request class and specialization are missing.");
+        }
+        const request = this.signupRequests.get(session.signupRequestId);
+        if (!request || request.status !== "pending") {
+          throw new Error("That signup request is no longer pending.");
+        }
+        const nextRoster = structuredClone(roster);
+        addRosterAssignment(
+          nextRoster,
+          {
+            memberId: session.memberId,
+            classKey: session.classKey,
+            specKey: session.specKey,
+            placement: session.placement,
+          },
+          interaction.user.id,
+        );
+        const nextRequest: RaidSignupRequest = {
+          ...request,
+          status: "draft-accepted",
+          updatedAt: new Date().toISOString(),
+          decidedBy: interaction.user.id,
+          decisionAt: new Date().toISOString(),
+        };
+        await this.persistSignupRequest(guild, nextRequest);
+        try {
+          await this.persist(guild, nextRoster);
+        } catch (error) {
+          await this.persistSignupRequest(guild, request);
+          throw error;
+        }
+        this.sessions.delete(session.id);
+        await interaction.update({
+          content: `✅ ${this.sessionSummary(session)}\n\nAccepted into the working Draft. Finalize the roster to approve the request.`,
+          components: [],
+          allowedMentions: { parse: [] },
+        });
+        return;
+      }
       moveRosterAssignment(
         roster,
         session.memberId,
@@ -1731,6 +2122,55 @@ export class RaidRosterService {
     });
   }
 
+  private async rejectSignupRequest(
+    interaction: ButtonInteraction,
+    requestId: string,
+    binding: RaidRosterBinding,
+  ): Promise<void> {
+    await this.authorize(interaction, binding);
+    const request = this.signupRequests.get(requestId);
+    if (
+      !request ||
+      request.guildId !== interaction.guildId ||
+      request.status !== "pending" ||
+      request.threadId !== interaction.channelId
+    ) {
+      throw new Error("That signup request is no longer pending.");
+    }
+    const guild = interaction.guild;
+    if (!guild) {
+      throw new Error("Signup request controls require a guild.");
+    }
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const rejected: RaidSignupRequest = {
+      ...request,
+      status: "rejected",
+      updatedAt: new Date().toISOString(),
+      decidedBy: interaction.user.id,
+      decisionAt: new Date().toISOString(),
+    };
+    await this.persistSignupRequest(guild, rejected);
+    const roster = this.rosters.get(request.rosterId);
+    let dmFailed = false;
+    try {
+      const applicant = await guild.client.users.fetch(request.applicantId);
+      await applicant.send(
+        `Your signup request for **${roster?.name ?? "the raid roster"}** was not approved. You may submit a new request later.`,
+      );
+    } catch (error) {
+      dmFailed = true;
+      console.error(
+        `Could not DM rejected signup applicant ${request.applicantId}.`,
+        error,
+      );
+    }
+    await interaction.editReply(
+      dmFailed
+        ? "Rejected the signup request, but Discord would not deliver the applicant's DM."
+        : "Rejected the signup request and notified the applicant.",
+    );
+  }
+
   public async handleInteraction(interaction: Interaction): Promise<boolean> {
     if (
       !(
@@ -1772,6 +2212,18 @@ export class RaidRosterService {
     );
     if (!binding || !isRaidRosterBindingComplete(binding)) {
       throw new Error("Raid roster controls are not enabled in this server.");
+    }
+    if (
+      parts[1] === "request" &&
+      parts[2] === "reject" &&
+      interaction.isButton()
+    ) {
+      await this.rejectSignupRequest(
+        interaction,
+        parts[3] ?? "",
+        binding,
+      );
+      return true;
     }
     if (parts[1] === "control" && interaction.isButton()) {
       await this.handleControlButton(
