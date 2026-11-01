@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   zorsCommand,
   zorsOwnerCommand,
-  zorsRaidCommand,
+  zorsSignupCommand,
   zorsRosterCommand,
 } from "../src/commands.js";
 
@@ -146,7 +146,8 @@ describe("Zors Bot command registration", () => {
       ]),
     );
     expect(zorsCommand.toJSON().name).toBe("zors");
-    expect(zorsRaidCommand.toJSON().options?.map(({ name }) => name)).toEqual([
+    expect(zorsSignupCommand.toJSON().name).toBe("zors-signup");
+    expect(zorsSignupCommand.toJSON().options?.map(({ name }) => name)).toEqual([
       "create",
       "help",
     ]);

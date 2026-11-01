@@ -651,13 +651,20 @@ categories:
         permissionProfile: raid-management-readonly
         preserveHistory: true
         positionAfter: coordinator-chat
+      - key: roster-archives
+        name: "🗃️roster-archives"
+        aliases: [roster-archives, "Roster Archives"]
+        type: forum
+        permissionProfile: raid-management-readonly
+        preserveHistory: true
+        positionAfter: raid-rosters
       - key: signup-requests
         name: "📨signup-requests"
         aliases: [signup-requests]
         type: forum
         permissionProfile: raid-management-readonly
         preserveHistory: true
-        positionAfter: raid-rosters
+        positionAfter: roster-archives
       - key: raid-applicants
         name: "📨raid-applicants"
         aliases: ["Raid Applicants", "raid-applicants"]

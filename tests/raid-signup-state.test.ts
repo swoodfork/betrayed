@@ -5,6 +5,7 @@ import {
   raidSignupSheetSchema,
   shiftSignupSevenDays,
 } from "../src/raid-signup-state.js";
+import { buildSignupSheetControls } from "../src/raid-rosters.js";
 
 const signup = raidSignupSheetSchema.parse({
   schemaVersion: 1,
@@ -55,5 +56,38 @@ describe("raid signup sheet state", () => {
       }),
     ).toThrow("after its start");
   });
-});
 
+  it("allows cleared state but never restarts it", () => {
+    const cleared = raidSignupSheetSchema.parse({
+      ...signup,
+      status: "cleared",
+    });
+
+    expect(cleared.status).toBe("cleared");
+    expect(() => shiftSignupSevenDays(cleared)).toThrow(
+      "Only a closed signup sheet",
+    );
+    expect(buildSignupSheetControls(cleared)).toEqual([]);
+  });
+
+  it("offers Clear on open and closed sheets but Restart only when closed", () => {
+    const openLabels = buildSignupSheetControls({
+      ...signup,
+      status: "open",
+    }).flatMap((row) => row.components.map((button) => button.toJSON().label));
+    const closedLabels = buildSignupSheetControls(signup).flatMap((row) =>
+      row.components.map((button) => button.toJSON().label),
+    );
+
+    expect(openLabels).toEqual([
+      "Request a Spot",
+      "Close Signup",
+      "Clear and Archive",
+    ]);
+    expect(closedLabels).toEqual([
+      "Restart +7 Days",
+      "Restart with New Schedule",
+      "Clear and Archive",
+    ]);
+  });
+});

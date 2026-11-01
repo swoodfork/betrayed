@@ -81,7 +81,7 @@ Use a command group rather than adding many unrelated top-level commands:
 /zors-roster finalize
 /zors-roster revert
 /zors-roster archive
-/zors-raid create
+/zors-signup create
 ```
 
 `/zors-roster create` starts an ephemeral builder:
@@ -336,17 +336,17 @@ presentation cannot destroy it.
 Use a second command group:
 
 ```text
-/zors-raid create
-/zors-raid show
-/zors-raid refresh
-/zors-raid publish
-/zors-raid bump
-/zors-raid resend
-/zors-raid cancel
-/zors-raid close
+/zors-signup create
+/zors-signup show
+/zors-signup refresh
+/zors-signup publish
+/zors-signup bump
+/zors-signup resend
+/zors-signup cancel
+/zors-signup close
 ```
 
-`/zors-raid create` is limited to Raid Coordinator, Officer, Administrator, and
+`/zors-signup create` is limited to Raid Coordinator, Officer, Administrator, and
 the configured server owner. It starts an ephemeral wizard:
 
 1. Select a saved roster. If none exists, stop and direct the coordinator to
@@ -442,7 +442,7 @@ assigned group or Bench. Rejected applicants disappear from Pending Approval.
 The durable request history remains in its read-only `📨signup-requests` post
 and the canonical Officer-only control record.
 
-An authorized coordinator or Officer can run `/zors-raid publish` in another
+An authorized coordinator or Officer can run `/zors-signup publish` in another
 channel to manifest a synchronized copy:
 
 1. Zors shows a paginated ephemeral list of active signups.
@@ -455,7 +455,7 @@ mirrors. Anyone who can see a particular projection can use its **Request to
 Join This Raid** button. All projections use the same signup and roster IDs;
 they are not separate signups.
 
-`/zors-raid bump` shows the paginated active-signup list. After the executor
+`/zors-signup bump` shows the paginated active-signup list. After the executor
 selects a signup, Zors bumps **every currently bound projection** in its own
 existing channel. It never moves all copies into the command channel and never
 removes a copy merely because another copy was bumped.
@@ -569,6 +569,7 @@ Create three private Forum channels with increasingly separated purposes:
 🔒 Raid Coordinator 🔒
   🔐coordinator-affairs
   📋raid-rosters
+  🗃️roster-archives
   📨signup-requests
 ```
 
@@ -596,7 +597,8 @@ Production and preserve this exact order.
 
 ### Forum permission model
 
-For `🗄️zors-raid-control`, `📋raid-rosters`, and `📨signup-requests`:
+For `🗄️zors-raid-control`, `📋raid-rosters`, `🗃️roster-archives`, and
+`📨signup-requests`:
 
 - Zors Bot receives View Channel, Send Messages/Create Posts, Send Messages in
   Threads, Read Message History, Manage Messages, and Manage Threads.
@@ -891,7 +893,7 @@ and delivery history.
 
 ## Failure Handling
 
-- If the signup message was deleted, `/zors-raid refresh` creates a replacement
+- If the signup message was deleted, `/zors-signup refresh` creates a replacement
   and updates the canonical binding.
 - If one mirrored signup projection was deleted, remove only that projection's
   stale binding; the underlying signup and other projections remain active.
@@ -1029,7 +1031,7 @@ only behind an explicit Test-guild configuration.
 
 ### Phase 2: Signup requests and reusable sheet
 
-- `/zors-raid create` creates one durable signup sheet from inside a finalized
+- `/zors-signup create` creates one durable signup sheet from inside a finalized
   roster post and publishes it in the roster's bound team channel.
 - Requests originate only from the sheet's **Request a Spot** button.
 - Group and Bench members cannot create requests; they use attendance DMs.
@@ -1043,15 +1045,18 @@ only behind an explicit Test-guild configuration.
 - Finalize approves staged requests and assigns the team role; Revert restores
   them to Pending.
 - Close disables new requests but keeps existing requests visible.
-- Restart either advances exactly seven days or accepts a custom date/hour,
-  clears remaining pending requests, preserves the roster, and reopens the same
+- Restart first writes an immutable cycle snapshot to
+  `🗃️roster-archives`, then either advances exactly seven days or accepts a
+  custom date/hour, clears requests, preserves the roster, and reopens the same
   sheet.
+- Clear and Archive writes the same snapshot and clears requests, but marks the
+  sheet permanently cleared with no Restart controls.
 - Restart refuses while Draft-accepted requests still require Finalize/Revert.
 
 ### Phase 3: Raid creation and live sheet
 
 - Extend the durable sheet with attendance-confirmation state.
-- Add `/zors-raid publish` with a paginated active-signup selector.
+- Add `/zors-signup publish` with a paginated active-signup selector.
 - Support synchronized public recruiting mirrors.
 - Add signup projection bump controls.
 - Immediately DM grouped and Bench members when the attached roster is already

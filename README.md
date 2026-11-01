@@ -124,7 +124,7 @@ so Zors resolves the current thread and refuses the command from the control
 post or any unrelated channel. This compact response shows Groups and Bench
 only; the persistent roster post remains the complete view.
 
-After a roster has a finalized revision, a coordinator runs `/zors-raid create`
+After a roster has a finalized revision, a coordinator runs `/zors-signup create`
 inside its roster post. Zors creates one reusable signup sheet in the roster's
 bound team channel. Members request a spot from that sheet, choose class/spec,
 and receive one durable private request post in `📨signup-requests`. Members
@@ -141,11 +141,15 @@ approves staged requests and assigns the team role; Revert returns them to
 Pending. Staff can reject a still-pending request from its private post.
 
 Close Signup disables new requests but preserves current requests for staff to
-finish processing. A closed sheet offers **Restart +7 Days** and **Restart with
-New Schedule**. Restart clears that sheet's remaining pending requests, keeps
-the finalized roster—including Group, Bench, and Overflow—then reopens the same
-sheet for its next cycle. Restart refuses while a request is staged in a roster
-Draft, requiring staff to Finalize or Revert first.
+finish processing. A closed sheet offers **Restart +7 Days**, **Restart with
+New Schedule**, and **Clear and Archive**. Every Restart first writes an
+immutable cycle snapshot to `🗃️roster-archives`, then clears that sheet's
+requests, keeps the finalized roster—including Group, Bench, and Overflow—and
+reopens the same sheet. Clear and Archive also snapshots the cycle and clears
+its requests, but permanently clears that sheet and removes all restart
+controls. A new sheet can then be created from the roster post. Restart and
+Clear refuse while a request is staged in a roster Draft, requiring staff to
+Finalize or Revert first.
 
 Move, Swap, Change Spec, and Remove use roster-only member menus rather than
 Discord-wide member pickers. Rosters larger than Discord's 25-option select

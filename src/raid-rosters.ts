@@ -119,6 +119,13 @@ interface SignupSession {
   specKey?: string;
 }
 
+type CompleteRaidRosterBinding = RaidRosterBinding & {
+  controlForumId: string;
+  rosterForumId: string;
+  signupRequestForumId: string;
+  archiveForumId: string;
+};
+
 interface StorageMetadata {
   rosterId: string;
   presentationThreadId: string;
@@ -457,6 +464,48 @@ export function buildDraftWarningControls(
   );
 }
 
+export function buildSignupSheetControls(
+  signup: RaidSignupSheet,
+): ActionRowBuilder<ButtonBuilder>[] {
+  if (signup.status === "cleared") {
+    return [];
+  }
+  if (signup.status === "open") {
+    return [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`${customIdPrefix}:raid:request:${signup.raidId}`)
+          .setLabel("Request a Spot")
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId(`${customIdPrefix}:raid:close:${signup.raidId}`)
+          .setLabel("Close Signup")
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId(`${customIdPrefix}:raid:clear:${signup.raidId}`)
+          .setLabel("Clear and Archive")
+          .setStyle(ButtonStyle.Danger),
+      ),
+    ];
+  }
+  return [
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${customIdPrefix}:raid:restart-seven:${signup.raidId}`)
+        .setLabel("Restart +7 Days")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`${customIdPrefix}:raid:restart-custom:${signup.raidId}`)
+        .setLabel("Restart with New Schedule")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`${customIdPrefix}:raid:clear:${signup.raidId}`)
+        .setLabel("Clear and Archive")
+        .setStyle(ButtonStyle.Danger),
+    ),
+  ];
+}
+
 function interactionBinding(
   guildId: string | null,
   config: BotConfig,
@@ -501,6 +550,7 @@ export class RaidRosterService {
   private readonly signupSheets = new Map<string, RaidSignupSheet>();
   private readonly signupSessions = new Map<string, SignupSession>();
   private readonly pendingSignupSubmissions = new Set<string>();
+  private readonly archivedSignupCycles = new Set<string>();
 
   public constructor(
     private readonly config: BotConfig,
@@ -556,10 +606,22 @@ export class RaidRosterService {
     const end = Math.floor(new Date(signup.endAt).getTime() / 1_000);
     const summary = new EmbedBuilder()
       .setTitle(`🗓️ ${signup.name}`)
-      .setColor(signup.status === "open" ? 0x2ecc71 : 0x7f8c8d)
+      .setColor(
+        signup.status === "open"
+          ? 0x2ecc71
+          : signup.status === "closed"
+            ? 0x7f8c8d
+            : 0x2c3e50,
+      )
       .setDescription(
         [
-          `**Status:** ${signup.status === "open" ? "🟢 Open" : "⚫ Closed"}`,
+          `**Status:** ${
+            signup.status === "open"
+              ? "🟢 Open"
+              : signup.status === "closed"
+                ? "⚫ Closed"
+                : "🗃️ Cleared and Archived"
+          }`,
           `**Team:** <@&${roster.teamRoleId}>`,
           `**Starts:** <t:${start}:F> (<t:${start}:R>)`,
           `**Ends:** <t:${end}:t>`,
@@ -567,7 +629,9 @@ export class RaidRosterService {
           "",
           signup.status === "open"
             ? "Members who are not already in a Group or Bench may use **Request a Spot**."
-            : "This signup is closed. Existing requests remain visible until the sheet is restarted.",
+            : signup.status === "closed"
+              ? "This signup is closed. Existing requests remain visible until the sheet is restarted or cleared."
+              : "This signup was permanently cleared. Its final cycle is stored in Roster Archives and this sheet cannot be restarted.",
         ].join("\n"),
       )
       .setFooter({ text: `Raid signup ${signup.raidId}` });
@@ -582,38 +646,13 @@ export class RaidRosterService {
       includeOverflow: false,
       signupRequests: this.signupRequestsForSheet(signup.raidId),
     }).setTitle(`📋 ${roster.name} — Signup View`);
-    return [summary, rosterView];
+    return signup.status === "cleared" ? [summary] : [summary, rosterView];
   }
 
   private signupSheetComponents(
     signup: RaidSignupSheet,
   ): ActionRowBuilder<ButtonBuilder>[] {
-    if (signup.status === "open") {
-      return [
-        new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`${customIdPrefix}:raid:request:${signup.raidId}`)
-            .setLabel("Request a Spot")
-            .setStyle(ButtonStyle.Primary),
-          new ButtonBuilder()
-            .setCustomId(`${customIdPrefix}:raid:close:${signup.raidId}`)
-            .setLabel("Close Signup")
-            .setStyle(ButtonStyle.Secondary),
-        ),
-      ];
-    }
-    return [
-      new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`${customIdPrefix}:raid:restart-seven:${signup.raidId}`)
-          .setLabel("Restart +7 Days")
-          .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-          .setCustomId(`${customIdPrefix}:raid:restart-custom:${signup.raidId}`)
-          .setLabel("Restart with New Schedule")
-          .setStyle(ButtonStyle.Primary),
-      ),
-    ];
+    return buildSignupSheetControls(signup);
   }
 
   private async fetchStoredSignupSheet(
@@ -924,10 +963,12 @@ export class RaidRosterService {
     if (!isRaidRosterBindingComplete(binding)) {
       return 0;
     }
-    const [controlForum, rosterForum, requestForum] = await Promise.all([
+    const [controlForum, rosterForum, requestForum, archiveForum] =
+      await Promise.all([
       guild.channels.fetch(binding.controlForumId),
       guild.channels.fetch(binding.rosterForumId),
       guild.channels.fetch(binding.signupRequestForumId),
+      guild.channels.fetch(binding.archiveForumId),
     ]);
     if (
       !controlForum ||
@@ -935,16 +976,20 @@ export class RaidRosterService {
       !rosterForum ||
       rosterForum.type !== ChannelType.GuildForum ||
       !requestForum ||
-      requestForum.type !== ChannelType.GuildForum
+      requestForum.type !== ChannelType.GuildForum ||
+      !archiveForum ||
+      archiveForum.type !== ChannelType.GuildForum
     ) {
       throw new Error("One or more configured raid roster channels are not Forums.");
     }
     this.bindingsByGuild.set(guild.id, binding);
-    const [controlThreads, rosterThreads, requestThreads] = await Promise.all([
-      allForumThreads(controlForum),
-      allForumThreads(rosterForum),
-      allForumThreads(requestForum),
-    ]);
+    const [controlThreads, rosterThreads, requestThreads, archiveThreads] =
+      await Promise.all([
+        allForumThreads(controlForum),
+        allForumThreads(rosterForum),
+        allForumThreads(requestForum),
+        allForumThreads(archiveForum),
+      ]);
     await this.ensureControlPanel(guild, binding, rosterThreads);
 
     for (const thread of requestThreads.values()) {
@@ -964,6 +1009,19 @@ export class RaidRosterService {
       request.threadId = thread.id;
       this.signupRequests.set(request.requestId, request);
       this.signupRequestThreadIds.set(request.requestId, thread.id);
+    }
+    for (const thread of archiveThreads.values()) {
+      const starter = await thread.fetchStarterMessage();
+      const embed = starter?.embeds[0]?.toJSON();
+      if (embed?.title !== "Zors Signup Cycle Archive") {
+        continue;
+      }
+      const raidId = fieldValue(embed, "Raid ID");
+      const cycle = Number(fieldValue(embed, "Cycle"));
+      if (!raidId?.match(/^[0-9a-f-]{36}$/i) || !Number.isInteger(cycle)) {
+        throw new Error(`Signup archive thread ${thread.id} has invalid metadata.`);
+      }
+      this.archivedSignupCycles.add(`${raidId}:${cycle}`);
     }
 
     let reconstructed = 0;
@@ -1506,7 +1564,7 @@ export class RaidRosterService {
     throw new Error("Unknown Zors roster command.");
   }
 
-  public async handleRaidCommand(
+  public async handleSignupCommand(
     interaction: ChatInputCommandInteraction,
   ): Promise<void> {
     const binding = interactionBinding(
@@ -1523,7 +1581,7 @@ export class RaidRosterService {
       await interaction.reply({
         content: [
           "**Zors raid signup commands**",
-          "`/zors-raid create` — Create one reusable signup sheet from inside a finalized roster post.",
+          "`/zors-signup create` — Create one reusable signup sheet from inside a finalized roster post.",
           "Members request open spots from the sheet itself; Group and Bench members use DM attendance confirmations instead.",
           "Close preserves current requests. Restart clears requests and either advances seven days or accepts a new schedule.",
         ].join("\n"),
@@ -1543,7 +1601,8 @@ export class RaidRosterService {
       throw new Error("Finalize this roster before creating its signup sheet.");
     }
     const existing = [...this.signupSheets.values()].find(
-      (signup) => signup.rosterId === roster.rosterId,
+      (signup) =>
+        signup.rosterId === roster.rosterId && signup.status !== "cleared",
     );
     if (existing) {
       throw new Error(
@@ -2781,6 +2840,98 @@ export class RaidRosterService {
     }
   }
 
+  private async archiveSignupCycle(
+    guild: Guild,
+    signup: RaidSignupSheet,
+    binding: RaidRosterBinding & { archiveForumId: string },
+    reason: "restart-seven" | "restart-custom" | "clear",
+  ): Promise<void> {
+    const archiveKey = `${signup.raidId}:${signup.cycle}`;
+    if (this.archivedSignupCycles.has(archiveKey)) {
+      return;
+    }
+    const roster = this.rosters.get(signup.rosterId);
+    if (!roster?.finalizedRevision) {
+      throw new Error("The signup's finalized roster snapshot is unavailable.");
+    }
+    const forum = await guild.channels.fetch(binding.archiveForumId);
+    if (!forum || forum.type !== ChannelType.GuildForum) {
+      throw new Error("The configured Roster Archives channel is not a Forum.");
+    }
+    const requests = [...this.signupRequests.values()]
+      .filter((request) => request.raidId === signup.raidId)
+      .sort(
+        (left, right) =>
+          new Date(left.createdAt).getTime() -
+          new Date(right.createdAt).getTime(),
+      );
+    const archivedAt = new Date().toISOString();
+    const publishedRoster: RaidRosterDocument = {
+      ...structuredClone(roster),
+      status: "finalized",
+      draftRevision: null,
+    };
+    const start = Math.floor(new Date(signup.startAt).getTime() / 1_000);
+    const archiveSummary = new EmbedBuilder()
+      .setTitle("Zors Signup Cycle Archive")
+      .setColor(0x2c3e50)
+      .setDescription(
+        [
+          `**Signup:** ${signup.name}`,
+          `**Raid Date:** <t:${start}:F>`,
+          `**Roster:** ${roster.name}`,
+          `**Archive Reason:** ${reason}`,
+          `**Archived:** <t:${Math.floor(new Date(archivedAt).getTime() / 1_000)}:F>`,
+        ].join("\n"),
+      )
+      .addFields(
+        { name: "Raid ID", value: signup.raidId },
+        { name: "Cycle", value: String(signup.cycle), inline: true },
+        {
+          name: "Request Count",
+          value: String(requests.length),
+          inline: true,
+        },
+      )
+      .setFooter({ text: "Immutable Zors signup cycle archive • schema 1" });
+    const archiveState = {
+      schemaVersion: 1,
+      archivedAt,
+      reason,
+      signup,
+      roster: publishedRoster,
+      requests,
+    };
+    const localDate = new Date(
+      new Date(signup.startAt).getTime() - 7 * 60 * 60 * 1_000,
+    )
+      .toISOString()
+      .slice(0, 10);
+    await forum.threads.create({
+      name: `${signup.name} — ${localDate} — Cycle ${signup.cycle}`.slice(
+        0,
+        100,
+      ),
+      message: {
+        embeds: [
+          archiveSummary,
+          buildRosterEmbed(publishedRoster, {
+            signupRequests: requests,
+          }).setTitle(`📋 ${roster.name} — Archived Snapshot`),
+        ],
+        files: [
+          new AttachmentBuilder(
+            Buffer.from(`${JSON.stringify(archiveState, null, 2)}\n`, "utf8"),
+            { name: "zors-signup-cycle-archive.json" },
+          ),
+        ],
+        allowedMentions: { parse: [] },
+      },
+      reason: `Archive Zors signup ${signup.raidId} cycle ${signup.cycle}`,
+    });
+    this.archivedSignupCycles.add(archiveKey);
+  }
+
   private async clearSheetRequests(
     guild: Guild,
     signup: RaidSignupSheet,
@@ -2818,10 +2969,22 @@ export class RaidRosterService {
     guild: Guild,
     signup: RaidSignupSheet,
     restarted: RaidSignupSheet,
+    binding: RaidRosterBinding & { archiveForumId: string },
+    reason: "restart-seven" | "restart-custom",
   ): Promise<number> {
     if (signup.status !== "closed") {
       throw new Error("Close this signup sheet before restarting it.");
     }
+    if (
+      this.signupRequestsForSheet(signup.raidId).some(
+        ({ status }) => status === "draft-accepted",
+      )
+    ) {
+      throw new Error(
+        "Finalize or revert the roster Draft before restarting this signup sheet.",
+      );
+    }
+    await this.archiveSignupCycle(guild, signup, binding, reason);
     const cleared = await this.clearSheetRequests(guild, signup);
     await this.persistSignupSheet(guild, restarted);
     return cleared;
@@ -2831,11 +2994,14 @@ export class RaidRosterService {
     interaction: ButtonInteraction,
     action: string,
     raidId: string,
-    binding: RaidRosterBinding,
+    binding: CompleteRaidRosterBinding,
   ): Promise<void> {
     const signup = this.signupSheets.get(raidId);
     if (!signup) {
       throw new Error("That signup sheet is unavailable.");
+    }
+    if (signup.guildId !== interaction.guildId) {
+      throw new Error("That signup control belongs to another server.");
     }
     if (action === "request") {
       await this.beginSheetSignup(interaction, signup);
@@ -2864,10 +3030,77 @@ export class RaidRosterService {
     if (action === "restart-seven") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const restarted = shiftSignupSevenDays(signup);
-      const cleared = await this.restartSignupSheet(guild, signup, restarted);
+      const cleared = await this.restartSignupSheet(
+        guild,
+        signup,
+        restarted,
+        binding,
+        "restart-seven",
+      );
       await interaction.editReply(
         `Restarted the sheet seven days later and cleared ${cleared} pending request(s).`,
       );
+      return;
+    }
+    if (action === "clear") {
+      if (signup.status === "cleared") {
+        throw new Error("This signup sheet was already cleared.");
+      }
+      await interaction.reply({
+        content:
+          "Clear this signup permanently? Zors will archive the current cycle and requests, remove the sheet data, and disable Restart.",
+        components: [
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+              .setCustomId(
+                `${customIdPrefix}:raid:clear-confirm:${signup.raidId}`,
+              )
+              .setLabel("Confirm Clear and Archive")
+              .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+              .setCustomId(
+                `${customIdPrefix}:raid:clear-cancel:${signup.raidId}`,
+              )
+              .setLabel("Cancel")
+              .setStyle(ButtonStyle.Secondary),
+          ),
+        ],
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    if (action === "clear-cancel") {
+      await interaction.update({
+        content: "Clear cancelled. The signup sheet was not changed.",
+        components: [],
+      });
+      return;
+    }
+    if (action === "clear-confirm") {
+      if (signup.status === "cleared") {
+        throw new Error("This signup sheet was already cleared.");
+      }
+      if (
+        this.signupRequestsForSheet(signup.raidId).some(
+          ({ status }) => status === "draft-accepted",
+        )
+      ) {
+        throw new Error(
+          "Finalize or revert the roster Draft before clearing this signup sheet.",
+        );
+      }
+      await interaction.deferUpdate();
+      await this.archiveSignupCycle(guild, signup, binding, "clear");
+      const cleared = await this.clearSheetRequests(guild, signup);
+      await this.persistSignupSheet(guild, {
+        ...signup,
+        status: "cleared",
+        updatedAt: new Date().toISOString(),
+      });
+      await interaction.editReply({
+        content: `Cleared the signup permanently and archived its cycle. ${cleared} pending request(s) were cleared.`,
+        components: [],
+      });
       return;
     }
     if (action === "restart-custom") {
@@ -2919,7 +3152,7 @@ export class RaidRosterService {
   private async handleRaidRestartModal(
     interaction: ModalSubmitInteraction,
     raidId: string,
-    binding: RaidRosterBinding,
+    binding: CompleteRaidRosterBinding,
   ): Promise<void> {
     await this.authorize(interaction, binding);
     const signup = this.signupSheets.get(raidId);
@@ -2942,14 +3175,20 @@ export class RaidRosterService {
       ).toISOString();
     }
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const cleared = await this.restartSignupSheet(guild, signup, {
-      ...signup,
-      startAt,
-      endAt,
-      status: "open",
-      cycle: signup.cycle + 1,
-      updatedAt: new Date().toISOString(),
-    });
+    const cleared = await this.restartSignupSheet(
+      guild,
+      signup,
+      {
+        ...signup,
+        startAt,
+        endAt,
+        status: "open",
+        cycle: signup.cycle + 1,
+        updatedAt: new Date().toISOString(),
+      },
+      binding,
+      "restart-custom",
+    );
     await interaction.editReply(
       `Restarted the sheet with the new schedule and cleared ${cleared} pending request(s).`,
     );

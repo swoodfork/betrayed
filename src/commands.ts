@@ -293,8 +293,8 @@ const hourlyChoices = Array.from({ length: 24 }, (_, hour) => ({
   value: String(hour),
 }));
 
-export const zorsRaidCommand = new SlashCommandBuilder()
-  .setName("zors-raid")
+export const zorsSignupCommand = new SlashCommandBuilder()
+  .setName("zors-signup")
   .setDescription("Create and manage reusable raid signup sheets")
   .addSubcommand((command) =>
     command
@@ -342,7 +342,7 @@ export async function registerGuildCommands(
     zorsCommand.toJSON(),
     zorsOwnerCommand.toJSON(),
     zorsRosterCommand.toJSON(),
-    zorsRaidCommand.toJSON(),
+    zorsSignupCommand.toJSON(),
   ];
 
   await rest.put(

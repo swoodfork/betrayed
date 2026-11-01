@@ -67,6 +67,10 @@ describe("raid roster desired state", () => {
         }),
         expect.objectContaining({
           key: "signup-requests",
+          positionAfter: "roster-archives",
+        }),
+        expect.objectContaining({
+          key: "roster-archives",
           positionAfter: "raid-rosters",
         }),
       ]),

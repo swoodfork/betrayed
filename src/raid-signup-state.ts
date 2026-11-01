@@ -12,7 +12,7 @@ export const raidSignupSheetSchema = z
     name: z.string().min(1).max(100),
     startAt: isoDateTime,
     endAt: isoDateTime,
-    status: z.enum(["open", "closed"]),
+    status: z.enum(["open", "closed", "cleared"]),
     cycle: z.number().int().positive(),
     channelId: snowflake,
     messageId: snowflake,
@@ -56,6 +56,9 @@ export function pdtDateHour(date: string, hour: number): string {
 export function shiftSignupSevenDays(
   signup: RaidSignupSheet,
 ): RaidSignupSheet {
+  if (signup.status !== "closed") {
+    throw new Error("Only a closed signup sheet can be restarted.");
+  }
   const sevenDays = 7 * 24 * 60 * 60 * 1_000;
   return raidSignupSheetSchema.parse({
     ...signup,

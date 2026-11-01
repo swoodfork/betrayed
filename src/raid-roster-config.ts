@@ -16,6 +16,7 @@ const guildRaidRosterSchema = z.object({
   controlForumId: snowflake.nullable(),
   rosterForumId: snowflake.nullable(),
   signupRequestForumId: snowflake.nullable(),
+  archiveForumId: snowflake.nullable(),
 });
 
 const raidRosterConfigSchema = z.object({
@@ -33,11 +34,13 @@ export function isRaidRosterBindingComplete(
   controlForumId: string;
   rosterForumId: string;
   signupRequestForumId: string;
+  archiveForumId: string;
 } {
   return Boolean(
     binding.controlForumId &&
       binding.rosterForumId &&
-      binding.signupRequestForumId,
+      binding.signupRequestForumId &&
+      binding.archiveForumId,
   );
 }
 
@@ -63,6 +66,7 @@ export async function loadRaidRosterConfig(
       binding.controlForumId,
       binding.rosterForumId,
       binding.signupRequestForumId,
+      binding.archiveForumId,
     ];
     if (forumIds.some(Boolean) && !forumIds.every(Boolean)) {
       throw new Error(`${scope} raid roster Forum bindings are incomplete.`);
