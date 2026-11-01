@@ -3308,7 +3308,7 @@ export class RaidRosterService {
                       `${customIdPrefix}:roster-dispute:${roster.rosterId}:${revision}:${change.memberId}`,
                     )
                     .setLabel("Dispute this with Raid Coordinators")
-                    .setStyle(ButtonStyle.Secondary),
+                    .setStyle(ButtonStyle.Danger),
                 ),
               ]
             : [],
