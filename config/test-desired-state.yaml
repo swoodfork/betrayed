@@ -658,20 +658,13 @@ categories:
         permissionProfile: raid-management-readonly
         preserveHistory: true
         positionAfter: raid-rosters
-      - key: raider-response-forum
-        name: "📨raider-response-forum"
-        aliases: ["Raider Response Forum"]
+      - key: raider-responses
+        name: "📨raider-responses"
+        aliases: ["Raider Response Forum", "📨raider-response-forum"]
         type: forum
         permissionProfile: raid-management-readonly
         preserveHistory: true
         positionAfter: roster-archives
-      - key: raider-responses
-        name: "📨raider-responses"
-        aliases: ["Raider Responses", raider-responses]
-        type: text
-        permissionProfile: raid-management-readonly
-        preserveHistory: true
-        positionAfter: raider-response-forum
       - key: signup-requests
         name: "📨signup-requests"
         aliases: [signup-requests]

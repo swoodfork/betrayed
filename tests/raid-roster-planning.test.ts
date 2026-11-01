@@ -62,7 +62,7 @@ describe("raid roster desired state", () => {
     expect(coordinatorCategory?.channels).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          key: "raider-response-forum",
+          key: "raider-responses",
           permissionProfile: "raid-management-readonly",
           positionAfter: "roster-archives",
         }),
