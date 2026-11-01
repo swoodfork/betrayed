@@ -26,23 +26,33 @@ pass.
 - Every signup is attached to exactly one saved roster.
 - Each roster is explicitly either 20-player with four five-player groups or
   40-player with eight five-player groups.
+- Every roster has exactly ten numbered Bench positions.
+- Bench members receive the same attendance-confirmation cadence as grouped
+  members.
+- Additional members may be held in an unnumbered Overflow list, but Overflow
+  members never receive automated attendance confirmations.
 - Each roster has exactly one team role whose name contains its matching roster
   size, such as `Zors-20` or `Zors-40`.
 - Each roster has one primary team channel where new signup sheets are posted.
 - A signup may also have synchronized mirror sheets in additional channels for
   recruiting. Every copy represents the same signup event and roster.
-- Roster membership, class, spec, group, and Bench placement remain reusable
-  between weekly signups.
+- Roster membership, class, spec, group, Bench, and Overflow placement remain
+  reusable between weekly signups.
 - Raid times and confirmation history belong to the dated signup, never to the
   reusable roster.
 - Any member who can see a signup sheet may request to join its roster.
 - Each request contains one class and one specialization.
-- Accepting a request permanently adds the member to the roster, automatically
-  assigns the roster's team role, and lets the coordinator choose a group slot
-  or Bench.
+- Accepting a request adds the member to the working Draft and lets the
+  coordinator choose a group slot, Bench, or Overflow. Finalize makes the
+  addition permanent and assigns the roster's team role.
 - Rejected applicants receive a DM, as do accepted applicants.
 - Zors sends raid-confirmation DMs only to current members of the attached
-  roster. Pending or rejected requests never enter the reminder scheduler.
+  roster who occupy a group or one of the ten Bench positions. Pending,
+  rejected, and Overflow members never enter the reminder scheduler.
+- Each Forum post contains exactly one roster.
+- Roster edits use a Draft revision and a last-finalized snapshot.
+- Active signups continue using the last-finalized snapshot while a new Draft
+  is being edited.
 - Phase one creates one specifically dated raid at a time.
 - The primary signup sheet is posted in the roster's bound team channel.
 - Authorized staff can publish the same active signup into additional channels.
@@ -105,10 +115,129 @@ Forum and its child posts, even when the caller has permission. Zors should
 create one permanent **Roster Control** post during setup so the first roster
 can be created without exposing a builder in a public channel. Every roster
 post then contains interactive controls for Edit, Add Member, Pending Requests,
-Bump, Create Signup, and Archive. Slash commands remain available as a fallback
-inside the protected Forum.
+Bump, Finalize, Revert, Create Signup, and Archive. Slash commands remain
+available as a fallback inside the protected Forum.
 
-### 2. Request roster membership from a signup sheet
+Every roster command run inside a roster post is bound to that post's one roster
+ID. It must not ask the coordinator to choose or modify another roster. Commands
+run from the Roster Control post may create a new roster or show a roster-post
+link, but cannot attach a second roster to an existing post.
+
+### Native builder controls instead of drag and drop
+
+Discord bot messages do not support true drag-and-drop cards. Implementing
+browser-style drag and drop would require a separate authenticated web
+application, which is unnecessary for the first release.
+
+Use hierarchical buttons and dropdowns instead:
+
+- **Add Member**: member select, class select, filtered spec select, then
+  placement.
+- **Move Member**: select Group, Bench, or Overflow; select the member; select
+  the destination.
+- **Swap Members**: select the first member and second occupied position, then
+  preview the swap.
+- **Change Spec**: select the member, class, and filtered spec.
+- **Remove Member**: select the member and confirm.
+
+A 40-player roster plus ten Bench slots exceeds Discord's 25-option select
+limit. Placement therefore uses a hierarchy:
+
+1. Select Group, Bench, or Overflow.
+2. For Group, select Group 1 through Group 8 and then Slot 1 through Slot 5.
+3. For Bench, select Bench 1 through Bench 10.
+4. Overflow requires no numbered position.
+
+Every mutation shows a complete before/after preview before it is added to the
+Draft revision.
+
+### 2. Draft, finalize, and revert a roster
+
+Each roster post maintains two versions:
+
+- **Last finalized snapshot**: the roster currently used by active signup
+  sheets and attendance scheduling.
+- **Working Draft**: uncommitted theorycrafting changes visible in the roster
+  pane to authorized staff.
+
+An initial roster starts as Draft. A dated signup may be attached to it, but the
+signup remains **Awaiting roster finalization** and sends no DMs until a Raid
+Coordinator runs `/zors roster finalize` or presses **Finalize** in that roster
+post.
+
+Initial finalization:
+
+1. Validates every group, Bench, Overflow, member, class/spec, team role, and
+   channel binding.
+2. Saves the first finalized snapshot.
+3. Activates any attached dated signups.
+4. Sends the Initial attendance DM to every grouped and Bench member for each
+   active signup.
+5. Excludes Overflow members from automated attendance DMs.
+
+Editing an already finalized roster creates a new Draft revision. Existing
+signup sheets and reminders continue using the last finalized snapshot while
+coordinators theorycraft. Draft changes are not shown publicly and do not alter
+the scheduler until Finalize.
+
+Finalizing a later revision:
+
+1. Computes a member-by-member diff against the last finalized snapshot.
+2. Atomically promotes the Draft to the new finalized snapshot.
+3. Refreshes the roster post and every projection of every attached active
+   signup.
+4. Sends roster-change DMs only to members affected by the revision.
+5. Starts or stops attendance scheduling according to each finalized placement.
+
+Roster-change DMs show the exact before and after values, including:
+
+- Group and slot.
+- Bench or Overflow placement.
+- Class/spec.
+- Added or removed status.
+
+The DM contains:
+
+- **Acknowledge**
+- **Acknowledge with issues**
+
+**Acknowledge with issues** opens a modal for the member to describe the issue.
+Zors records the acknowledgement and posts the issue to
+`🔐coordinator-affairs` with links to the roster and affected signup. A dispute
+does not reject or roll back the finalized roster; coordinators resolve it
+through a later Draft revision.
+
+Placement changes affect attendance automation as follows:
+
+- Group to Group, Group to Bench, Bench to Group, class/spec, or position
+  changes preserve existing attendance history and future cadence.
+- A new grouped or Bench member receives Initial attendance confirmation for
+  each active signup, then only future checkpoints.
+- Moving Overflow into a group or Bench starts attendance automation and sends
+  Initial for each active signup.
+- Moving a grouped or Bench member into Overflow stops future automated
+  attendance DMs after finalization.
+- Removing a member stops future reminders but preserves their historical raid
+  record.
+
+`/zors roster revert` or **Revert Draft** discards the entire working revision
+and restores the last finalized snapshot without sending change or attendance
+DMs. A roster with no previous finalized snapshot cannot revert; it can only be
+edited, finalized, or archived.
+
+After 30 minutes with no activity on a Draft, Zors posts one persistent warning
+inside that roster post:
+
+```text
+This roster has unfinalized changes. Active signup sheets and automated
+reminders are still using the last finalized version.
+```
+
+The warning includes **Finalize** and **Revert Draft** controls. It does not
+repeat every 30 minutes and remains until addressed. Finalize or Revert deletes
+the warning. A later Draft revision starts a new 30-minute inactivity cycle.
+
+### 3. Request roster membership from a signup sheet
 
 Every live signup sheet has a **Request to Join This Raid** button. Any server
 member who can see the sheet may use it.
@@ -142,18 +271,31 @@ in `📨signup-requests`, so Zors does not send a duplicate alert to
 When accepting, the coordinator:
 
 1. May change the requested class/spec.
-2. Chooses an open group/position or **Bench**.
+2. Chooses an open group/position, one of ten Bench positions, or Overflow.
 3. Reviews the resulting roster.
-4. Confirms the permanent roster addition.
+4. Confirms adding the applicant to the working Draft.
 
-Zors then assigns the roster's raid-team Discord role, updates the canonical
-roster, refreshes the roster Forum post, refreshes every active signup attached
-to that roster, and sends the new member an immediate confirmation DM for the
-source signup. The new member receives only checkpoint DMs that are still in
-the future.
+Zors marks the request **Accepted — awaiting roster finalization**, adds the
+member to the Draft, and sends a decision DM explaining that the assignment is
+pending Finalize. It does not update active signup sheets or send attendance
+confirmations yet.
 
-If all main slots are occupied, Bench remains available. A coordinator can
-later move a benched member into a group through the roster editor.
+On Finalize, Zors assigns the team role, publishes the roster change, sends the
+member's assignment-change DM, refreshes every attached signup, and sends
+Initial attendance confirmation if the member occupies a group or Bench. The
+member then receives only scheduled checkpoints still in the future. Overflow
+members receive the assignment-change DM but no attendance confirmations.
+
+If the Draft is reverted, accepted requests whose additions existed only in
+that Draft return to Pending rather than being silently rejected. Their team
+roles are not assigned.
+
+If all main slots are occupied, one of ten numbered Bench positions remains
+available. If the ten Bench positions are also occupied, the coordinator may
+approve the applicant into the unnumbered Overflow list. A coordinator can
+later move a Bench or Overflow member into a group through the roster editor.
+Overflow members appear on roster and signup displays but receive no automated
+attendance DMs until a finalized revision moves them into a group or Bench.
 
 The roster editor has two addition paths:
 
@@ -163,7 +305,7 @@ The roster editor has two addition paths:
   posts. Discord selects allow at most 25 options, so the builder must paginate
   rather than silently omit older requests.
 
-### 3. Publish or bump the roster
+### 4. Publish or bump the roster
 
 Each saved 20-player or 40-player roster has one post in the private
 `📋raid-rosters` Forum beneath `🔐coordinator-affairs`. Coordinators move
@@ -182,7 +324,7 @@ This can be repeated indefinitely without creating duplicate roster posts. The
 roster's durable source of truth remains the Officer-only control record, so
 editing, bumping, or archiving the coordinator presentation cannot destroy it.
 
-### 4. Create a dated raid
+### 5. Create a dated raid
 
 Use a second command group:
 
@@ -209,7 +351,10 @@ the configured server owner. It starts an ephemeral wizard:
 6. Preview the resolved PST/PDT timestamps and roster.
 7. Confirm creation.
 8. Post the primary sheet in the roster's bound team channel.
-9. Persist the signup and immediately DM every current roster member.
+9. Persist the signup.
+10. If the roster is finalized, immediately DM every grouped and Bench member.
+    If it is Draft, show **Awaiting roster finalization** and send nothing until
+    Finalize.
 
 Discord has no native calendar-date picker. A validated date field is therefore
 needed, but the start and end times can use dropdowns containing hourly values.
@@ -230,7 +375,11 @@ calculated from the selected raid start, never from the signup creation date.
 If the signup is created after a checkpoint boundary, that checkpoint is
 skipped rather than sent late.
 
-### 5. Display and mirror the live signup sheet
+If a Draft roster is finalized after signup creation, Initial confirmation is
+sent at finalization. Only the 3-day, 24-hour, and 6-hour checkpoints still in
+the future are scheduled.
+
+### 6. Display and mirror the live signup sheet
 
 Zors posts the primary embed in the team channel bound to the selected roster.
 That channel can remain visible only to the roster's team role. The embed
@@ -241,6 +390,10 @@ should include:
 - Roster and team role.
 - Group 1 through Group 4 for 20-player rosters, or Group 1 through Group 8
   for 40-player rosters.
+- Bench 1 through Bench 10 with the same confirmation history as grouped
+  members.
+- Unnumbered Overflow, explicitly labeled as not receiving automated attendance
+  reminders.
 - Member, class, and spec for each slot.
 - Current attendance state.
 - Confirmation history for each checkpoint.
@@ -559,7 +712,8 @@ On startup:
 
 1. Load all roster, request, and active raid control posts.
 2. Validate schema versions and message bindings.
-3. Rebuild the next due checkpoint or reminder for every participant.
+3. Rebuild the next due checkpoint or reminder for every grouped or Bench
+   participant in each signup's applied finalized roster revision.
 4. Immediately process overdue work in a bounded, rate-limited batch.
 5. Resume the normal scheduler loop.
 
@@ -580,6 +734,9 @@ All state mutations for one raid must be serialized through a per-raid lock.
 The handler re-reads the current participant state before writing so two rapid
 button presses cannot overwrite newer state.
 
+Draft roster revisions never mutate the scheduler. A successful Finalize
+applies the diff to attached raids under the same serialized mutation boundary.
+
 ## Command Permissions and Auditing
 
 Roster and raid management commands are available to:
@@ -599,6 +756,7 @@ acceptance, and rejection remain limited to the management roles above.
 The existing `📜zors-command-log` should audit:
 
 - Roster creation and edits.
+- Roster finalization, reversion, and member change issues.
 - Raid creation, cancellation, and closure.
 - Manual resend requests.
 - Roster bumps.
@@ -621,8 +779,24 @@ Roster
   primaryTeamChannelId
   presentationThreadId
   status
+  finalizedRevisionId
+  draftRevisionId
+  draftWarningMessageId
+
+RosterRevision
+  id
+  rosterId
+  baseRevisionId
+  status
+  createdByMemberId
+  createdAt
+  lastActivityAt
+  finalizedByMemberId
+  finalizedAt
+  touchedMemberIds[]
   slots[]
-  bench[]
+  bench[10]
+  overflow[]
 
 RosterSlot
   memberId
@@ -631,6 +805,15 @@ RosterSlot
   groupNumber
   position
   placementStatus
+
+RosterChangeAcknowledgement
+  rosterId
+  revisionId
+  memberId
+  status
+  issueText
+  dmMessageId
+  respondedAt
 
 SignupRequest
   id
@@ -658,6 +841,7 @@ RaidEvent
   timeZone
   signupProjections[]
   controlThreadId
+  appliedRosterRevisionId
   status
   participants[]
 
@@ -674,6 +858,7 @@ RaidParticipant
   className
   specialization
   groupNumber
+  placementStatus
   attendanceOverride
   currentStatus
   dmUnavailable
@@ -715,6 +900,12 @@ and delivery history.
   existing request instead of creating another Forum post.
 - If automatic team-role assignment fails, do not partially accept the
   request. Keep it pending and show the permission error to the coordinator.
+- If a Draft fails finalization validation, leave the last finalized snapshot
+  and all active signup scheduling unchanged.
+- If roster-change DM delivery fails, finalize the roster but mark the affected
+  acknowledgement unavailable and show it in the roster post.
+- If an acknowledgement includes issues, persist the issue before notifying
+  `🔐coordinator-affairs`; failure to notify must not discard the issue.
 - If a member leaves the guild, mark the slot unavailable and notify the
   coordinator; do not silently assign another member.
 - If a roster changes after a raid is created, refresh every active attached
@@ -746,8 +937,18 @@ and delivery history.
 - Roster member and team-role validation.
 - Saved-roster prerequisite for raid creation.
 - Fixed 20-player/four-group and 40-player/eight-group validation.
+- Exactly ten numbered Bench positions plus unnumbered Overflow.
+- Full attendance cadence for Bench and no automated cadence for Overflow.
 - Exactly one matching numbered team role per roster.
 - Roster command parent-Forum restrictions.
+- One roster ID per Forum post and context-bound command routing.
+- Initial Draft finalization with and without an attached signup.
+- Active signups continue from the last finalized snapshot during Draft edits.
+- Thirty-minute inactivity warning creation and deletion on Finalize/Revert.
+- Draft reversion without member DMs.
+- Finalization diff and affected-member-only change DMs.
+- Acknowledge and Acknowledge-with-issues modal handling.
+- Overflow-to-Bench/Group activation and Group/Bench-to-Overflow suppression.
 - Zors-only Forum post creation and mutation.
 - Officer read-only access to `🗄️zors-raid-control`.
 - Coordinator denial from `🗄️zors-raid-control`.
@@ -783,6 +984,15 @@ and delivery history.
 - Verify Yes, No, absence reversion, closed DMs, and simultaneous responses.
 - Verify public signup request, coordinator spec edit, acceptance, rejection,
   automatic role assignment, group placement, and Bench placement.
+- Verify ten Bench slots, unnumbered Overflow, and Overflow reminder exclusion.
+- Create an active signup from a Draft roster and verify that no DMs send until
+  Finalize.
+- Leave a Draft inactive for 30 compressed test minutes and verify its warning,
+  Finalize, Revert, and warning deletion.
+- Verify active reminders continue from the previous finalized revision while a
+  new Draft is edited.
+- Verify only changed members receive assignment-change DMs and that submitted
+  issues appear in `🔐coordinator-affairs`.
 - Restart the Render worker between stages and confirm recovery.
 - Confirm the live signup sheet remains accurate.
 - Confirm team-role-only primary visibility and a public recruiting mirror.
@@ -804,8 +1014,12 @@ only behind an explicit Test-guild configuration.
 - Add `/zors roster` command group.
 - Restrict every roster builder and control to `📋raid-rosters` and its posts.
 - Add fixed 20-player and 40-player formats.
+- Add ten Bench slots and unnumbered non-alerting Overflow.
 - Bind exactly one numbered team role and one primary team channel per roster.
 - Build the interactive class/spec/member roster editor.
+- Add contextual Finalize and Revert with finalized-snapshot/Draft revisions.
+- Add the persistent 30-minute inactivity warning.
+- Add affected-member change DMs and issue escalation.
 - Persist and reconstruct roster control posts.
 - Render and bump roster presentation messages.
 
@@ -828,7 +1042,8 @@ only behind an explicit Test-guild configuration.
 - Add `/zors raid publish` with a paginated active-signup selector.
 - Support synchronized public recruiting mirrors.
 - Add roster and signup projection bump controls.
-- Immediately DM all current roster members.
+- Immediately DM grouped and Bench members when the attached roster is already
+  finalized, or defer Initial DMs until first finalization.
 - Add manual refresh, cancel, and close operations.
 
 ### Phase 4: DM responses
@@ -862,7 +1077,10 @@ The first production release is complete only when:
 
 - A coordinator can create, edit, show, bump, and archive a saved roster.
 - Every roster slot has a valid member, class, spec, and group.
-- Bench members are preserved without occupying a main group slot.
+- Every roster has ten numbered Bench positions; Bench members receive the full
+  attendance cadence without occupying a main group slot.
+- Additional Overflow members are unnumbered, remain visible, and receive no
+  automated attendance confirmations.
 - A 20-player roster has four groups and a 40-player roster has eight groups.
 - Every roster has exactly one matching numbered team role and one primary team
   channel.
@@ -875,25 +1093,40 @@ The first production release is complete only when:
 - Administrator bypass is explicitly accepted and documented.
 - Each saved roster remains one persistent Forum post that can be bumped
   repeatedly.
+- Each roster Forum post contains exactly one roster, and contextual commands
+  cannot target another roster.
+- Initial and subsequent edits remain Draft until a coordinator explicitly
+  finalizes them.
+- An active signup continues using the last finalized snapshot while a Draft is
+  edited.
+- After 30 minutes of Draft inactivity, one warning remains until Finalize or
+  Revert deletes it.
+- Revert restores the last finalized snapshot and sends no member DMs.
+- Finalize updates every attached signup and sends before/after assignment DMs
+  only to affected members.
+- Assignment DMs support Acknowledge and Acknowledge with issues; submitted
+  issues are persisted and forwarded to `🔐coordinator-affairs`.
 - Raid creation is impossible until a saved roster is selected.
 - Every signup is attached to exactly one roster.
 - A dated raid can be created with hourly start/end selections.
 - The primary sheet posts in the roster's role-restricted team channel.
 - Authorized staff can select an active signup and publish synchronized mirrors
   in additional channels.
-- Primary and mirrored sheets update together after every response, request
-  acceptance, roster edit, and spec change.
+- Primary and mirrored sheets update together after every response and
+  finalized roster revision.
 - Bumping a signup refreshes every bound sheet in place without creating a new
   underlying signup or consolidating copies into one channel.
-- Signup creation immediately contacts every current roster member.
+- Signup creation immediately contacts every grouped and Bench member when the
+  roster is finalized; a Draft-linked signup waits until Finalize.
 - Passed reminder checkpoints are skipped.
 - Any visible member can submit one class/spec request from the signup sheet.
 - Coordinators see Pending Approval on the sheets and roster pane, can read the
   request posts directly, and can use Zors to edit a request's spec, reject it,
-  or accept it into a chosen slot or Bench.
-- Accepted members receive the team role, become persistent roster members,
-  appear on attached signup sheets, and receive Immediate plus only future
-  confirmations.
+  or accept it into a chosen slot, Bench, or Overflow.
+- Accepted requests enter the working Draft. Finalize assigns the team role and
+  publishes the addition; Revert returns Draft-only acceptances to Pending.
+- Finalized grouped and Bench additions receive Immediate plus only future
+  confirmations; Overflow additions receive no attendance automation.
 - Rejected and accepted applicants receive decision DMs.
 - Roster membership and spec changes update attached signup sheets without
   moving confirmation history into the roster.
