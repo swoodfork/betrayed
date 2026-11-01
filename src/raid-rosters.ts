@@ -1420,6 +1420,24 @@ export class RaidRosterService {
         );
       }
       this.signupSheets.set(signup.raidId, signup);
+      for (const reference of signup.attendancePromptMessages) {
+        const response = signup.attendanceConfirmations.find(
+          ({ memberId }) => memberId === reference.memberId,
+        );
+        const hasActiveFollowup =
+          response &&
+          !response.lockedAt &&
+          (response.status === "tentative" ||
+            response.status === "declined" ||
+            response.status === "issue");
+        await this.disableAttendanceControlsInChannel(
+          guild,
+          reference.channelId,
+          signup.raidId,
+          reference.memberId,
+          hasActiveFollowup ? reference.messageId : undefined,
+        );
+      }
       const channel = await guild.channels.fetch(signup.channelId);
       if (!channel?.isTextBased()) {
         throw new Error(`Raid signup ${signup.raidId} channel is unavailable.`);
