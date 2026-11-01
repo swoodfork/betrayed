@@ -13,6 +13,7 @@ import {
   attendanceAssignmentCopy,
   buildAttendanceFollowupControls,
   buildSignupSheetControls,
+  isAttendanceControlFor,
 } from "../src/raid-rosters.js";
 
 const signup = raidSignupSheetSchema.parse({
@@ -115,6 +116,37 @@ describe("raid signup sheet state", () => {
 
     expect(declined).toEqual(["I can make it now"]);
     expect(tentative).toEqual(["I can make it", "I can not make it"]);
+  });
+
+  it("identifies every attendance control for the same raid member", () => {
+    expect(
+      isAttendanceControlFor(
+        `zors-roster:attendance:decline:${signup.raidId}:1:${signup.createdBy}`,
+        signup.raidId,
+        signup.createdBy,
+      ),
+    ).toBe(true);
+    expect(
+      isAttendanceControlFor(
+        `zors-roster:attend-followup:confirm:${signup.raidId}:2:${signup.createdBy}`,
+        signup.raidId,
+        signup.createdBy,
+      ),
+    ).toBe(true);
+    expect(
+      isAttendanceControlFor(
+        `zors-roster:attend-followup:confirm:${signup.raidId}:1:223456789012345678`,
+        signup.raidId,
+        signup.createdBy,
+      ),
+    ).toBe(false);
+    expect(
+      isAttendanceControlFor(
+        `zors-roster:raid:request:${signup.raidId}`,
+        signup.raidId,
+        signup.createdBy,
+      ),
+    ).toBe(false);
   });
 
   it("uses placement-specific team text in attendance DMs", () => {

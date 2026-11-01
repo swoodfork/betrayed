@@ -6,6 +6,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
+  ComponentType,
   EmbedBuilder,
   MessageFlags,
   ModalBuilder,
@@ -590,6 +591,21 @@ export function buildAttendanceFollowupControls(
   }
 
   return row;
+}
+
+export function isAttendanceControlFor(
+  customId: string,
+  raidId: string,
+  memberId: string,
+): boolean {
+  const parts = customId.split(":");
+  return (
+    parts.length === 6 &&
+    parts[0] === customIdPrefix &&
+    (parts[1] === "attendance" || parts[1] === "attend-followup") &&
+    parts[3] === raidId &&
+    parts[5] === memberId
+  );
 }
 
 export function attendanceAssignmentCopy(
@@ -3707,6 +3723,48 @@ export class RaidRosterService {
     }
   }
 
+  private async disableAttendanceControlsInChannel(
+    guild: Guild,
+    channelId: string,
+    raidId: string,
+    memberId: string,
+    keepMessageId?: string,
+  ): Promise<void> {
+    try {
+      const channel = await guild.client.channels.fetch(channelId);
+      if (!channel?.isTextBased()) {
+        return;
+      }
+      const messages = await channel.messages.fetch({ limit: 100 });
+      const stale = messages.filter(
+        (message) =>
+          message.id !== keepMessageId &&
+          message.components.some((row) =>
+            row.type === ComponentType.ActionRow
+              ? row.components.some(
+                  (component) =>
+                    "customId" in component &&
+                    typeof component.customId === "string" &&
+                    isAttendanceControlFor(
+                      component.customId,
+                      raidId,
+                      memberId,
+                    ),
+                )
+              : false,
+          ),
+      );
+      await Promise.all(
+        stale.map((message) => message.edit({ components: [] })),
+      );
+    } catch (error) {
+      console.warn(
+        `Could not disable older attendance controls for ${memberId} in ${channelId}.`,
+        error,
+      );
+    }
+  }
+
   private async responseDestination(
     guild: Guild,
     roster: RaidRosterDocument,
@@ -3770,9 +3828,15 @@ export class RaidRosterService {
     signup: RaidSignupSheet,
   ): Promise<void> {
     await Promise.all(
-      signup.attendancePromptMessages.map((reference) =>
+      signup.attendancePromptMessages.flatMap((reference) => [
         this.disableDmControl(guild, reference),
-      ),
+        this.disableAttendanceControlsInChannel(
+          guild,
+          reference.channelId,
+          signup.raidId,
+          reference.memberId,
+        ),
+      ]),
     );
   }
 
@@ -3832,12 +3896,14 @@ export class RaidRosterService {
         throw new Error("Overflow assignments cannot receive attendance DMs.");
       }
       try {
-        const previousPrompt = signup.attendancePromptMessages.find(
+        const previousPrompts = signup.attendancePromptMessages.filter(
           ({ memberId }) => memberId === assignment.memberId,
         );
-        if (previousPrompt) {
-          await this.disableDmControl(guild, previousPrompt);
-        }
+        await Promise.all(
+          previousPrompts.map((reference) =>
+            this.disableDmControl(guild, reference),
+          ),
+        );
         const user = await guild.client.users.fetch(assignment.memberId);
         const copy = attendanceAssignmentCopy(
           assignment.placement.kind,
@@ -3896,6 +3962,13 @@ export class RaidRosterService {
             ),
           ],
         });
+        await this.disableAttendanceControlsInChannel(
+          guild,
+          message.channelId,
+          signup.raidId,
+          assignment.memberId,
+          message.id,
+        );
         sentMemberIds.push(assignment.memberId);
         sentPromptMessages.push({
           memberId: assignment.memberId,
@@ -4017,6 +4090,10 @@ export class RaidRosterService {
             lockedAt: now,
           },
         ],
+        attendancePromptMessages:
+          currentSignup.attendancePromptMessages.filter(
+            (reference) => reference.memberId !== memberId,
+          ),
         updatedAt: now,
       });
       await interaction.update({
@@ -4024,6 +4101,12 @@ export class RaidRosterService {
         embeds: interaction.message.embeds,
         components: [],
       });
+      await this.disableAttendanceControlsInChannel(
+        guild,
+        interaction.channelId,
+        raidId,
+        memberId,
+      );
     } finally {
       this.pendingAttendanceResponses.delete(responseKey);
     }
@@ -4034,6 +4117,13 @@ export class RaidRosterService {
     signup: RaidSignupSheet,
     memberId: string,
   ): Promise<void> {
+    if (interaction.isModalSubmit() && !interaction.isFromMessage()) {
+      throw new Error("This attendance response is not attached to a DM.");
+    }
+    const interactionMessage = interaction.message;
+    if (!interactionMessage) {
+      throw new Error("This attendance response message is unavailable.");
+    }
     const existing = signup.attendanceConfirmations.find(
       (entry) => entry.memberId === memberId,
     );
@@ -4043,16 +4133,24 @@ export class RaidRosterService {
       (existing.status === "tentative" ||
         existing.status === "declined" ||
         existing.status === "issue");
+    const currentPrompt = signup.attendancePromptMessages.find(
+      (reference) => reference.memberId === memberId,
+    );
+    const isCurrentPrompt =
+      !currentPrompt || currentPrompt.messageId === interactionMessage.id;
     const update = {
       content:
-        existing?.status === "confirmed"
+        unresolved && !isCurrentPrompt
+          ? "This older attendance message is no longer active. Use your latest attendance message if you need to update your response."
+          : existing?.status === "confirmed"
           ? "✅ Your Attendance is Confirmed. Contact a Raid Coordinator if it needs to change."
           : existing?.status === "tentative"
             ? "🟡 Your Attendance is Tentative. Use the choices below when your plans are final."
             : unresolved
               ? "🔴 You are marked Not Attending. If your plans change, use the choice below."
               : "🔴 You are marked Not Attending. Contact a Raid Coordinator if your final response needs to change.",
-      components: unresolved
+      embeds: [],
+      components: unresolved && isCurrentPrompt
         ? [
             buildAttendanceFollowupControls(
               signup,
@@ -4063,13 +4161,20 @@ export class RaidRosterService {
         : [],
     };
     if (interaction.isModalSubmit()) {
-      if (!interaction.isFromMessage()) {
-        throw new Error("This attendance response is not attached to a DM.");
-      }
       await interaction.update(update);
-      return;
+    } else {
+      await interaction.update(update);
     }
-    await interaction.update(update);
+    const guild = await interaction.client.guilds.fetch(signup.guildId);
+    await this.disableAttendanceControlsInChannel(
+      guild,
+      interaction.channelId,
+      signup.raidId,
+      memberId,
+      unresolved
+        ? currentPrompt?.messageId ?? interactionMessage.id
+        : undefined,
+    );
   }
 
   private async recordAttendanceResponse(
@@ -4145,6 +4250,19 @@ export class RaidRosterService {
             issue: reason,
           },
         ],
+        attendancePromptMessages:
+          source === "initial"
+            ? [
+                ...signup.attendancePromptMessages.filter(
+                  (reference) => reference.memberId !== memberId,
+                ),
+                {
+                  memberId,
+                  channelId: interaction.channelId,
+                  messageId: interaction.message.id,
+                },
+              ]
+            : signup.attendancePromptMessages,
         updatedAt: new Date().toISOString(),
       });
       await this.sendAttendanceCoordinatorUpdate(
@@ -4161,10 +4279,18 @@ export class RaidRosterService {
           response === "tentative"
             ? "🟡 Your Attendance is Tentative. Raid Coordinators received your explanation.\n\nWhen your plans are final, reopen this direct message and press one of the buttons below."
             : "🔴 You are marked Not Attending. Raid Coordinators received your reason.\n\nIf your plans change and you can attend, press the button below to alert the officer core.",
+        embeds: [],
         components: [
           buildAttendanceFollowupControls(signup, memberId, response),
         ],
       });
+      await this.disableAttendanceControlsInChannel(
+        guild,
+        interaction.channelId,
+        raidId,
+        memberId,
+        interaction.message.id,
+      );
     } finally {
       this.pendingAttendanceResponses.delete(responseKey);
     }
@@ -4323,6 +4449,10 @@ export class RaidRosterService {
             ...(nextStatus === "declined" ? { issue: updateReason } : {}),
           },
         ],
+        attendancePromptMessages:
+          currentSignup.attendancePromptMessages.filter(
+            (reference) => reference.memberId !== memberId,
+          ),
         updatedAt: now,
       });
       await this.sendAttendanceCoordinatorUpdate(
@@ -4339,8 +4469,15 @@ export class RaidRosterService {
           nextStatus === "confirmed"
             ? "✅ Your Attendance is Confirmed. The officer core was alerted."
             : "🔴 You are marked Not Attending. The officer core was alerted.",
+        embeds: [],
         components: [],
       });
+      await this.disableAttendanceControlsInChannel(
+        guild,
+        interaction.channelId,
+        raidId,
+        memberId,
+      );
     } finally {
       this.pendingAttendanceResponses.delete(responseKey);
     }
