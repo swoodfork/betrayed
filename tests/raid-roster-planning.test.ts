@@ -16,7 +16,13 @@ describe("raid roster desired state", () => {
     const profile = desired.permissionProfiles.find(
       ({ key }) => key === "raid-management-readonly",
     );
+    const rosterProfile = desired.permissionProfiles.find(
+      ({ key }) => key === "raid-roster-commands",
+    );
     const coordinator = profile?.overwrites?.find(
+      ({ roleKey }) => roleKey === "raid-coordinator",
+    );
+    const rosterCoordinator = rosterProfile?.overwrites?.find(
       ({ roleKey }) => roleKey === "raid-coordinator",
     );
     const zors = profile?.overwrites?.find(
@@ -50,6 +56,20 @@ describe("raid roster desired state", () => {
         "ManageThreads",
       ]),
     );
+    expect(rosterCoordinator).toMatchObject({
+      allow: expect.arrayContaining([
+        "ViewChannel",
+        "SendMessagesInThreads",
+        "ReadMessageHistory",
+        "UseApplicationCommands",
+      ]),
+      deny: expect.arrayContaining([
+        "SendMessages",
+        "CreatePublicThreads",
+        "ManageThreads",
+      ]),
+    });
+    expect(rosterCoordinator?.deny).not.toContain("SendMessagesInThreads");
     expect(officerCategory?.channels).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -68,6 +88,7 @@ describe("raid roster desired state", () => {
         }),
         expect.objectContaining({
           key: "raid-rosters",
+          permissionProfile: "raid-roster-commands",
           positionAfter: "coordinator-chat",
         }),
         expect.objectContaining({

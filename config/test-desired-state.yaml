@@ -301,6 +301,27 @@ permissionProfiles:
       - roleKey: zors-bot
         allow: [ViewChannel, SendMessages, SendMessagesInThreads, CreatePublicThreads, EmbedLinks, ReadMessageHistory, ManageMessages, ManageThreads, UseApplicationCommands]
         deny: []
+  - key: raid-roster-commands
+    description: Raid Coordinators can use commands and reply inside existing roster posts without creating or managing posts.
+    overwrites:
+      - roleKey: everyone
+        allow: []
+        deny: [ViewChannel]
+      - roleKey: guild-master
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, CreatePublicThreads, EmbedLinks, ReadMessageHistory, UseApplicationCommands]
+        deny: []
+      - roleKey: discord-admin
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, CreatePublicThreads, EmbedLinks, ReadMessageHistory, UseApplicationCommands]
+        deny: []
+      - roleKey: officer
+        allow: [ViewChannel, ReadMessageHistory, UseApplicationCommands]
+        deny: [AddReactions, SendMessages, SendMessagesInThreads, CreatePublicThreads, CreatePrivateThreads, ManageMessages, ManageThreads]
+      - roleKey: raid-coordinator
+        allow: [ViewChannel, SendMessagesInThreads, ReadMessageHistory, UseApplicationCommands]
+        deny: [AddReactions, SendMessages, CreatePublicThreads, CreatePrivateThreads, ManageMessages, ManageThreads]
+      - roleKey: zors-bot
+        allow: [ViewChannel, SendMessages, SendMessagesInThreads, CreatePublicThreads, EmbedLinks, ReadMessageHistory, ManageMessages, ManageThreads, UseApplicationCommands]
+        deny: []
   - key: council-private
     description: Only staff and Council members can view and participate.
     overwrites:
@@ -648,7 +669,7 @@ categories:
         name: "📋raid-rosters"
         aliases: [raid-rosters]
         type: forum
-        permissionProfile: raid-management-readonly
+        permissionProfile: raid-roster-commands
         preserveHistory: true
         positionAfter: coordinator-chat
       - key: roster-archives
