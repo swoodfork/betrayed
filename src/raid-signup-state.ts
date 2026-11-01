@@ -5,7 +5,7 @@ const isoDateTime = z.string().datetime();
 
 const attendanceConfirmationSchema = z.object({
   memberId: snowflake,
-  status: z.enum(["confirmed", "issue"]),
+  status: z.enum(["confirmed", "declined", "tentative", "issue"]),
   recordedAt: isoDateTime,
   issue: z.string().max(1_000).optional(),
 });

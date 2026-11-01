@@ -137,9 +137,9 @@ already assigned to a Group or Bench cannot request another spot because their
 attendance is handled by cycle-specific Zors DMs. Each DM includes the full
 signup name, Discord-localized raid date and time, roster spot, and a direct
 signup-sheet link. **I will be at raid** records a durable confirmation;
-**I cannot attend** records the response and forwards its explanation to
-`🔐coordinator-affairs`. Overflow members may request a spot, including with a
-different spec.
+**Tentative** and **I cannot attend** require an explanation and forward the
+response to `🔐coordinator-affairs`. Overflow members may request a spot,
+including with a different spec.
 
 Pending requests are projected into the roster and signup sheet without being
 mixed into approved Overflow. Move Member lists assigned members and pending
@@ -149,12 +149,11 @@ approval moves that one assignment instead of duplicating the member. Finalize
 approves staged requests and assigns the team role; Revert returns them to
 Pending. Staff can reject a still-pending request from its private post.
 
-Regular members see only **Request a Spot** on an open signup sheet. Staff-only
-**Close Signup**, **Restart**, and **Clear and Archive** controls live in the
-private roster post instead of the member-facing signup message. Close Signup
-disables new requests but preserves current requests for staff to finish
-processing. A closed signup offers **Restart +7 Days**, **Restart with New
-Schedule**, and **Clear and Archive** in its roster post. Every Restart writes an
+Regular members see only **Request a Spot** on an open signup sheet. Authorized
+Raid Coordinators, Officers, Administrators, and the owner manage its lifecycle
+contextually from the roster post with `/zors-signup-admin close`,
+`restart-seven`, `restart-custom`, or `clear`. Close preserves current requests
+and attendance responses for staff to finish processing. Every Restart writes an
 immutable cycle snapshot to `🗃️roster-archives`, then clears that sheet's
 requests, keeps the finalized roster—including Group, Bench, and Overflow—and
 clears the prior attendance responses, reopens the same sheet, and sends fresh
@@ -163,6 +162,15 @@ cycle and clears its requests, but permanently clears that sheet and removes
 all restart controls. A new sheet can then be created from the roster post.
 Restart and Clear refuse while a request is staged in a roster Draft, requiring
 staff to Finalize or Revert first.
+
+Group and Bench attendance DMs offer **I will be at raid**, **Tentative**, and
+**I cannot attend**. Tentative and declined responses require an explanation.
+The signup roster displays confirmed members with a green indicator, tentative
+members with yellow, and declined members with red. Coordinator alerts include
+the member's Discord mention, class/spec, roster spot, Discord-localized raid
+date/time, team-role tag, explanation, and direct signup-sheet link. Discord
+mentions are used throughout roster and signup displays so the member's current
+server display name is shown even when it differs from an in-game name.
 
 Move, Swap, Change Spec, and Remove use roster-only member menus rather than
 Discord-wide member pickers. Rosters larger than Discord's 25-option select

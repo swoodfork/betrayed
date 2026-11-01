@@ -286,6 +286,17 @@ describe("raid roster state", () => {
     expect(embed.fields?.[0]?.value).toContain(
       "🟧 <@223456789012345678>",
     );
+    const attendance = buildRosterEmbed(document, {
+      attendanceConfirmations: [
+        {
+          memberId: memberOne,
+          status: "declined",
+          recordedAt: "2026-11-01T01:00:00.000Z",
+          issue: "Emergency",
+        },
+      ],
+    }).toJSON();
+    expect(attendance.fields?.[0]?.value).toContain("🔴 Not Attending");
   });
 
   it("restarts Bench 2 display numbering and reduces contextual show output", () => {

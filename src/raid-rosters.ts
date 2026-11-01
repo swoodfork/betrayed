@@ -275,12 +275,31 @@ function specLabel(classKey: string, specKey: string): string {
   );
 }
 
-function assignmentLine(assignment: RosterAssignment): string {
+type AttendanceStatus =
+  RaidSignupSheet["attendanceConfirmations"][number]["status"];
+
+function attendanceIndicator(status?: AttendanceStatus): string {
+  if (status === "confirmed") {
+    return " — 🟢 Confirmed";
+  }
+  if (status === "tentative") {
+    return " — 🟡 Tentative";
+  }
+  if (status === "declined" || status === "issue") {
+    return " — 🔴 Not Attending";
+  }
+  return "";
+}
+
+function assignmentLine(
+  assignment: RosterAssignment,
+  attendanceStatus?: AttendanceStatus,
+): string {
   const marker =
     classColorMarkers[
       assignment.classKey as keyof typeof wowForeverClassSpecializations
     ] ?? "◆";
-  return `${marker} <@${assignment.memberId}> — **${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}**`;
+  return `${marker} <@${assignment.memberId}> — **${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}**${attendanceIndicator(attendanceStatus)}`;
 }
 
 function sortedAssignments(
@@ -304,6 +323,7 @@ interface RosterEmbedOptions {
   includeOverflow?: boolean;
   includeSignupRequests?: boolean;
   signupRequests?: readonly RaidSignupRequest[];
+  attendanceConfirmations?: RaidSignupSheet["attendanceConfirmations"];
 }
 
 export function buildRosterEmbed(
@@ -312,6 +332,12 @@ export function buildRosterEmbed(
 ): EmbedBuilder {
   const assignments = sortedAssignments(roster);
   const revision = activeRevision(roster);
+  const attendanceByMember = new Map(
+    (options.attendanceConfirmations ?? []).map((confirmation) => [
+      confirmation.memberId,
+      confirmation.status,
+    ]),
+  );
   const status =
     roster.status === "draft"
       ? "🟡 Draft"
@@ -359,7 +385,7 @@ export function buildRosterEmbed(
       name: `⚔️ Group ${group}`,
       value: Array.from({ length: 5 }, (_, index) => {
         const assignment = bySlot.get(index + 1);
-        return `**${index + 1}.** ${assignment ? assignmentLine(assignment) : "—"}`;
+        return `**${index + 1}.** ${assignment ? assignmentLine(assignment, attendanceByMember.get(assignment.memberId)) : "—"}`;
       }).join("\n"),
       inline: true,
     });
@@ -387,7 +413,7 @@ export function buildRosterEmbed(
       value: Array.from({ length: 5 }, (_, index) => {
         const slot = benchGroup * 5 + index + 1;
         const assignment = benchBySlot.get(slot);
-        return `**${index + 1}.** ${assignment ? assignmentLine(assignment) : "—"}`;
+        return `**${index + 1}.** ${assignment ? assignmentLine(assignment, attendanceByMember.get(assignment.memberId)) : "—"}`;
       }).join("\n"),
       inline: true,
     });
@@ -437,7 +463,7 @@ export function buildRosterEmbed(
           name:
             index === 0 ? "📦 Overflow" : "📦 Overflow (continued)",
           value: [
-            ...chunk.map(assignmentLine),
+            ...chunk.map((assignment) => assignmentLine(assignment)),
             ...(remaining > 0 ? [`*and ${remaining} more*`] : []),
           ].join("\n"),
         });
@@ -453,7 +479,6 @@ export function buildRosterEmbed(
 
 export function buildRosterControls(
   roster: RaidRosterDocument,
-  signup?: RaidSignupSheet,
 ): ActionRowBuilder<ButtonBuilder>[] {
   if (roster.status === "archived") {
     return [];
@@ -483,7 +508,6 @@ export function buildRosterControls(
       control("revert", "Revert Draft", ButtonStyle.Danger),
       control("archive", "Archive", ButtonStyle.Secondary),
     ),
-    ...(signup ? buildSignupStaffControls(signup) : []),
   ];
 }
 
@@ -518,44 +542,6 @@ export function buildSignupSheetControls(
         .setCustomId(`${customIdPrefix}:raid:request:${signup.raidId}`)
         .setLabel("Request a Spot")
         .setStyle(ButtonStyle.Primary),
-    ),
-  ];
-}
-
-export function buildSignupStaffControls(
-  signup: RaidSignupSheet,
-): ActionRowBuilder<ButtonBuilder>[] {
-  if (signup.status === "cleared") {
-    return [];
-  }
-  if (signup.status === "open") {
-    return [
-      new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`${customIdPrefix}:raid:close:${signup.raidId}`)
-          .setLabel("Close Signup")
-          .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-          .setCustomId(`${customIdPrefix}:raid:clear:${signup.raidId}`)
-          .setLabel("Clear and Archive")
-          .setStyle(ButtonStyle.Danger),
-      ),
-    ];
-  }
-  return [
-    new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`${customIdPrefix}:raid:restart-seven:${signup.raidId}`)
-        .setLabel("Restart +7 Days")
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId(`${customIdPrefix}:raid:restart-custom:${signup.raidId}`)
-        .setLabel("Restart with New Schedule")
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId(`${customIdPrefix}:raid:clear:${signup.raidId}`)
-        .setLabel("Clear and Archive")
-        .setStyle(ButtonStyle.Danger),
     ),
   ];
 }
@@ -700,6 +686,7 @@ export class RaidRosterService {
     const rosterView = buildRosterEmbed(publishedRoster, {
       includeOverflow: false,
       signupRequests: this.signupRequestsForSheet(signup.raidId),
+      attendanceConfirmations: signup.attendanceConfirmations,
     }).setTitle(`📋 ${roster.name} — Signup View`);
     return signup.status === "cleared" ? [summary] : [summary, rosterView];
   }
@@ -708,12 +695,6 @@ export class RaidRosterService {
     signup: RaidSignupSheet,
   ): ActionRowBuilder<ButtonBuilder>[] {
     return buildSignupSheetControls(signup);
-  }
-
-  private activeSignupForRoster(rosterId: string): RaidSignupSheet | undefined {
-    return [...this.signupSheets.values()].find(
-      (signup) => signup.rosterId === rosterId && signup.status !== "cleared",
-    );
   }
 
   private async refreshRosterPresentation(
@@ -732,10 +713,7 @@ export class RaidRosterService {
     }
     await starter.edit({
       embeds: [this.rosterPresentationEmbed(roster)],
-      components: buildRosterControls(
-        roster,
-        this.activeSignupForRoster(roster.rosterId),
-      ),
+      components: buildRosterControls(roster),
       allowedMentions: { parse: [] },
     });
   }
@@ -1297,10 +1275,7 @@ export class RaidRosterService {
     }
     await presentationStarter.edit({
       embeds: [this.rosterPresentationEmbed(validated)],
-      components: buildRosterControls(
-        validated,
-        this.activeSignupForRoster(validated.rosterId),
-      ),
+      components: buildRosterControls(validated),
       allowedMentions: { parse: [] },
     });
     for (const signup of this.signupSheets.values()) {
@@ -2238,10 +2213,146 @@ export class RaidRosterService {
     );
   }
 
+  public async handleSignupAdminCommand(
+    interaction: ChatInputCommandInteraction,
+  ): Promise<void> {
+    const binding = interactionBinding(
+      interaction.guildId,
+      this.config,
+      this.rosterConfig,
+    );
+    if (!binding || !isRaidRosterBindingComplete(binding)) {
+      throw new Error("Raid signup administration is not enabled in this server.");
+    }
+    await this.authorize(interaction, binding);
+    const subcommand = interaction.options.getSubcommand();
+    if (subcommand === "help") {
+      await interaction.reply({
+        content: [
+          "**Zors signup administration**",
+          "Run these commands inside the roster's `📋raid-rosters` post.",
+          "`/zors-signup-admin close` — Close the active sheet while preserving requests and attendance.",
+          "`/zors-signup-admin restart-seven` — Archive the cycle and restart exactly seven days later.",
+          "`/zors-signup-admin restart-custom` — Archive the cycle and restart with a new date and time.",
+          "`/zors-signup-admin clear` — Archive and permanently clear the active sheet after confirmation.",
+        ].join("\n"),
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    const guild = interaction.guild;
+    if (!guild) {
+      throw new Error("Signup administration requires a guild.");
+    }
+    const roster = await this.rosterFromCommand(interaction);
+    const signup = [...this.signupSheets.values()].find(
+      (candidate) =>
+        candidate.rosterId === roster.rosterId &&
+        candidate.status !== "cleared",
+    );
+    if (!signup) {
+      throw new Error("This roster has no active signup sheet.");
+    }
+    if (subcommand === "close") {
+      if (signup.status !== "open") {
+        throw new Error("This signup sheet is already closed.");
+      }
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await this.persistSignupSheet(guild, {
+        ...signup,
+        status: "closed",
+        updatedAt: new Date().toISOString(),
+      });
+      await interaction.editReply(
+        "Closed the signup. Existing requests and attendance responses were preserved.",
+      );
+      return;
+    }
+    if (subcommand === "restart-seven") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const cleared = await this.restartSignupSheet(
+        guild,
+        signup,
+        shiftSignupSevenDays(signup),
+        binding,
+        "restart-seven",
+      );
+      await interaction.editReply(
+        `Archived and restarted the signup seven days later. Cleared ${cleared} pending request(s).`,
+      );
+      return;
+    }
+    if (subcommand === "restart-custom") {
+      const date = interaction.options.getString("date", true);
+      const startHour = Number(
+        interaction.options.getString("start-hour", true),
+      );
+      const endHour = Number(
+        interaction.options.getString("end-hour", true),
+      );
+      const startAt = pdtDateHour(date, startHour);
+      let endAt = pdtDateHour(date, endHour);
+      if (new Date(endAt) <= new Date(startAt)) {
+        endAt = new Date(
+          new Date(endAt).getTime() + 24 * 60 * 60 * 1_000,
+        ).toISOString();
+      }
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const cleared = await this.restartSignupSheet(
+        guild,
+        signup,
+        {
+          ...signup,
+          startAt,
+          endAt,
+          status: "open",
+          cycle: signup.cycle + 1,
+          attendanceConfirmations: [],
+          attendanceNotifiedMemberIds: [],
+          updatedAt: new Date().toISOString(),
+        },
+        binding,
+        "restart-custom",
+      );
+      await interaction.editReply(
+        `Archived and restarted the signup with the new schedule. Cleared ${cleared} pending request(s).`,
+      );
+      return;
+    }
+    if (subcommand === "clear") {
+      await interaction.reply({
+        content:
+          "Permanently clear this signup? Zors will archive the current cycle and requests, remove the active sheet data, and disable Restart.",
+        components: [
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+              .setCustomId(
+                `${customIdPrefix}:raid:clear-confirm:${signup.raidId}`,
+              )
+              .setLabel("Confirm Clear and Archive")
+              .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+              .setCustomId(
+                `${customIdPrefix}:raid:clear-cancel:${signup.raidId}`,
+              )
+              .setLabel("Cancel")
+              .setStyle(ButtonStyle.Secondary),
+          ),
+        ],
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    throw new Error("Unknown Zors signup administration command.");
+  }
+
   public async handleAutocomplete(
     interaction: AutocompleteInteraction,
   ): Promise<boolean> {
-    if (interaction.commandName === "zors-signup") {
+    if (
+      interaction.commandName === "zors-signup" ||
+      interaction.commandName === "zors-signup-admin"
+    ) {
       const focusedOption = interaction.options.getFocused(true);
       if (focusedOption.name !== "date") {
         return false;
@@ -3138,208 +3249,262 @@ export class RaidRosterService {
   }
 
   private async sendAttendanceConfirmations(
-      guild: Guild,
-      signup: RaidSignupSheet,
-      roster: RaidRosterDocument,
-      memberIds?: ReadonlySet<string>,
-    ): Promise<void> {
-      const responded = new Set(
-        signup.attendanceConfirmations.map(({ memberId }) => memberId),
-      );
-      const notified = new Set(signup.attendanceNotifiedMemberIds);
-      const assignments =
-        roster.finalizedRevision?.assignments.filter(
-          ({ memberId, placement }) =>
-            (placement.kind === "group" || placement.kind === "bench") &&
-            (!memberIds || memberIds.has(memberId)) &&
-            !responded.has(memberId) &&
-            !notified.has(memberId),
-        ) ?? [];
-      const start = Math.floor(new Date(signup.startAt).getTime() / 1_000);
-      const end = Math.floor(new Date(signup.endAt).getTime() / 1_000);
-      const signupUrl = `https://discord.com/channels/${guild.id}/${signup.channelId}/${signup.messageId}`;
-      const sentMemberIds: string[] = [];
-      for (const assignment of assignments) {
-        try {
-          const user = await guild.client.users.fetch(assignment.memberId);
-          await user.send({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle(`Raid Attendance — ${signup.name}`)
-                .setColor(0x2ecc71)
-                .setDescription(
-                  "You have a finalized Group or Bench spot for this raid.",
-                )
-                .addFields(
-                  { name: "Full Signup Name", value: signup.name },
-                  {
-                    name: "Raid Date and Time",
-                    value: `<t:${start}:F> – <t:${end}:t>`,
-                  },
-                  {
-                    name: "Roster Spot",
-                    value: `${describePlacement(assignment.placement)} — ${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}`,
-                  },
-                  {
-                    name: "Signup Sheet",
-                    value: `[Open the signup sheet](${signupUrl})`,
-                  },
-                )
-                .setFooter({
-                  text: `Signup cycle ${signup.cycle} • raid ${signup.raidId}`,
-                }),
-            ],
-            components: [
-              new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder()
-                  .setCustomId(
-                    `${customIdPrefix}:attendance:confirm:${signup.raidId}:${signup.cycle}:${assignment.memberId}`,
-                  )
-                  .setLabel("I will be at raid")
-                  .setStyle(ButtonStyle.Success),
-                new ButtonBuilder()
-                  .setCustomId(
-                    `${customIdPrefix}:attendance:issue:${signup.raidId}:${signup.cycle}:${assignment.memberId}`,
-                  )
-                  .setLabel("I cannot attend")
-                  .setStyle(ButtonStyle.Danger),
-              ),
-            ],
-          });
-          sentMemberIds.push(assignment.memberId);
-        } catch (error) {
-          console.warn(
-            `Could not DM raid attendance confirmation to ${assignment.memberId}.`,
-            error,
-          );
-        }
-      }
-      if (sentMemberIds.length > 0) {
-        const currentSignup = this.signupSheets.get(signup.raidId) ?? signup;
-        await this.persistSignupSheet(guild, {
-          ...currentSignup,
-          attendanceNotifiedMemberIds: [
-            ...new Set([
-              ...currentSignup.attendanceNotifiedMemberIds,
-              ...sentMemberIds,
-            ]),
+    guild: Guild,
+    signup: RaidSignupSheet,
+    roster: RaidRosterDocument,
+    memberIds?: ReadonlySet<string>,
+  ): Promise<void> {
+    const responded = new Set(
+      signup.attendanceConfirmations.map(({ memberId }) => memberId),
+    );
+    const notified = new Set(signup.attendanceNotifiedMemberIds);
+    const assignments =
+      roster.finalizedRevision?.assignments.filter(
+        ({ memberId, placement }) =>
+          (placement.kind === "group" || placement.kind === "bench") &&
+          (!memberIds || memberIds.has(memberId)) &&
+          !responded.has(memberId) &&
+          !notified.has(memberId),
+      ) ?? [];
+    const start = Math.floor(new Date(signup.startAt).getTime() / 1_000);
+    const end = Math.floor(new Date(signup.endAt).getTime() / 1_000);
+    const signupUrl = `https://discord.com/channels/${guild.id}/${signup.channelId}/${signup.messageId}`;
+    const sentMemberIds: string[] = [];
+    for (const assignment of assignments) {
+      try {
+        const user = await guild.client.users.fetch(assignment.memberId);
+        await user.send({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle(`Raid Attendance — ${signup.name}`)
+              .setColor(0x2ecc71)
+              .setDescription(
+                "You have a finalized Group or Bench spot for this raid.",
+              )
+              .addFields(
+                { name: "Full Signup Name", value: signup.name },
+                {
+                  name: "Raid Date and Time",
+                  value: `<t:${start}:F> – <t:${end}:t>`,
+                },
+                {
+                  name: "Roster Spot",
+                  value: `${describePlacement(assignment.placement)} — ${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}`,
+                },
+                {
+                  name: "Team Role",
+                  value: `<@&${roster.teamRoleId}>`,
+                },
+                {
+                  name: "Signup Sheet",
+                  value: `[Open the signup sheet](${signupUrl})`,
+                },
+              )
+              .setFooter({
+                text: `Signup cycle ${signup.cycle} • raid ${signup.raidId}`,
+              }),
           ],
-          updatedAt: new Date().toISOString(),
+          components: [
+            new ActionRowBuilder<ButtonBuilder>().addComponents(
+              new ButtonBuilder()
+                .setCustomId(
+                  `${customIdPrefix}:attendance:confirm:${signup.raidId}:${signup.cycle}:${assignment.memberId}`,
+                )
+                .setLabel("I will be at raid")
+                .setStyle(ButtonStyle.Success),
+              new ButtonBuilder()
+                .setCustomId(
+                  `${customIdPrefix}:attendance:tentative:${signup.raidId}:${signup.cycle}:${assignment.memberId}`,
+                )
+                .setLabel("Tentative")
+                .setStyle(ButtonStyle.Primary),
+              new ButtonBuilder()
+                .setCustomId(
+                  `${customIdPrefix}:attendance:decline:${signup.raidId}:${signup.cycle}:${assignment.memberId}`,
+                )
+                .setLabel("I cannot attend")
+                .setStyle(ButtonStyle.Danger),
+            ),
+          ],
         });
-      }
-    }
-
-    private async recordAttendanceConfirmation(
-      interaction: ButtonInteraction,
-      action: "confirm" | "issue",
-      raidId: string,
-      cycle: number,
-      memberId: string,
-    ): Promise<void> {
-      if (interaction.user.id !== memberId) {
-        throw new Error("This attendance confirmation belongs to another member.");
-      }
-      const signup = this.signupSheets.get(raidId);
-      if (!signup || signup.cycle !== cycle || signup.status === "cleared") {
-        throw new Error("This attendance confirmation is stale.");
-      }
-      if (action === "issue") {
-        await interaction.showModal(
-          new ModalBuilder()
-            .setCustomId(
-              `${customIdPrefix}:attendance-issue:${raidId}:${cycle}:${memberId}`,
-            )
-            .setTitle("Raid Attendance Issue")
-            .addComponents(
-              new ActionRowBuilder<TextInputBuilder>().addComponents(
-                new TextInputBuilder()
-                  .setCustomId("issue")
-                  .setLabel("What should the coordinators know?")
-                  .setStyle(TextInputStyle.Paragraph)
-                  .setMaxLength(1_000)
-                  .setRequired(true),
-              ),
-            ),
+        sentMemberIds.push(assignment.memberId);
+      } catch (error) {
+        console.warn(
+          `Could not DM raid attendance confirmation to ${assignment.memberId}.`,
+          error,
         );
-        return;
       }
-      const guild = await interaction.client.guilds.fetch(signup.guildId);
+    }
+    if (sentMemberIds.length > 0) {
+      const currentSignup = this.signupSheets.get(signup.raidId) ?? signup;
       await this.persistSignupSheet(guild, {
-        ...signup,
-        attendanceConfirmations: [
-          ...signup.attendanceConfirmations.filter(
-            (entry) => entry.memberId !== memberId,
-          ),
-          {
-            memberId,
-            status: "confirmed",
-            recordedAt: new Date().toISOString(),
-          },
+        ...currentSignup,
+        attendanceNotifiedMemberIds: [
+          ...new Set([
+            ...currentSignup.attendanceNotifiedMemberIds,
+            ...sentMemberIds,
+          ]),
         ],
         updatedAt: new Date().toISOString(),
-      });
-      await interaction.update({
-        content: "✅ Your Attendance is Confirmed.",
-        embeds: interaction.message.embeds,
-        components: [],
       });
     }
+  }
 
-    private async recordAttendanceIssue(
-      interaction: ModalSubmitInteraction,
-      raidId: string,
-      cycle: number,
-      memberId: string,
-    ): Promise<void> {
-      if (interaction.user.id !== memberId) {
-        throw new Error("This attendance response belongs to another member.");
-      }
-      const signup = this.signupSheets.get(raidId);
-      if (!signup || signup.cycle !== cycle || signup.status === "cleared") {
-        throw new Error("This attendance confirmation is stale.");
-      }
-      const issue = interaction.fields.getTextInputValue("issue").trim();
-      const guild = await interaction.client.guilds.fetch(signup.guildId);
-      const binding = this.bindingsByGuild.get(signup.guildId);
-      if (!binding) {
-        throw new Error("The roster server binding is unavailable.");
-      }
-      await this.persistSignupSheet(guild, {
-        ...signup,
-        attendanceConfirmations: [
-          ...signup.attendanceConfirmations.filter(
-            (entry) => entry.memberId !== memberId,
-          ),
-          {
-            memberId,
-            status: "issue",
-            recordedAt: new Date().toISOString(),
-            issue,
-          },
-        ],
-        updatedAt: new Date().toISOString(),
-      });
-      const channel = await guild.channels.fetch(binding.coordinatorChannelId);
-      if (!channel?.isSendable()) {
-        throw new Error("The coordinator channel cannot receive attendance issues.");
-      }
-      await channel.send({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle(`Raid Attendance Issue — ${signup.name}`)
-            .setColor(0xe74c3c)
-            .addFields(
-              { name: "Member", value: `<@${memberId}>` },
-              { name: "Issue", value: issue },
-              { name: "Signup Sheet", value: `<#${signup.channelId}>` },
+  private async recordAttendanceConfirmation(
+    interaction: ButtonInteraction,
+    action: "confirm" | "decline" | "tentative" | "issue",
+    raidId: string,
+    cycle: number,
+    memberId: string,
+  ): Promise<void> {
+    if (interaction.user.id !== memberId) {
+      throw new Error("This attendance confirmation belongs to another member.");
+    }
+    const signup = this.signupSheets.get(raidId);
+    if (!signup || signup.cycle !== cycle || signup.status === "cleared") {
+      throw new Error("This attendance confirmation is stale.");
+    }
+    if (action !== "confirm") {
+      const response = action === "tentative" ? "tentative" : "declined";
+      await interaction.showModal(
+        new ModalBuilder()
+          .setCustomId(
+            `${customIdPrefix}:attend-response:${response}:${raidId}:${cycle}:${memberId}`,
+          )
+          .setTitle(
+            response === "tentative"
+              ? "Tentative Raid Attendance"
+              : "Cannot Attend Raid",
+          )
+          .addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(
+              new TextInputBuilder()
+                .setCustomId("reason")
+                .setLabel(
+                  response === "tentative"
+                    ? "Why are you tentative?"
+                    : "Why can you not attend?",
+                )
+                .setStyle(TextInputStyle.Paragraph)
+                .setMaxLength(1_000)
+                .setRequired(true),
             ),
-        ],
-        allowedMentions: { parse: [] },
-      });
-      await interaction.reply({
-        content:
-          "Your attendance issue was sent to the Raid Coordinators. Your Attendance is not Confirmed.",
-      });
+          ),
+      );
+      return;
+    }
+    const guild = await interaction.client.guilds.fetch(signup.guildId);
+    await this.persistSignupSheet(guild, {
+      ...signup,
+      attendanceConfirmations: [
+        ...signup.attendanceConfirmations.filter(
+          (entry) => entry.memberId !== memberId,
+        ),
+        {
+          memberId,
+          status: "confirmed",
+          recordedAt: new Date().toISOString(),
+        },
+      ],
+      updatedAt: new Date().toISOString(),
+    });
+    await interaction.update({
+      content: "✅ Your Attendance is Confirmed.",
+      embeds: interaction.message.embeds,
+      components: [],
+    });
+  }
+
+  private async recordAttendanceResponse(
+    interaction: ModalSubmitInteraction,
+    response: "declined" | "tentative",
+    raidId: string,
+    cycle: number,
+    memberId: string,
+    fieldName = "reason",
+  ): Promise<void> {
+    if (interaction.user.id !== memberId) {
+      throw new Error("This attendance response belongs to another member.");
+    }
+    const signup = this.signupSheets.get(raidId);
+    if (!signup || signup.cycle !== cycle || signup.status === "cleared") {
+      throw new Error("This attendance confirmation is stale.");
+    }
+    const reason = interaction.fields.getTextInputValue(fieldName).trim();
+    const guild = await interaction.client.guilds.fetch(signup.guildId);
+    const binding = this.bindingsByGuild.get(signup.guildId);
+    const roster = this.rosters.get(signup.rosterId);
+    if (!binding || !roster) {
+      throw new Error("The roster server binding is unavailable.");
+    }
+    const assignment = roster.finalizedRevision?.assignments.find(
+      ({ memberId: assignedMemberId }) => assignedMemberId === memberId,
+    );
+    if (!assignment) {
+      throw new Error("This member no longer has a finalized roster spot.");
+    }
+    const channel = await guild.channels.fetch(binding.coordinatorChannelId);
+    if (!channel?.isSendable()) {
+      throw new Error("The coordinator channel cannot receive attendance responses.");
+    }
+    await this.persistSignupSheet(guild, {
+      ...signup,
+      attendanceConfirmations: [
+        ...signup.attendanceConfirmations.filter(
+          (entry) => entry.memberId !== memberId,
+        ),
+        {
+          memberId,
+          status: response,
+          recordedAt: new Date().toISOString(),
+          issue: reason,
+        },
+      ],
+      updatedAt: new Date().toISOString(),
+    });
+    const start = Math.floor(new Date(signup.startAt).getTime() / 1_000);
+    const end = Math.floor(new Date(signup.endAt).getTime() / 1_000);
+    const signupUrl = `https://discord.com/channels/${guild.id}/${signup.channelId}/${signup.messageId}`;
+    await channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(
+            `${response === "tentative" ? "Tentative Raid Attendance" : "Raid Attendance Declined"} — ${signup.name}`,
+          )
+          .setColor(response === "tentative" ? 0xf1c40f : 0xe74c3c)
+          .addFields(
+            { name: "Discord Member", value: `<@${memberId}>` },
+            {
+              name: "Class / Specialization",
+              value: `${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}`,
+            },
+            {
+              name: "Roster Spot",
+              value: describePlacement(assignment.placement),
+            },
+            {
+              name: "Raid Date and Time",
+              value: `<t:${start}:F> – <t:${end}:t>`,
+            },
+            { name: "Team Role", value: `<@&${roster.teamRoleId}>` },
+            {
+              name: response === "tentative" ? "Explanation" : "Reason",
+              value: reason,
+            },
+            {
+              name: "Signup Sheet",
+              value: `[Open signup sheet](${signupUrl}) in <#${signup.channelId}>`,
+            },
+          ),
+      ],
+      allowedMentions: { parse: [] },
+    });
+    await interaction.reply({
+      content:
+        response === "tentative"
+          ? "🟡 Your Attendance is Tentative. Raid Coordinators received your explanation."
+          : "🔴 You are marked Not Attending. Raid Coordinators received your reason.",
+    });
   }
 
   private async recordAcknowledgement(
@@ -4043,7 +4208,17 @@ export class RaidRosterService {
     if (parts[1] === "attendance" && interaction.isButton()) {
       await this.recordAttendanceConfirmation(
         interaction,
-        parts[2] as "confirm" | "issue",
+        parts[2] as "confirm" | "decline" | "tentative" | "issue",
+        parts[3] ?? "",
+        Number(parts[4]),
+        parts[5] ?? "",
+      );
+      return true;
+    }
+    if (parts[1] === "attend-response" && interaction.isModalSubmit()) {
+      await this.recordAttendanceResponse(
+        interaction,
+        parts[2] as "declined" | "tentative",
         parts[3] ?? "",
         Number(parts[4]),
         parts[5] ?? "",
@@ -4051,11 +4226,13 @@ export class RaidRosterService {
       return true;
     }
     if (parts[1] === "attendance-issue" && interaction.isModalSubmit()) {
-      await this.recordAttendanceIssue(
+      await this.recordAttendanceResponse(
         interaction,
+        "declined",
         parts[2] ?? "",
         Number(parts[3]),
         parts[4] ?? "",
+        "issue",
       );
       return true;
     }

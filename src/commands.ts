@@ -375,6 +375,54 @@ export const zorsSignupCommand = new SlashCommandBuilder()
     command.setName("help").setDescription("Explain raid signup sheets"),
   );
 
+export const zorsSignupAdminCommand = new SlashCommandBuilder()
+  .setName("zors-signup-admin")
+  .setDescription("Manage the active signup for this roster")
+  .addSubcommand((command) =>
+    command
+      .setName("close")
+      .setDescription("Close the active signup while preserving responses"),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("restart-seven")
+      .setDescription("Archive and restart the signup exactly seven days later"),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("restart-custom")
+      .setDescription("Archive and restart the signup with a new schedule")
+      .addStringOption((option) =>
+        option
+          .setName("date")
+          .setDescription("Choose Today or another YYYY-MM-DD raid date")
+          .setAutocomplete(true)
+          .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("start-hour")
+          .setDescription("Raid start hour in PDT")
+          .addChoices(...hourlyChoices)
+          .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("end-hour")
+          .setDescription("Raid end hour in PDT")
+          .addChoices(...hourlyChoices)
+          .setRequired(true),
+      ),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("clear")
+      .setDescription("Archive and permanently clear the active signup"),
+  )
+  .addSubcommand((command) =>
+    command.setName("help").setDescription("Explain signup administration"),
+  );
+
 export async function registerGuildCommands(
   config: BotConfig,
   guildId: string,
@@ -385,6 +433,7 @@ export async function registerGuildCommands(
     zorsOwnerCommand.toJSON(),
     zorsRosterCommand.toJSON(),
     zorsSignupCommand.toJSON(),
+    zorsSignupAdminCommand.toJSON(),
   ];
 
   await rest.put(

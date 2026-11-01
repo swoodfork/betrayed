@@ -5,10 +5,7 @@ import {
   raidSignupSheetSchema,
   shiftSignupSevenDays,
 } from "../src/raid-signup-state.js";
-import {
-  buildSignupSheetControls,
-  buildSignupStaffControls,
-} from "../src/raid-rosters.js";
+import { buildSignupSheetControls } from "../src/raid-rosters.js";
 
 const signup = raidSignupSheetSchema.parse({
   schemaVersion: 1,
@@ -89,7 +86,7 @@ describe("raid signup sheet state", () => {
     expect(buildSignupSheetControls(cleared)).toEqual([]);
   });
 
-  it("shows members only Request a Spot while staff retain lifecycle controls", () => {
+  it("shows members only Request a Spot while the signup is open", () => {
     const openLabels = buildSignupSheetControls({
       ...signup,
       status: "open",
@@ -97,21 +94,8 @@ describe("raid signup sheet state", () => {
     const closedLabels = buildSignupSheetControls(signup).flatMap((row) =>
       row.components.map((button) => button.toJSON().label),
     );
-    const openStaffLabels = buildSignupStaffControls({
-      ...signup,
-      status: "open",
-    }).flatMap((row) => row.components.map((button) => button.toJSON().label));
-    const closedStaffLabels = buildSignupStaffControls(signup).flatMap((row) =>
-      row.components.map((button) => button.toJSON().label),
-    );
 
     expect(openLabels).toEqual(["Request a Spot"]);
     expect(closedLabels).toEqual([]);
-    expect(openStaffLabels).toEqual(["Close Signup", "Clear and Archive"]);
-    expect(closedStaffLabels).toEqual([
-      "Restart +7 Days",
-      "Restart with New Schedule",
-      "Clear and Archive",
-    ]);
   });
 });

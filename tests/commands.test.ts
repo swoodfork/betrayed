@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   zorsCommand,
   zorsOwnerCommand,
+  zorsSignupAdminCommand,
   zorsSignupCommand,
   zorsRosterCommand,
 } from "../src/commands.js";
@@ -161,6 +162,24 @@ describe("Zors Bot command registration", () => {
         expect.objectContaining({
           name: "date",
           type: ApplicationCommandOptionType.String,
+          autocomplete: true,
+        }),
+      ]),
+    );
+    expect(zorsSignupAdminCommand.toJSON().options?.map(({ name }) => name)).toEqual([
+      "close",
+      "restart-seven",
+      "restart-custom",
+      "clear",
+      "help",
+    ]);
+    const customRestart = zorsSignupAdminCommand
+      .toJSON()
+      .options?.find((option) => option.name === "restart-custom");
+    expect(customRestart?.options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "date",
           autocomplete: true,
         }),
       ]),
