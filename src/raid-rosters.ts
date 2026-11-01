@@ -59,6 +59,9 @@ import {
   type RaidSignupRequest,
 } from "./raid-signup-requests.js";
 import {
+  canRecordAttendanceFollowup,
+  canRecordAttendanceWithdrawal,
+  canRecordInitialAttendance,
   pdtDateHour,
   raidSignupSheetSchema,
   resetSignupAttendanceForMembers,
@@ -623,6 +626,7 @@ export class RaidRosterService {
   private readonly signupSheets = new Map<string, RaidSignupSheet>();
   private readonly signupSessions = new Map<string, SignupSession>();
   private readonly pendingSignupSubmissions = new Set<string>();
+  private readonly pendingAttendanceResponses = new Set<string>();
   private readonly archivedSignupCycles = new Set<string>();
   private readonly archivedDeletedRosters = new Set<string>();
 
@@ -3409,6 +3413,14 @@ export class RaidRosterService {
     if (!signup || signup.cycle !== cycle || signup.status === "cleared") {
       throw new Error("This attendance confirmation is stale.");
     }
+    if (!canRecordInitialAttendance(signup, memberId)) {
+      await this.updateRecordedAttendanceInteraction(
+        interaction,
+        signup,
+        memberId,
+      );
+      return;
+    }
     if (action !== "confirm") {
       const response = action === "tentative" ? "tentative" : "declined";
       await interaction.showModal(
@@ -3438,26 +3450,95 @@ export class RaidRosterService {
       );
       return;
     }
-    const guild = await interaction.client.guilds.fetch(signup.guildId);
-    await this.persistSignupSheet(guild, {
-      ...signup,
-      attendanceConfirmations: [
-        ...signup.attendanceConfirmations.filter(
-          (entry) => entry.memberId !== memberId,
-        ),
-        {
-          memberId,
-          status: "confirmed",
-          recordedAt: new Date().toISOString(),
-        },
-      ],
-      updatedAt: new Date().toISOString(),
-    });
-    await interaction.update({
-      content: "✅ Your Attendance is Confirmed.",
-      embeds: interaction.message.embeds,
-      components: [],
-    });
+    const responseKey = `${raidId}:${cycle}:${memberId}`;
+    if (this.pendingAttendanceResponses.has(responseKey)) {
+      await interaction.deferUpdate();
+      return;
+    }
+    this.pendingAttendanceResponses.add(responseKey);
+    try {
+      const currentSignup = this.signupSheets.get(raidId);
+      if (
+        !currentSignup ||
+        !canRecordInitialAttendance(currentSignup, memberId)
+      ) {
+        if (currentSignup) {
+          await this.updateRecordedAttendanceInteraction(
+            interaction,
+            currentSignup,
+            memberId,
+          );
+        } else {
+          await interaction.deferUpdate();
+        }
+        return;
+      }
+      const now = new Date().toISOString();
+      const guild = await interaction.client.guilds.fetch(currentSignup.guildId);
+      await this.persistSignupSheet(guild, {
+        ...currentSignup,
+        attendanceConfirmations: [
+          ...currentSignup.attendanceConfirmations,
+          {
+            memberId,
+            status: "confirmed",
+            recordedAt: now,
+            lockedAt: now,
+          },
+        ],
+        updatedAt: now,
+      });
+      await interaction.update({
+        content: "✅ Your Attendance is Confirmed.",
+        embeds: interaction.message.embeds,
+        components: [],
+      });
+    } finally {
+      this.pendingAttendanceResponses.delete(responseKey);
+    }
+  }
+
+  private async updateRecordedAttendanceInteraction(
+    interaction: ButtonInteraction | ModalSubmitInteraction,
+    signup: RaidSignupSheet,
+    memberId: string,
+  ): Promise<void> {
+    const existing = signup.attendanceConfirmations.find(
+      (entry) => entry.memberId === memberId,
+    );
+    const unresolved =
+      existing &&
+      !existing.lockedAt &&
+      (existing.status === "tentative" ||
+        existing.status === "declined" ||
+        existing.status === "issue");
+    const update = {
+      content:
+        existing?.status === "confirmed"
+          ? "✅ Your Attendance is Confirmed. Contact a Raid Coordinator if it needs to change."
+          : existing?.status === "tentative"
+            ? "🟡 Your Attendance is Tentative. Use the choices below when your plans are final."
+            : unresolved
+              ? "🔴 You are marked Not Attending. If your plans change, use the choice below."
+              : "🔴 You are marked Not Attending. Contact a Raid Coordinator if your final response needs to change.",
+      components: unresolved
+        ? [
+            buildAttendanceFollowupControls(
+              signup,
+              memberId,
+              existing.status === "tentative" ? "tentative" : "declined",
+            ),
+          ]
+        : [],
+    };
+    if (interaction.isModalSubmit()) {
+      if (!interaction.isFromMessage()) {
+        throw new Error("This attendance response is not attached to a DM.");
+      }
+      await interaction.update(update);
+      return;
+    }
+    await interaction.update(update);
   }
 
   private async recordAttendanceResponse(
@@ -3471,58 +3552,90 @@ export class RaidRosterService {
     if (interaction.user.id !== memberId) {
       throw new Error("This attendance response belongs to another member.");
     }
-    const signup = this.signupSheets.get(raidId);
-    if (!signup || signup.cycle !== cycle || signup.status === "cleared") {
+    const initialSignup = this.signupSheets.get(raidId);
+    if (
+      !initialSignup ||
+      initialSignup.cycle !== cycle ||
+      initialSignup.status === "cleared"
+    ) {
       throw new Error("This attendance confirmation is stale.");
     }
-    const reason = interaction.fields.getTextInputValue(fieldName).trim();
-    const guild = await interaction.client.guilds.fetch(signup.guildId);
-    const roster = this.rosters.get(signup.rosterId);
-    if (!roster) {
-      throw new Error("The roster server binding is unavailable.");
+    const responseKey = `${raidId}:${cycle}:${memberId}`;
+    if (this.pendingAttendanceResponses.has(responseKey)) {
+      await interaction.deferUpdate();
+      return;
     }
-    const assignment = activeRevision(roster)?.assignments.find(
-      ({ memberId: assignedMemberId }) => assignedMemberId === memberId,
-    );
-    if (!assignment) {
-      throw new Error("This member no longer has a finalized roster spot.");
+    this.pendingAttendanceResponses.add(responseKey);
+    try {
+      const signup = this.signupSheets.get(raidId);
+      const allowed =
+        signup &&
+        (fieldName === "reason"
+          ? canRecordInitialAttendance(signup, memberId)
+          : canRecordAttendanceWithdrawal(signup, memberId));
+      if (!signup || !allowed) {
+        if (signup) {
+          await this.updateRecordedAttendanceInteraction(
+            interaction,
+            signup,
+            memberId,
+          );
+        } else {
+          await interaction.deferUpdate();
+        }
+        return;
+      }
+      const reason = interaction.fields.getTextInputValue(fieldName).trim();
+      const guild = await interaction.client.guilds.fetch(signup.guildId);
+      const roster = this.rosters.get(signup.rosterId);
+      if (!roster) {
+        throw new Error("The roster server binding is unavailable.");
+      }
+      const assignment = activeRevision(roster)?.assignments.find(
+        ({ memberId: assignedMemberId }) => assignedMemberId === memberId,
+      );
+      if (!assignment) {
+        throw new Error("This member no longer has a finalized roster spot.");
+      }
+      await this.persistSignupSheet(guild, {
+        ...signup,
+        attendanceConfirmations: [
+          ...signup.attendanceConfirmations.filter(
+            (entry) => entry.memberId !== memberId,
+          ),
+          {
+            memberId,
+            status: response,
+            recordedAt: new Date().toISOString(),
+            issue: reason,
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      });
+      await this.sendAttendanceCoordinatorUpdate(
+        guild,
+        signup,
+        roster,
+        assignment,
+        response,
+        reason,
+        false,
+      );
+      if (!interaction.isFromMessage()) {
+        throw new Error("This attendance response is not attached to a DM.");
+      }
+      await interaction.update({
+        content:
+          response === "tentative"
+            ? "🟡 Your Attendance is Tentative. Raid Coordinators received your explanation.\n\nWhen your plans are final, reopen this direct message and press one of the buttons below."
+            : "🔴 You are marked Not Attending. Raid Coordinators received your reason.\n\nIf your plans change and you can attend, press the button below to alert the officer core.",
+        components: [
+          buildAttendanceFollowupControls(signup, memberId, response),
+        ],
+      });
+    } finally {
+      this.pendingAttendanceResponses.delete(responseKey);
     }
-    await this.persistSignupSheet(guild, {
-      ...signup,
-      attendanceConfirmations: [
-        ...signup.attendanceConfirmations.filter(
-          (entry) => entry.memberId !== memberId,
-        ),
-        {
-          memberId,
-          status: response,
-          recordedAt: new Date().toISOString(),
-          issue: reason,
-        },
-      ],
-      updatedAt: new Date().toISOString(),
-    });
-    await this.sendAttendanceCoordinatorUpdate(
-      guild,
-      signup,
-      roster,
-      assignment,
-      response,
-      reason,
-      false,
-    );
-    const followupButtons = buildAttendanceFollowupControls(
-      signup,
-      memberId,
-      response,
-    );
-    await interaction.reply({
-      content:
-        response === "tentative"
-          ? "🟡 Your Attendance is Tentative. Raid Coordinators received your explanation.\n\nIf events finalize and you ultimately figure out whether you can come, reopen this direct message and press one of the buttons below."
-          : "🔴 You are marked Not Attending. Raid Coordinators received your reason.\n\nIf plans change and you ultimately end up being able to come, press the button below to alert the officer core.",
-      components: [followupButtons],
-    });
   }
 
   private async sendAttendanceCoordinatorUpdate(
@@ -3613,7 +3726,42 @@ export class RaidRosterService {
     if (!signup || signup.cycle !== cycle || signup.status === "cleared") {
       throw new Error("This attendance follow-up is stale.");
     }
-    const roster = this.rosters.get(signup.rosterId);
+    if (!canRecordAttendanceFollowup(signup, memberId, response)) {
+      await this.updateRecordedAttendanceInteraction(
+        interaction,
+        signup,
+        memberId,
+      );
+      return;
+    }
+    const responseKey = `${raidId}:${cycle}:${memberId}`;
+    if (this.pendingAttendanceResponses.has(responseKey)) {
+      await interaction.deferUpdate();
+      return;
+    }
+    this.pendingAttendanceResponses.add(responseKey);
+    try {
+      const currentSignup = this.signupSheets.get(raidId);
+      if (
+        !currentSignup ||
+        !canRecordAttendanceFollowup(
+          currentSignup,
+          memberId,
+          response,
+        )
+      ) {
+        if (currentSignup) {
+          await this.updateRecordedAttendanceInteraction(
+            interaction,
+            currentSignup,
+            memberId,
+          );
+        } else {
+          await interaction.deferUpdate();
+        }
+        return;
+      }
+    const roster = this.rosters.get(currentSignup.rosterId);
     const assignment = roster
       ? activeRevision(roster)?.assignments.find(
       ({ memberId: assignedMemberId }) => assignedMemberId === memberId,
@@ -3622,7 +3770,7 @@ export class RaidRosterService {
     if (!roster || !assignment) {
       throw new Error("This member no longer has a finalized roster spot.");
     }
-    const existing = signup.attendanceConfirmations.find(
+    const existing = currentSignup.attendanceConfirmations.find(
       (entry) => entry.memberId === memberId,
     );
     const nextStatus = response === "confirm" ? "confirmed" : "declined";
@@ -3631,25 +3779,27 @@ export class RaidRosterService {
         ? "The member reported that their plans changed and they can now attend."
         : existing?.issue ??
           "The member finalized their tentative response as not attending.";
-    const guild = await interaction.client.guilds.fetch(signup.guildId);
+    const guild = await interaction.client.guilds.fetch(currentSignup.guildId);
+    const now = new Date().toISOString();
     await this.persistSignupSheet(guild, {
-      ...signup,
+      ...currentSignup,
       attendanceConfirmations: [
-        ...signup.attendanceConfirmations.filter(
+        ...currentSignup.attendanceConfirmations.filter(
           (entry) => entry.memberId !== memberId,
         ),
         {
           memberId,
           status: nextStatus,
-          recordedAt: new Date().toISOString(),
+          recordedAt: now,
+          lockedAt: now,
           ...(nextStatus === "declined" ? { issue: updateReason } : {}),
         },
       ],
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     });
     await this.sendAttendanceCoordinatorUpdate(
       guild,
-      signup,
+      currentSignup,
       roster,
       assignment,
       nextStatus,
@@ -3663,6 +3813,9 @@ export class RaidRosterService {
           : "🔴 You are marked Not Attending. The officer core was alerted.",
       components: [],
     });
+    } finally {
+      this.pendingAttendanceResponses.delete(responseKey);
+    }
   }
 
   private async recordAcknowledgement(

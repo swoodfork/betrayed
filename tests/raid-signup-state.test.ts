@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canRecordAttendanceFollowup,
+  canRecordAttendanceWithdrawal,
+  canRecordInitialAttendance,
   pdtDateHour,
   raidSignupSheetSchema,
   resetSignupAttendanceForMembers,
@@ -111,6 +114,49 @@ describe("raid signup sheet state", () => {
 
     expect(declined).toEqual(["I can make it now"]);
     expect(tentative).toEqual(["I can make it", "I can not make it"]);
+  });
+
+  it("allows only valid single-use attendance transitions", () => {
+    const memberId = signup.createdBy;
+    const tentative = {
+      ...signup,
+      attendanceConfirmations: [
+        {
+          memberId,
+          status: "tentative" as const,
+          recordedAt: signup.createdAt,
+          issue: "Schedule may change",
+        },
+      ],
+    };
+    const finalizedDecline = {
+      ...signup,
+      attendanceConfirmations: [
+        {
+          memberId,
+          status: "declined" as const,
+          recordedAt: signup.createdAt,
+          issue: "Cannot attend",
+          lockedAt: signup.createdAt,
+        },
+      ],
+    };
+
+    expect(canRecordInitialAttendance(signup, memberId)).toBe(true);
+    expect(canRecordInitialAttendance(tentative, memberId)).toBe(false);
+    expect(canRecordAttendanceFollowup(tentative, memberId, "confirm")).toBe(
+      true,
+    );
+    expect(canRecordAttendanceFollowup(tentative, memberId, "decline")).toBe(
+      true,
+    );
+    expect(
+      canRecordAttendanceFollowup(finalizedDecline, memberId, "confirm"),
+    ).toBe(false);
+    expect(canRecordAttendanceWithdrawal(tentative, memberId)).toBe(true);
+    expect(canRecordAttendanceWithdrawal(finalizedDecline, memberId)).toBe(
+      false,
+    );
   });
 
   it("rejects signup state whose end is not after its start", () => {

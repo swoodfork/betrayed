@@ -451,6 +451,11 @@ class/spec placement; the signup supplies raid times and confirmations.
 Updates should be debounced briefly so several simultaneous responses produce
 one Discord edit rather than a burst of edits.
 
+Attendance DM controls are single-use. A confirmed response removes all
+buttons. Tentative and Not Attending responses replace the original controls
+with only their valid follow-up choices; choosing a final follow-up removes the
+remaining buttons and durably locks the response against replay.
+
 The **Pending Approval** section is rendered on the primary sheet and every
 mirror so members and staff can see that a request is waiting without opening
 the request Forum. To stay within Discord embed limits, show the first ten

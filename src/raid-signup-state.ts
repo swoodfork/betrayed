@@ -8,6 +8,7 @@ const attendanceConfirmationSchema = z.object({
   status: z.enum(["confirmed", "declined", "tentative", "issue"]),
   recordedAt: isoDateTime,
   issue: z.string().max(1_000).optional(),
+  lockedAt: isoDateTime.optional(),
 });
 
 export const raidSignupSheetSchema = z
@@ -41,6 +42,49 @@ export const raidSignupSheetSchema = z
   });
 
 export type RaidSignupSheet = z.infer<typeof raidSignupSheetSchema>;
+
+export function canRecordInitialAttendance(
+  signup: RaidSignupSheet,
+  memberId: string,
+): boolean {
+  return !signup.attendanceConfirmations.some(
+    (entry) => entry.memberId === memberId,
+  );
+}
+
+export function canRecordAttendanceWithdrawal(
+  signup: RaidSignupSheet,
+  memberId: string,
+): boolean {
+  const existing = signup.attendanceConfirmations.find(
+    (entry) => entry.memberId === memberId,
+  );
+  return (
+    !existing ||
+    (existing.status !== "declined" && existing.status !== "issue")
+  );
+}
+
+export function canRecordAttendanceFollowup(
+  signup: RaidSignupSheet,
+  memberId: string,
+  response: "confirm" | "decline",
+): boolean {
+  const existing = signup.attendanceConfirmations.find(
+    (entry) => entry.memberId === memberId,
+  );
+  if (!existing || existing.lockedAt) {
+    return false;
+  }
+  if (response === "decline") {
+    return existing.status === "tentative";
+  }
+  return (
+    existing.status === "tentative" ||
+    existing.status === "declined" ||
+    existing.status === "issue"
+  );
+}
 
 export function pdtDateHour(date: string, hour: number): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {

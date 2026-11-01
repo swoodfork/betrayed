@@ -184,6 +184,10 @@ The member-facing signup roster renders each Group and Bench as a full-width
 row so Discord has the maximum available width for names, class/spec, and
 attendance status. The protected staff roster keeps its compact two-column
 layout.
+Attendance DM buttons are single-use. Confirming removes all controls;
+Tentative and Not Attending replace the original controls with only the valid
+follow-up choices. A final follow-up removes the remaining buttons and locks
+the response against replayed or stale interactions.
 Declined members retain an **I can make it now** follow-up action. Tentative
 members retain **I can make it** and **I can not make it** actions; either change
 updates the signup indicator and alerts the officer core. Finalizing a changed
