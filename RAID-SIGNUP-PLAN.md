@@ -134,10 +134,10 @@ Each request post contains:
 - **Review**, **Accept**, **Reject**, and **Edit Class/Spec** controls as
   appropriate.
 
-Creating the metadata post refreshes the signup's Pending Approval sections,
-refreshes the attached roster post's pending count, and alerts the Raid
-Coordinator role in `🔐coordinator-affairs`. Accept and reject decisions DM the
-applicant.
+Creating the request post refreshes the signup's Pending Approval sections and
+the attached roster post's pending count. Coordinators see the new post directly
+in `📨signup-requests`, so Zors does not send a duplicate alert to
+`🔐coordinator-affairs`. Accept and reject decisions DM the applicant.
 
 When accepting, the coordinator:
 
@@ -272,14 +272,15 @@ Updates should be debounced briefly so several simultaneous responses produce
 one Discord edit rather than a burst of edits.
 
 The **Pending Approval** section is rendered on the primary sheet and every
-mirror so members and staff can see that a request is waiting without accessing
-Officer-only metadata. To stay within Discord embed limits, show the first ten
+mirror so members and staff can see that a request is waiting without opening
+the request Forum. To stay within Discord embed limits, show the first ten
 pending requests plus `and N more` when necessary. Authorized staff can use a
 **Review Pending Requests** control for the full paginated list.
 
 Accepted applicants disappear from Pending Approval and appear in their
 assigned group or Bench. Rejected applicants disappear from Pending Approval.
-The durable request history remains in Officer-only storage.
+The durable request history remains in its read-only `📨signup-requests` post
+and the canonical Officer-only control record.
 
 An authorized coordinator or Officer can run `/zors raid publish` in another
 channel to manifest a synchronized copy:
@@ -404,24 +405,19 @@ Create three private Forum channels with increasingly separated purposes:
   🗝️officer-affairs
   📜zors-command-log
   🗄️zors-raid-control
-  📨signup-requests
 
 🔒 Raid Coordinator 🔒
   🔐coordinator-affairs
   📋raid-rosters
+  📨signup-requests
 ```
 
 `🗄️zors-raid-control` sits directly beneath `📜zors-command-log` and contains
 the machine-readable durable state. It uses the Officer section permissions and
 is visible only to the Guild Master/owner, Discord Admin, Officer, and Zors Bot.
-Raid Coordinators operate through bot controls and do not need direct access to
-the lower-level storage records.
-
-`📨signup-requests` sits directly beneath `🗄️zors-raid-control`. It uses the
-Officer section permissions and contains one metadata Forum post per player
-request. Raid Coordinators do not need direct access to this storage Forum.
-They review and decide requests through the pending controls in
-`📋raid-rosters`.
+Officers receive read-only access; only the owner and Zors Bot are intentionally
+allowed to create, edit, reply, react, delete, or manage its posts. Raid
+Coordinators cannot view this lower-level storage Forum.
 
 `📋raid-rosters` sits directly beneath `🔐coordinator-affairs`. It uses the
 Raid Coordinator section permissions and contains one presentation post per saved
@@ -429,8 +425,44 @@ Raid Coordinator section permissions and contains one presentation post per save
 commands and components validate that their channel's parent is this configured
 Forum before opening any builder.
 
+`📨signup-requests` sits directly beneath `📋raid-rosters`. It uses the same
+read-only coordinator-facing permissions and contains one Forum post per player
+request. Coordinators and Officers can read incoming requests and use Zors
+controls, but cannot manually create, edit, reply to, react to, delete, or
+manage posts.
+
 The desired-state planner should bind all three channel IDs immutably in
 Production and preserve this exact order.
+
+### Forum permission model
+
+For `🗄️zors-raid-control`, `📋raid-rosters`, and `📨signup-requests`:
+
+- Zors Bot receives View Channel, Send Messages/Create Posts, Send Messages in
+  Threads, Read Message History, Manage Messages, and Manage Threads.
+- The server owner can always manage the Forums because Discord owners bypass
+  channel restrictions.
+- Officers can view `🗄️zors-raid-control`, but direct posting, replying,
+  reacting, deleting, thread creation, and channel/thread management are denied.
+- Raid Coordinators cannot view `🗄️zors-raid-control`.
+- Officers and Raid Coordinators can view `📋raid-rosters` and
+  `📨signup-requests`, but all direct mutation permissions are denied.
+- Use Application Commands remains allowed in the coordinator-facing Forums so
+  authorized users can invoke Zors. Message buttons and selects remain the
+  preferred control surface.
+
+Denying Discord's Forum **Create Posts** capability removes the normal
+**Create Post** option for Officers and Raid Coordinators. Zors creates every
+post through the API after validating an authorized interaction.
+
+Discord's Administrator permission bypasses channel overwrites. The accepted
+policy is therefore:
+
+- The owner and Zors Bot are the intended direct writers.
+- Officers and Raid Coordinators are technically read-only and mutate data only
+  through audited Zors interactions.
+- Any member who retains Administrator can still modify these Forums directly;
+  Discord does not provide a channel-level way to prevent that bypass.
 
 Use one control Forum post per roster and one control Forum post per raid
 event.
@@ -716,6 +748,11 @@ and delivery history.
 - Fixed 20-player/four-group and 40-player/eight-group validation.
 - Exactly one matching numbered team role per roster.
 - Roster command parent-Forum restrictions.
+- Zors-only Forum post creation and mutation.
+- Officer read-only access to `🗄️zors-raid-control`.
+- Coordinator denial from `🗄️zors-raid-control`.
+- Officer/Coordinator read-only access plus working Zors interactions in
+  `📋raid-rosters` and `📨signup-requests`.
 - Duplicate membership and duplicate pending-request prevention.
 - Applicant class/spec capture and coordinator spec override.
 - Pending Approval propagation to every signup projection and the roster pane.
@@ -775,9 +812,8 @@ only behind an explicit Test-guild configuration.
 ### Phase 2: Signup requests
 
 - Add the public **Request to Join This Raid** workflow.
-- Create one Officer-only metadata Forum post per request.
+- Create one read-only coordinator-visible Forum post per request.
 - Show Pending Approval on every projection and the roster pane.
-- Alert Raid Coordinators in `🔐coordinator-affairs`.
 - Add class/spec editing, accept, and reject controls.
 - Add automatic team-role assignment.
 - Add coordinator-selected group slot or Bench placement.
@@ -831,6 +867,12 @@ The first production release is complete only when:
 - Every roster has exactly one matching numbered team role and one primary team
   channel.
 - Roster builders and controls refuse to operate outside `📋raid-rosters`.
+- Officers and Coordinators cannot manually create posts, reply, react, edit,
+  delete, or manage `📋raid-rosters` and `📨signup-requests`.
+- Officers can read but cannot manually mutate `🗄️zors-raid-control`; Raid
+  Coordinators cannot view it.
+- Zors Bot creates and updates all three Forums after validated interactions.
+- Administrator bypass is explicitly accepted and documented.
 - Each saved roster remains one persistent Forum post that can be bumped
   repeatedly.
 - Raid creation is impossible until a saved roster is selected.
@@ -846,9 +888,9 @@ The first production release is complete only when:
 - Signup creation immediately contacts every current roster member.
 - Passed reminder checkpoints are skipped.
 - Any visible member can submit one class/spec request from the signup sheet.
-- Coordinators see Pending Approval on the sheets and roster pane, receive an
-  alert in `🔐coordinator-affairs`, and can edit a request's spec, reject it, or
-  accept it into a chosen slot or Bench without accessing Officer-only metadata.
+- Coordinators see Pending Approval on the sheets and roster pane, can read the
+  request posts directly, and can use Zors to edit a request's spec, reject it,
+  or accept it into a chosen slot or Bench.
 - Accepted members receive the team role, become persistent roster members,
   appear on attached signup sheets, and receive Immediate plus only future
   confirmations.
