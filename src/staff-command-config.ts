@@ -11,6 +11,7 @@ const snowflake = z.string().regex(/^\d{17,20}$/);
 const guildStaffCommandSchema = z.object({
   guildId: snowflake,
   officerRoleId: snowflake,
+  commandLogChannelId: snowflake,
 });
 
 const staffCommandSchema = z.object({

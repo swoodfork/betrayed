@@ -10,6 +10,7 @@ import {
 } from "discord.js";
 
 import { registerGuildCommands } from "./commands.js";
+import { logZorsCommand } from "./command-audit.js";
 import type { BotConfig } from "./config.js";
 import { createInventory, type GuildInventory } from "./inventory.js";
 import {
@@ -201,6 +202,40 @@ async function handleZorsCommand(
     content: help.join("\n"),
     flags: MessageFlags.Ephemeral,
   });
+}
+
+async function handleAuditedZorsCommand(
+  interaction: ChatInputCommandInteraction,
+  config: BotConfig,
+  client: Client,
+  getInventory: (guild: Guild) => Promise<GuildInventory>,
+  onboarding: MemberOnboardingConfig,
+  staffCommands: StaffCommandConfig,
+): Promise<void> {
+  let commandError: unknown;
+  try {
+    await handleZorsCommand(
+      interaction,
+      config,
+      client,
+      getInventory,
+      onboarding,
+      staffCommands,
+    );
+  } catch (error) {
+    commandError = error;
+    throw error;
+  } finally {
+    const binding =
+      interaction.guildId === config.DISCORD_TEST_GUILD_ID
+        ? staffCommands.test
+        : interaction.guildId === config.DISCORD_PRODUCTION_GUILD_ID
+          ? staffCommands.production
+          : null;
+    if (binding) {
+      await logZorsCommand(interaction, binding, commandError);
+    }
+  }
 }
 
 async function configureGuildOnboarding(
@@ -486,7 +521,7 @@ export function createBot(config: BotConfig): Client {
       if (!interaction.isChatInputCommand()) {
         return;
       }
-      await handleZorsCommand(
+      await handleAuditedZorsCommand(
         interaction,
         config,
         client,

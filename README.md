@@ -93,6 +93,11 @@ while allowing Guild Master, Discord Admin, Officer, and Zors Bot to publish.
 The Test guild has Community enabled so it can mirror the announcement channel;
 `📌server-rules` is its rules channel and `👋welcome` receives Community updates.
 
+Every `/zors` and `/zors-owner` invocation is audited to the private
+`📜zors-command-log` channel in the Officer category. Audit entries include the
+executor, source channel, supplied option values, response or error, and a
+successful, partially successful, or failed outcome.
+
 `💤 sleep` is the only voice channel in the final `🌙 AFK/Inactive 🌙` category and is
 intended for Discord's inactive-member destination. Select it manually under
 **Server Settings → Overview → Inactive Channel** and choose the desired

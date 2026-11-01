@@ -569,6 +569,13 @@ categories:
         type: text
         permissionProfile: staff-private
         preserveHistory: true
+      - key: zors-command-log
+        name: "📜zors-command-log"
+        aliases: [zors-command-log]
+        type: text
+        permissionProfile: staff-private
+        preserveHistory: true
+        positionAfter: internal-affairs
       - key: officer-voice
         name: "🔊 Officer Chat"
         aliases:

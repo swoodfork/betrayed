@@ -4,7 +4,7 @@ import { parseConfig } from "../src/config.js";
 import { loadStaffCommandConfig } from "../src/staff-command-config.js";
 
 describe("staff command bindings", () => {
-  it("loads immutable Officer role bindings for both guilds", async () => {
+  it("loads immutable staff command bindings for both guilds", async () => {
     const botConfig = parseConfig({
       DISCORD_TOKEN: "test-token-with-sufficient-length",
       DISCORD_APPLICATION_ID: "123456789012345678",
@@ -23,6 +23,12 @@ describe("staff command bindings", () => {
     );
     expect(staffCommands.production.officerRoleId).toBe(
       "705314605378830367",
+    );
+    expect(staffCommands.test.commandLogChannelId).toBe(
+      "1566301079417786429",
+    );
+    expect(staffCommands.production.commandLogChannelId).toBe(
+      "1566301153258512414",
     );
   });
 });
