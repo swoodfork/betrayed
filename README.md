@@ -109,12 +109,18 @@ Officers and Raid Coordinators can use Zors controls but cannot manually create,
 reply to, react to, edit, delete, or manage roster/request Forum posts.
 
 Roster controls support Add Member, Move Member, Swap Members, Change Spec,
-Remove Member, Finalize, Revert Draft, Bump, and Archive. Both formats reserve
-ten numbered Bench positions and an unnumbered Overflow list. Finalization
+Remove Member, Finalize, Revert Draft, and Archive. Both formats reserve
+ten numbered Bench positions, displayed as two five-slot columns, and an
+unnumbered Overflow list. Finalization
 validates the team role, team channel, members, placements, and class/spec
 combinations, then sends change DMs only to affected members. Acknowledgements
 and reported issues are persisted; issues are forwarded to
 `🔐coordinator-affairs` without rolling back the finalized roster.
+
+`/zors-roster show` is contextual and intentionally has no roster or role
+option. Every roster Forum thread is durably mapped to exactly one roster ID,
+so Zors resolves the current thread and refuses the command from the control
+post or any unrelated channel.
 
 Move, Swap, Change Spec, and Remove use roster-only member menus rather than
 Discord-wide member pickers. Rosters larger than Discord's 25-option select

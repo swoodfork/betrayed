@@ -264,12 +264,21 @@ export function buildRosterEmbed(roster: RaidRosterDocument): EmbedBuilder {
       assignment,
     ]),
   );
+  for (let benchGroup = 0; benchGroup < 2; benchGroup += 1) {
+    embed.addFields({
+      name: `🪑 Bench ${benchGroup + 1}`,
+      value: Array.from({ length: 5 }, (_, index) => {
+        const slot = benchGroup * 5 + index + 1;
+        const assignment = benchBySlot.get(slot);
+        return `**${slot}.** ${assignment ? assignmentLine(assignment) : "—"}`;
+      }).join("\n"),
+      inline: true,
+    });
+  }
   embed.addFields({
-    name: "🪑 Bench",
-    value: Array.from({ length: 10 }, (_, index) => {
-      const assignment = benchBySlot.get(index + 1);
-      return `**${index + 1}.** ${assignment ? assignmentLine(assignment) : "—"}`;
-    }).join("\n"),
+    name: "\u200b",
+    value: "\u200b",
+    inline: true,
   });
 
   const overflow = assignments.filter(
@@ -324,14 +333,13 @@ export function buildRosterControls(
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       control("add", "Add Member", ButtonStyle.Primary),
       control("move", "Move Member", ButtonStyle.Primary),
-      control("swap", "Swap Members", ButtonStyle.Secondary, "🟨"),
-      control("spec", "Change Spec", ButtonStyle.Secondary, "🟨"),
+      control("swap", "Swap Members", ButtonStyle.Primary),
+      control("spec", "Change Spec", ButtonStyle.Primary),
       control("remove", "Remove Member", ButtonStyle.Danger),
     ),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       control("finalize", "Finalize", ButtonStyle.Success),
       control("revert", "Revert Draft", ButtonStyle.Danger),
-      control("bump", "Bump", ButtonStyle.Secondary),
       control("archive", "Archive", ButtonStyle.Secondary),
     ),
   ];
@@ -877,29 +885,6 @@ export class RaidRosterService {
     await this.deleteWarning(guild, roster, warningId);
   }
 
-  private async bump(guild: Guild, roster: RaidRosterDocument): Promise<void> {
-    const thread = await guild.channels.fetch(roster.presentationThreadId);
-    if (!thread?.isThread()) {
-      throw new Error("The roster thread is unavailable.");
-    }
-    if (thread.archived) {
-      await thread.setArchived(false, "Bump Zors roster");
-    }
-    const priorBumpId = roster.bumpMessageId;
-    const replacement = await thread.send({
-      embeds: [buildRosterEmbed(roster)],
-      allowedMentions: { parse: [] },
-    });
-    roster.bumpMessageId = replacement.id;
-    await this.persist(guild, roster);
-    if (priorBumpId) {
-      const prior = await thread.messages.fetch(priorBumpId).catch(() => null);
-      if (prior) {
-        await prior.delete();
-      }
-    }
-  }
-
   private async archive(guild: Guild, roster: RaidRosterDocument): Promise<void> {
     if (roster.draftRevision) {
       throw new Error("Finalize or revert the Draft before archiving this roster.");
@@ -933,7 +918,6 @@ export class RaidRosterService {
           "`/zors-roster show` — Show the current roster state.",
           "`/zors-roster finalize` — Publish the working Draft.",
           "`/zors-roster revert` — Restore the last finalized snapshot.",
-          "`/zors-roster bump` — Refresh this roster at the top of its Forum.",
           "`/zors-roster archive` — Archive a finalized roster.",
           "Use the buttons on a roster post to add, move, swap, change, or remove members.",
         ].join("\n"),
@@ -969,11 +953,6 @@ export class RaidRosterService {
     if (subcommand === "revert") {
       await this.revert(guild, roster, interaction.user.id);
       await interaction.editReply("Reverted the working Draft.");
-      return;
-    }
-    if (subcommand === "bump") {
-      await this.bump(guild, roster);
-      await interaction.editReply("Bumped this roster in its current Forum.");
       return;
     }
     if (subcommand === "archive") {
@@ -1270,7 +1249,7 @@ export class RaidRosterService {
     if (!guild) {
       throw new Error("Roster controls require a guild.");
     }
-    if (["finalize", "revert", "bump", "archive"].includes(action)) {
+    if (["finalize", "revert", "archive"].includes(action)) {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       if (action === "finalize") {
         const diff = await this.finalize(guild, roster, interaction.user.id);
@@ -1280,9 +1259,6 @@ export class RaidRosterService {
       } else if (action === "revert") {
         await this.revert(guild, roster, interaction.user.id);
         await interaction.editReply("Reverted the Draft.");
-      } else if (action === "bump") {
-        await this.bump(guild, roster);
-        await interaction.editReply("Bumped this roster.");
       } else {
         await this.archive(guild, roster);
         await interaction.editReply("Archived this roster.");

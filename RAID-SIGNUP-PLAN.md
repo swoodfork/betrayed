@@ -80,7 +80,6 @@ Use a command group rather than adding many unrelated top-level commands:
 /zors-roster show
 /zors-roster finalize
 /zors-roster revert
-/zors-roster bump
 /zors-roster archive
 ```
 
@@ -313,24 +312,19 @@ The roster editor has two entry paths:
   selects allow at most 25 options, so both member and request menus paginate
   rather than silently omitting entries.
 
-### 4. Publish or bump the roster
+### 4. Publish the roster
 
 Each saved 20-player or 40-player roster has one post in the private
 `📋raid-rosters` Forum beneath `🔐coordinator-affairs`. Coordinators move
 between Forum posts to view and operate different raid teams. Recommended
 Forum tags are `20-player`, `40-player`, `Active`, and `Archived`.
 
-`/zors-roster bump` or the post's **Bump** button should:
-
-1. Re-render the roster's starter display from canonical state.
-2. Add a compact bot-authored bump reply so the same Forum post returns to the
-   top of recent activity.
-3. Record the new bump reply ID.
-4. Delete the previous bot-authored bump reply only after the new reply exists.
-
-This can be repeated indefinitely without creating duplicate roster posts. The
-roster's durable source of truth remains the Officer-only control record, so
-editing, bumping, or archiving the coordinator presentation cannot destroy it.
+The roster starter display is edited in place after every saved mutation and
+startup reconstruction. A separate roster bump command is intentionally
+omitted because the persistent Forum post already provides direct navigation
+and contextual controls. The roster's durable source of truth remains the
+Officer-only control record, so editing or archiving the coordinator
+presentation cannot destroy it.
 
 ### 5. Create a dated raid
 
@@ -684,7 +678,7 @@ depending on Render's ephemeral filesystem.
 
 ### Why not use the visible roster message as storage?
 
-A presentation post is routinely edited, bumped, or deleted. It is not a safe
+A presentation post is routinely edited or may be deleted. It is not a safe
 canonical record. The Officer-only control Forum survives those operations and
 also keeps member delivery and confirmation history away from the coordinator
 presentation Forums and public signup channel.
@@ -767,7 +761,6 @@ The existing `📜zors-command-log` should audit:
 - Roster finalization, reversion, and member change issues.
 - Raid creation, cancellation, and closure.
 - Manual resend requests.
-- Roster bumps.
 - Signup-request acceptance, rejection, spec edits, and placement.
 - Actor, values, result, and failures.
 
@@ -897,7 +890,6 @@ and delivery history.
   and updates the canonical binding.
 - If one mirrored signup projection was deleted, remove only that projection's
   stale binding; the underlying signup and other projections remain active.
-- If the roster presentation was deleted, `/zors-roster bump` recreates it.
 - If a roster command or control is used outside `📋raid-rosters` or one of its
   child posts, reject it before showing any builder.
 - If a selected team role name does not contain the roster's `20` or `40`
@@ -1005,7 +997,6 @@ and delivery history.
 - Confirm the live signup sheet remains accurate.
 - Confirm team-role-only primary visibility and a public recruiting mirror.
 - Confirm requests from both projections enter the same request queue.
-- Confirm repeated roster Forum bumps keep one roster post.
 - Confirm signup bumps replace every bound projection safely and leave an old
   copy intact when its channel replacement fails.
 - Confirm command logging and private control-channel permissions.
@@ -1029,7 +1020,7 @@ only behind an explicit Test-guild configuration.
 - Add the persistent 30-minute inactivity warning.
 - Add affected-member change DMs and issue escalation.
 - Persist and reconstruct roster control posts.
-- Render and bump roster presentation messages.
+- Render roster presentation messages in place.
 
 ### Phase 2: Signup requests
 
@@ -1049,7 +1040,7 @@ only behind an explicit Test-guild configuration.
 - Create the raid control post and primary sheet in the roster's team channel.
 - Add `/zors-raid publish` with a paginated active-signup selector.
 - Support synchronized public recruiting mirrors.
-- Add roster and signup projection bump controls.
+- Add signup projection bump controls.
 - Immediately DM grouped and Bench members when the attached roster is already
   finalized, or defer Initial DMs until first finalization.
 - Add manual refresh, cancel, and close operations.
@@ -1083,7 +1074,7 @@ only behind an explicit Test-guild configuration.
 
 The first production release is complete only when:
 
-- A coordinator can create, edit, show, bump, and archive a saved roster.
+- A coordinator can create, edit, show, and archive a saved roster.
 - Every roster slot has a valid member, class, spec, and group.
 - Every roster has ten numbered Bench positions; Bench members receive the full
   attendance cadence without occupying a main group slot.
@@ -1099,8 +1090,7 @@ The first production release is complete only when:
   Coordinators cannot view it.
 - Zors Bot creates and updates all three Forums after validated interactions.
 - Administrator bypass is explicitly accepted and documented.
-- Each saved roster remains one persistent Forum post that can be bumped
-  repeatedly.
+- Each saved roster remains one persistent Forum post updated in place.
 - Each roster Forum post contains exactly one roster, and contextual commands
   cannot target another roster.
 - Initial and subsequent edits remain Draft until a coordinator explicitly

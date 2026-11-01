@@ -236,7 +236,9 @@ describe("raid roster state", () => {
       "⚔️ Group 3",
       "⚔️ Group 4",
       "\u200b",
-      "🪑 Bench",
+      "🪑 Bench 1",
+      "🪑 Bench 2",
+      "\u200b",
       "📦 Overflow",
     ]);
     expect(embed.fields?.[0]?.value).toContain(
@@ -244,7 +246,7 @@ describe("raid roster state", () => {
     );
   });
 
-  it("uses blue movement and gold-marked swap/spec controls", () => {
+  it("uses blue member-management controls", () => {
     const controls = buildRosterControls(roster())
       .flatMap((row) => row.components)
       .map((button) => button.toJSON());
@@ -253,10 +255,11 @@ describe("raid roster state", () => {
       controls.find(({ label }) => label === "Move Member")?.style,
     ).toBe(1);
     expect(
-      controls.find(({ label }) => label === "Swap Members")?.emoji?.name,
-    ).toBe("🟨");
+      controls.find(({ label }) => label === "Swap Members")?.style,
+    ).toBe(1);
     expect(
-      controls.find(({ label }) => label === "Change Spec")?.emoji?.name,
-    ).toBe("🟨");
+      controls.find(({ label }) => label === "Change Spec")?.style,
+    ).toBe(1);
+    expect(controls.map(({ label }) => label)).not.toContain("Bump");
   });
 });

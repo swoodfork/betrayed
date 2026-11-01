@@ -277,11 +277,6 @@ export const zorsRosterCommand = new SlashCommandBuilder()
   )
   .addSubcommand((command) =>
     command
-      .setName("bump")
-      .setDescription("Refresh this roster in its current Forum"),
-  )
-  .addSubcommand((command) =>
-    command
       .setName("archive")
       .setDescription("Archive a roster with no outstanding Draft"),
   )
