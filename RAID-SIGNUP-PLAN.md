@@ -134,8 +134,10 @@ Each request post contains:
 - **Review**, **Accept**, **Reject**, and **Edit Class/Spec** controls as
   appropriate.
 
-Creating the post alerts the Raid Coordinator role. Accept and reject decisions
-DM the applicant.
+Creating the metadata post refreshes the signup's Pending Approval sections,
+refreshes the attached roster post's pending count, and alerts the Raid
+Coordinator role in `🔐coordinator-affairs`. Accept and reject decisions DM the
+applicant.
 
 When accepting, the coordinator:
 
@@ -164,9 +166,9 @@ The roster editor has two addition paths:
 ### 3. Publish or bump the roster
 
 Each saved 20-player or 40-player roster has one post in the private
-`📋raid-rosters` Forum beneath `📨signup-requests`. Coordinators move between
-Forum posts to view and operate different raid teams. Recommended Forum tags
-are `20-player`, `40-player`, `Active`, and `Archived`.
+`📋raid-rosters` Forum beneath `🔐coordinator-affairs`. Coordinators move
+between Forum posts to view and operate different raid teams. Recommended
+Forum tags are `20-player`, `40-player`, `Active`, and `Archived`.
 
 `/zors roster bump` or the post's **Bump** button should:
 
@@ -242,6 +244,8 @@ should include:
 - Member, class, and spec for each slot.
 - Current attendance state.
 - Confirmation history for each checkpoint.
+- **Pending Approval** section containing each requesting member and requested
+  class/spec.
 - **Request to Join This Raid** button.
 
 Recommended compact history:
@@ -267,6 +271,16 @@ class/spec placement; the signup supplies raid times and confirmations.
 Updates should be debounced briefly so several simultaneous responses produce
 one Discord edit rather than a burst of edits.
 
+The **Pending Approval** section is rendered on the primary sheet and every
+mirror so members and staff can see that a request is waiting without accessing
+Officer-only metadata. To stay within Discord embed limits, show the first ten
+pending requests plus `and N more` when necessary. Authorized staff can use a
+**Review Pending Requests** control for the full paginated list.
+
+Accepted applicants disappear from Pending Approval and appear in their
+assigned group or Bench. Rejected applicants disappear from Pending Approval.
+The durable request history remains in Officer-only storage.
+
 An authorized coordinator or Officer can run `/zors raid publish` in another
 channel to manifest a synchronized copy:
 
@@ -280,11 +294,20 @@ mirrors. Anyone who can see a particular projection can use its **Request to
 Join This Raid** button. All projections use the same signup and roster IDs;
 they are not separate signups.
 
-`/zors raid bump` similarly shows active signups, then their existing
-projections. The executor can bump one projection or all projections. For a
-normal text channel, bumping sends the replacement first, updates the binding,
-and only then deletes the old message. Every later response or roster mutation
-edits every currently bound projection.
+`/zors raid bump` shows the paginated active-signup list. After the executor
+selects a signup, Zors bumps **every currently bound projection** in its own
+existing channel. It never moves all copies into the command channel and never
+removes a copy merely because another copy was bumped.
+
+For each projection independently, Zors:
+
+1. Sends the replacement in that projection's existing channel.
+2. Updates only that projection's message binding.
+3. Deletes its old message only after the replacement succeeds.
+
+If one channel fails, its old projection remains in place while successful
+channels finish. Zors reports a per-channel success/failure summary. Every
+later response or roster mutation continues editing every valid projection.
 
 ## Confirmation Cadence
 
@@ -381,10 +404,10 @@ Create three private Forum channels with increasingly separated purposes:
   🗝️officer-affairs
   📜zors-command-log
   🗄️zors-raid-control
+  📨signup-requests
 
 🔒 Raid Coordinator 🔒
   🔐coordinator-affairs
-  📨signup-requests
   📋raid-rosters
 ```
 
@@ -394,12 +417,14 @@ is visible only to the Guild Master/owner, Discord Admin, Officer, and Zors Bot.
 Raid Coordinators operate through bot controls and do not need direct access to
 the lower-level storage records.
 
-`📨signup-requests` sits directly beneath `🔐coordinator-affairs`. It uses the
-Raid Coordinator section permissions and contains one Forum post per player
-request.
+`📨signup-requests` sits directly beneath `🗄️zors-raid-control`. It uses the
+Officer section permissions and contains one metadata Forum post per player
+request. Raid Coordinators do not need direct access to this storage Forum.
+They review and decide requests through the pending controls in
+`📋raid-rosters`.
 
-`📋raid-rosters` sits directly beneath `📨signup-requests`. It uses the Raid
-Coordinator section permissions and contains one presentation post per saved
+`📋raid-rosters` sits directly beneath `🔐coordinator-affairs`. It uses the
+Raid Coordinator section permissions and contains one presentation post per saved
 20-player or 40-player roster plus one permanent Roster Control post. Roster
 commands and components validate that their channel's parent is this configured
 Forum before opening any builder.
@@ -693,13 +718,15 @@ and delivery history.
 - Roster command parent-Forum restrictions.
 - Duplicate membership and duplicate pending-request prevention.
 - Applicant class/spec capture and coordinator spec override.
+- Pending Approval propagation to every signup projection and the roster pane.
+- Pending display truncation plus authorized pagination beyond ten requests.
 - Accept, reject, role assignment, slot placement, and Bench placement.
 - Roster changes propagate to attached signup sheets without erasing
   confirmations.
 - Primary and mirrored signup projections remain identical.
 - Publishing uses a paginated active-signup selector.
-- Bumping one or all signup projections replaces messages without losing their
-  canonical bindings.
+- Bumping a signup replaces every projection in its existing channel without
+  losing canonical bindings or deleting failed-channel copies.
 - Embed and component limits.
 
 ### Restart tests
@@ -724,7 +751,8 @@ and delivery history.
 - Confirm team-role-only primary visibility and a public recruiting mirror.
 - Confirm requests from both projections enter the same request queue.
 - Confirm repeated roster Forum bumps keep one roster post.
-- Confirm signup bumps replace one or all selected projections safely.
+- Confirm signup bumps replace every bound projection safely and leave an old
+  copy intact when its channel replacement fails.
 - Confirm command logging and private control-channel permissions.
 
 Production timing must always use the real cadence. Compressed timing is allowed
@@ -747,8 +775,9 @@ only behind an explicit Test-guild configuration.
 ### Phase 2: Signup requests
 
 - Add the public **Request to Join This Raid** workflow.
-- Create one private Forum post per request.
-- Alert Raid Coordinators.
+- Create one Officer-only metadata Forum post per request.
+- Show Pending Approval on every projection and the roster pane.
+- Alert Raid Coordinators in `🔐coordinator-affairs`.
 - Add class/spec editing, accept, and reject controls.
 - Add automatic team-role assignment.
 - Add coordinator-selected group slot or Bench placement.
@@ -812,13 +841,14 @@ The first production release is complete only when:
   in additional channels.
 - Primary and mirrored sheets update together after every response, request
   acceptance, roster edit, and spec change.
-- Signup sheets can be bumped individually or together without creating a new
-  underlying signup.
+- Bumping a signup refreshes every bound sheet in place without creating a new
+  underlying signup or consolidating copies into one channel.
 - Signup creation immediately contacts every current roster member.
 - Passed reminder checkpoints are skipped.
 - Any visible member can submit one class/spec request from the signup sheet.
-- Coordinators receive a private request post and can edit its spec, reject it,
-  or accept it into a chosen slot or Bench.
+- Coordinators see Pending Approval on the sheets and roster pane, receive an
+  alert in `🔐coordinator-affairs`, and can edit a request's spec, reject it, or
+  accept it into a chosen slot or Bench without accessing Officer-only metadata.
 - Accepted members receive the team role, become persistent roster members,
   appear on attached signup sheets, and receive Immediate plus only future
   confirmations.
