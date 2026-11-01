@@ -1176,6 +1176,68 @@ export class RaidRosterService {
     return roster;
   }
 
+  private async recoverStoredRoster(
+    guild: Guild,
+    binding: CompleteRaidRosterBinding,
+    presentationThreadId: string,
+    expectedRosterId?: string,
+  ): Promise<RaidRosterDocument | null> {
+    const cached = this.rosterForThread(presentationThreadId);
+    if (cached && (!expectedRosterId || cached.rosterId === expectedRosterId)) {
+      return cached;
+    }
+    const presentation = await guild.channels.fetch(presentationThreadId);
+    if (
+      !presentation?.isThread() ||
+      presentation.parentId !== binding.rosterForumId
+    ) {
+      return null;
+    }
+    const controlForum = await guild.channels.fetch(binding.controlForumId);
+    if (!controlForum || controlForum.type !== ChannelType.GuildForum) {
+      throw new Error("The roster storage Forum is unavailable.");
+    }
+    let recovered: RaidRosterDocument | null = null;
+    for (const thread of (await allForumThreads(controlForum)).values()) {
+      const starter = await thread.fetchStarterMessage();
+      const metadata = starter?.embeds[0]
+        ? storageMetadataFromEmbed(starter.embeds[0].toJSON())
+        : null;
+      if (
+        !metadata ||
+        metadata.presentationThreadId !== presentationThreadId ||
+        (expectedRosterId && metadata.rosterId !== expectedRosterId)
+      ) {
+        continue;
+      }
+      if (recovered) {
+        throw new Error(
+          `Multiple storage records reference roster post ${presentationThreadId}.`,
+        );
+      }
+      recovered = await this.fetchStoredDocument(thread, metadata);
+    }
+    if (!recovered) {
+      return null;
+    }
+    if (recovered.guildId !== guild.id) {
+      throw new Error(
+        `Roster ${recovered.rosterId} belongs to a different server.`,
+      );
+    }
+    this.rosters.set(recovered.rosterId, recovered);
+    this.rosterIdByThread.set(
+      recovered.presentationThreadId,
+      recovered.rosterId,
+    );
+    await this.ensureFinalizedRosterRoles(guild, recovered);
+    this.scheduleWarning(guild, recovered);
+    console.log(
+      `Recovered roster ${recovered.rosterId} from Discord storage after a cache miss.`,
+    );
+    return recovered;
+  }
+
   public async configureGuild(
     guild: Guild,
     binding: RaidRosterBinding,
@@ -1643,8 +1705,19 @@ export class RaidRosterService {
 
   private async rosterFromCommand(
     interaction: ChatInputCommandInteraction,
+    binding: CompleteRaidRosterBinding,
   ): Promise<RaidRosterDocument> {
-    const roster = this.rosterForThread(interaction.channelId);
+    const guild = interaction.guild;
+    if (!guild) {
+      throw new Error("Roster commands require a guild.");
+    }
+    const roster =
+      this.rosterForThread(interaction.channelId) ??
+      await this.recoverStoredRoster(
+        guild,
+        binding,
+        interaction.channelId,
+      );
     if (!roster) {
       throw new Error(
         "Run this command inside the roster's 📋raid-rosters Forum post.",
@@ -2243,7 +2316,7 @@ export class RaidRosterService {
       await this.createRoster(interaction, binding);
       return;
     }
-    const roster = await this.rosterFromCommand(interaction);
+    const roster = await this.rosterFromCommand(interaction, binding);
     const guild = interaction.guild;
     if (!guild) {
       throw new Error("Roster commands require a guild.");
@@ -2323,7 +2396,7 @@ export class RaidRosterService {
     if (!guild) {
       throw new Error("Raid signup commands require a guild.");
     }
-    const roster = await this.rosterFromCommand(interaction);
+    const roster = await this.rosterFromCommand(interaction, binding);
     if (!roster.finalizedRevision) {
       throw new Error("Finalize this roster before creating its signup sheet.");
     }
@@ -3031,13 +3104,20 @@ export class RaidRosterService {
     } else {
       await this.authorize(interaction, binding);
     }
-    const roster = this.rosters.get(rosterId);
-    if (!roster || interaction.channelId !== roster.presentationThreadId) {
-      throw new Error("This control does not belong to the current roster post.");
-    }
     const guild = interaction.guild;
     if (!guild) {
       throw new Error("Roster controls require a guild.");
+    }
+    const roster =
+      this.rosters.get(rosterId) ??
+      await this.recoverStoredRoster(
+        guild,
+        binding,
+        interaction.channelId,
+        rosterId,
+      );
+    if (!roster || interaction.channelId !== roster.presentationThreadId) {
+      throw new Error("This control does not belong to the current roster post.");
     }
     if (action === "delete") {
       await this.promptDeleteRoster(interaction, roster);
