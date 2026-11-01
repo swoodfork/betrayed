@@ -1158,6 +1158,7 @@ export class RaidRosterService {
           roster.warningMessageId = null;
         }
       }
+      await this.ensureFinalizedRosterRoles(guild, roster);
       this.scheduleWarning(guild, roster);
       reconstructed += 1;
     }
@@ -1189,6 +1190,13 @@ export class RaidRosterService {
         components: this.signupSheetComponents(signup),
         allowedMentions: { parse: [] },
       });
+      if (signup.status === "open") {
+        await this.sendAttendanceConfirmations(
+          guild,
+          signup,
+          this.rosters.get(signup.rosterId)!,
+        );
+      }
     }
     return reconstructed;
   }
@@ -1490,6 +1498,49 @@ export class RaidRosterService {
     }
   }
 
+  private async ensureFinalizedRosterRoles(
+    guild: Guild,
+    roster: RaidRosterDocument,
+  ): Promise<void> {
+    const assignments = roster.finalizedRevision?.assignments ?? [];
+    if (assignments.length === 0) {
+      return;
+    }
+    const role = await guild.roles.fetch(roster.teamRoleId);
+    if (!role) {
+      throw new Error(
+        `Roster ${roster.rosterId} team role ${roster.teamRoleId} is unavailable.`,
+      );
+    }
+    const members = (
+      await Promise.all(
+        assignments.map(async ({ memberId }) => {
+          const member = await guild.members.fetch(memberId).catch(() => null);
+          if (!member) {
+            console.warn(
+              `Could not restore roster role for departed member ${memberId}.`,
+            );
+          }
+          return member;
+        }),
+      )
+    ).filter((member): member is GuildMember => member !== null);
+    const missingRole = members.filter(
+      (member) => !member.roles.cache.has(role.id),
+    );
+    if (missingRole.length > 0 && !role.editable) {
+      throw new Error(
+        `Zors cannot restore the ${role.name} role for finalized roster members. Move the Zors role above it and grant Manage Roles.`,
+      );
+    }
+    for (const member of missingRole) {
+      await member.roles.add(
+        role,
+        `Restore finalized Zors roster ${roster.rosterId}`,
+      );
+    }
+  }
+
   private async editRoster(
     interaction: ChatInputCommandInteraction,
     roster: RaidRosterDocument,
@@ -1665,7 +1716,7 @@ export class RaidRosterService {
     if (!draft) {
       throw new Error("This roster has no Draft changes to finalize.");
     }
-    await Promise.all(
+    const members = await Promise.all(
       draft.assignments.map(async ({ memberId }) => {
         const member = await guild.members.fetch(memberId).catch(() => null);
         if (!member) {
@@ -1673,29 +1724,41 @@ export class RaidRosterService {
             `Roster member ${memberId} is no longer in the server.`,
           );
         }
+        return member;
       }),
     );
     const warningId = roster.warningMessageId;
     const activeRequests = this.signupRequestsForRoster(roster.rosterId);
-    const draftAssignmentsByMember = new Map(
-      draft.assignments.map((assignment) => [assignment.memberId, assignment]),
+    const membersMissingRole = members.filter(
+      (member) => !member.roles.cache.has(role.id),
     );
-    const willApproveRequest = activeRequests.some((request) => {
-      const assignment = draftAssignmentsByMember.get(request.applicantId);
-      return (
-        assignment !== undefined &&
-        (request.status === "draft-accepted" ||
-          assignment.placement.kind === "group" ||
-          assignment.placement.kind === "bench")
-      );
-    });
-    if (willApproveRequest && !role.editable) {
+    if (membersMissingRole.length > 0 && !role.editable) {
       throw new Error(
         "Zors cannot assign the bound team role. Move the Zors role above it and grant Manage Roles.",
       );
     }
-    const diff = finalizeRoster(roster, editorId);
-    await this.persist(guild, roster);
+    const membersGivenRole: GuildMember[] = [];
+    const beforeFinalize = structuredClone(roster);
+    let diff: RosterDiff[];
+    try {
+      for (const member of membersMissingRole) {
+        await member.roles.add(
+          role,
+          `Finalized Zors roster ${roster.rosterId}`,
+        );
+        membersGivenRole.push(member);
+      }
+      diff = finalizeRoster(roster, editorId);
+      await this.persist(guild, roster);
+    } catch (error) {
+      Object.assign(roster, beforeFinalize);
+      await this.rollbackAddedRole(
+        membersGivenRole,
+        role.id,
+        "Roll back failed Zors roster finalization",
+      );
+      throw error;
+    }
     const finalizedAssignmentsByMember = new Map(
       roster.finalizedRevision?.assignments.map((assignment) => [
         assignment.memberId,
@@ -1712,13 +1775,6 @@ export class RaidRosterService {
         continue;
       }
       const approved = assignment !== undefined;
-      if (approved) {
-        const member = await guild.members.fetch(request.applicantId);
-        await member.roles.add(
-          role,
-          `Approved through Zors signup request ${request.requestId}`,
-        );
-      }
       await this.persistSignupRequest(guild, {
         ...request,
         status: approved ? "approved" : "pending",
@@ -1729,6 +1785,26 @@ export class RaidRosterService {
     }
     await this.deleteWarning(guild, roster, warningId);
     await this.sendAssignmentChanges(guild, roster, diff);
+    const activeSignup = [...this.signupSheets.values()].find(
+      (signup) =>
+        signup.rosterId === roster.rosterId && signup.status === "open",
+    );
+    if (activeSignup) {
+      await this.sendAttendanceConfirmations(
+        guild,
+        activeSignup,
+        roster,
+        new Set(
+          diff
+            .filter(
+              ({ after }) =>
+                after?.placement.kind === "group" ||
+                after?.placement.kind === "bench",
+            )
+            .map(({ memberId }) => memberId),
+        ),
+      );
+    }
     return diff;
   }
 
@@ -2115,8 +2191,11 @@ export class RaidRosterService {
       createdAt: now,
       createdBy: interaction.user.id,
       updatedAt: now,
+      attendanceConfirmations: [],
+      attendanceNotifiedMemberIds: [],
     });
     await this.persistSignupSheet(guild, signup);
+    await this.sendAttendanceConfirmations(guild, signup, roster);
     await interaction.editReply(
       `Created **${name}** in <#${teamChannel.id}>.`,
     );
@@ -2125,6 +2204,36 @@ export class RaidRosterService {
   public async handleAutocomplete(
     interaction: AutocompleteInteraction,
   ): Promise<boolean> {
+    if (interaction.commandName === "zors-signup") {
+      const focusedOption = interaction.options.getFocused(true);
+      if (focusedOption.name !== "date") {
+        return false;
+      }
+      const focused = String(focusedOption.value).toLowerCase();
+      const pdtNow = new Date(Date.now() - 7 * 60 * 60 * 1_000);
+      const choices = Array.from({ length: 14 }, (_, offset) => {
+        const date = new Date(
+          pdtNow.getTime() + offset * 24 * 60 * 60 * 1_000,
+        );
+        const value = date.toISOString().slice(0, 10);
+        const day = new Intl.DateTimeFormat("en-US", {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+          timeZone: "UTC",
+        }).format(date);
+        return {
+          name: offset === 0 ? `Today — ${value}` : `${day} — ${value}`,
+          value,
+        };
+      }).filter(
+        (choice) =>
+          choice.name.toLowerCase().includes(focused) ||
+          choice.value.includes(focused),
+      );
+      await interaction.respond(choices.slice(0, 25));
+      return true;
+    }
     if (interaction.commandName !== "zors-roster") {
       return false;
     }
@@ -2958,34 +3067,28 @@ export class RaidRosterService {
         const after = change.after
           ? `${describePlacement(change.after.placement)} — ${classLabel(change.after.classKey)} / ${specLabel(change.after.classKey, change.after.specKey)}`
           : "Removed from roster";
+        const title =
+          !change.before && change.after
+            ? `You Have Been Assigned a Raid Roster Spot — ${roster.name}`
+            : change.before && !change.after
+              ? `You Have Been Removed from the Raid Roster — ${roster.name}`
+              : `Your Raid Roster Spot Was Updated — ${roster.name}`;
         await user.send({
           embeds: [
             new EmbedBuilder()
-              .setTitle(`Roster assignment updated — ${roster.name}`)
+              .setTitle(title)
               .setColor(0x8e44ad)
               .addFields(
                 { name: "Before", value: before },
                 { name: "After", value: after },
+                {
+                  name: "Team Channel",
+                  value: `<#${roster.teamChannelId}>`,
+                },
               )
               .setFooter({
                 text: `Finalized revision ${revision} • roster ${roster.rosterId}`,
               }),
-          ],
-          components: [
-            new ActionRowBuilder<ButtonBuilder>().addComponents(
-              new ButtonBuilder()
-                .setCustomId(
-                  `${customIdPrefix}:ack:ok:${roster.rosterId}:${revision}:${change.memberId}`,
-                )
-                .setLabel("Acknowledge")
-                .setStyle(ButtonStyle.Success),
-              new ButtonBuilder()
-                .setCustomId(
-                  `${customIdPrefix}:ack:issue:${roster.rosterId}:${revision}:${change.memberId}`,
-                )
-                .setLabel("Acknowledge with issues")
-                .setStyle(ButtonStyle.Danger),
-            ),
           ],
         });
       } catch (error) {
@@ -2995,6 +3098,211 @@ export class RaidRosterService {
         );
       }
     }
+  }
+
+  private async sendAttendanceConfirmations(
+      guild: Guild,
+      signup: RaidSignupSheet,
+      roster: RaidRosterDocument,
+      memberIds?: ReadonlySet<string>,
+    ): Promise<void> {
+      const responded = new Set(
+        signup.attendanceConfirmations.map(({ memberId }) => memberId),
+      );
+      const notified = new Set(signup.attendanceNotifiedMemberIds);
+      const assignments =
+        roster.finalizedRevision?.assignments.filter(
+          ({ memberId, placement }) =>
+            (placement.kind === "group" || placement.kind === "bench") &&
+            (!memberIds || memberIds.has(memberId)) &&
+            !responded.has(memberId) &&
+            !notified.has(memberId),
+        ) ?? [];
+      const start = Math.floor(new Date(signup.startAt).getTime() / 1_000);
+      const end = Math.floor(new Date(signup.endAt).getTime() / 1_000);
+      const signupUrl = `https://discord.com/channels/${guild.id}/${signup.channelId}/${signup.messageId}`;
+      const sentMemberIds: string[] = [];
+      for (const assignment of assignments) {
+        try {
+          const user = await guild.client.users.fetch(assignment.memberId);
+          await user.send({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle(`Raid Attendance — ${signup.name}`)
+                .setColor(0x2ecc71)
+                .setDescription(
+                  "You have a finalized Group or Bench spot for this raid.",
+                )
+                .addFields(
+                  { name: "Full Signup Name", value: signup.name },
+                  {
+                    name: "Raid Date and Time",
+                    value: `<t:${start}:F> – <t:${end}:t>`,
+                  },
+                  {
+                    name: "Roster Spot",
+                    value: `${describePlacement(assignment.placement)} — ${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}`,
+                  },
+                  {
+                    name: "Signup Sheet",
+                    value: `[Open the signup sheet](${signupUrl})`,
+                  },
+                )
+                .setFooter({
+                  text: `Signup cycle ${signup.cycle} • raid ${signup.raidId}`,
+                }),
+            ],
+            components: [
+              new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder()
+                  .setCustomId(
+                    `${customIdPrefix}:attendance:confirm:${signup.raidId}:${signup.cycle}:${assignment.memberId}`,
+                  )
+                  .setLabel("I will be at raid")
+                  .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                  .setCustomId(
+                    `${customIdPrefix}:attendance:issue:${signup.raidId}:${signup.cycle}:${assignment.memberId}`,
+                  )
+                  .setLabel("I cannot attend")
+                  .setStyle(ButtonStyle.Danger),
+              ),
+            ],
+          });
+          sentMemberIds.push(assignment.memberId);
+        } catch (error) {
+          console.warn(
+            `Could not DM raid attendance confirmation to ${assignment.memberId}.`,
+            error,
+          );
+        }
+      }
+      if (sentMemberIds.length > 0) {
+        const currentSignup = this.signupSheets.get(signup.raidId) ?? signup;
+        await this.persistSignupSheet(guild, {
+          ...currentSignup,
+          attendanceNotifiedMemberIds: [
+            ...new Set([
+              ...currentSignup.attendanceNotifiedMemberIds,
+              ...sentMemberIds,
+            ]),
+          ],
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    private async recordAttendanceConfirmation(
+      interaction: ButtonInteraction,
+      action: "confirm" | "issue",
+      raidId: string,
+      cycle: number,
+      memberId: string,
+    ): Promise<void> {
+      if (interaction.user.id !== memberId) {
+        throw new Error("This attendance confirmation belongs to another member.");
+      }
+      const signup = this.signupSheets.get(raidId);
+      if (!signup || signup.cycle !== cycle || signup.status === "cleared") {
+        throw new Error("This attendance confirmation is stale.");
+      }
+      if (action === "issue") {
+        await interaction.showModal(
+          new ModalBuilder()
+            .setCustomId(
+              `${customIdPrefix}:attendance-issue:${raidId}:${cycle}:${memberId}`,
+            )
+            .setTitle("Raid Attendance Issue")
+            .addComponents(
+              new ActionRowBuilder<TextInputBuilder>().addComponents(
+                new TextInputBuilder()
+                  .setCustomId("issue")
+                  .setLabel("What should the coordinators know?")
+                  .setStyle(TextInputStyle.Paragraph)
+                  .setMaxLength(1_000)
+                  .setRequired(true),
+              ),
+            ),
+        );
+        return;
+      }
+      const guild = await interaction.client.guilds.fetch(signup.guildId);
+      await this.persistSignupSheet(guild, {
+        ...signup,
+        attendanceConfirmations: [
+          ...signup.attendanceConfirmations.filter(
+            (entry) => entry.memberId !== memberId,
+          ),
+          {
+            memberId,
+            status: "confirmed",
+            recordedAt: new Date().toISOString(),
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      });
+      await interaction.update({
+        content: "✅ Your Attendance is Confirmed.",
+        embeds: interaction.message.embeds,
+        components: [],
+      });
+    }
+
+    private async recordAttendanceIssue(
+      interaction: ModalSubmitInteraction,
+      raidId: string,
+      cycle: number,
+      memberId: string,
+    ): Promise<void> {
+      if (interaction.user.id !== memberId) {
+        throw new Error("This attendance response belongs to another member.");
+      }
+      const signup = this.signupSheets.get(raidId);
+      if (!signup || signup.cycle !== cycle || signup.status === "cleared") {
+        throw new Error("This attendance confirmation is stale.");
+      }
+      const issue = interaction.fields.getTextInputValue("issue").trim();
+      const guild = await interaction.client.guilds.fetch(signup.guildId);
+      const binding = this.bindingsByGuild.get(signup.guildId);
+      if (!binding) {
+        throw new Error("The roster server binding is unavailable.");
+      }
+      await this.persistSignupSheet(guild, {
+        ...signup,
+        attendanceConfirmations: [
+          ...signup.attendanceConfirmations.filter(
+            (entry) => entry.memberId !== memberId,
+          ),
+          {
+            memberId,
+            status: "issue",
+            recordedAt: new Date().toISOString(),
+            issue,
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      });
+      const channel = await guild.channels.fetch(binding.coordinatorChannelId);
+      if (!channel?.isSendable()) {
+        throw new Error("The coordinator channel cannot receive attendance issues.");
+      }
+      await channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle(`Raid Attendance Issue — ${signup.name}`)
+            .setColor(0xe74c3c)
+            .addFields(
+              { name: "Member", value: `<@${memberId}>` },
+              { name: "Issue", value: issue },
+              { name: "Signup Sheet", value: `<#${signup.channelId}>` },
+            ),
+        ],
+        allowedMentions: { parse: [] },
+      });
+      await interaction.reply({
+        content:
+          "Your attendance issue was sent to the Raid Coordinators. Your Attendance is not Confirmed.",
+      });
   }
 
   private async recordAcknowledgement(
@@ -3043,7 +3351,7 @@ export class RaidRosterService {
     const guild = await interaction.client.guilds.fetch(roster.guildId);
     await this.persist(guild, roster);
     await interaction.update({
-      content: "✅ Roster assignment acknowledged.",
+      content: "✅ Your Attendance is Confirmed.",
       embeds: interaction.message.embeds,
       components: [],
     });
@@ -3463,7 +3771,17 @@ export class RaidRosterService {
     }
     await this.archiveSignupCycle(guild, signup, binding, reason);
     const cleared = await this.clearSheetRequests(guild, signup);
-    await this.persistSignupSheet(guild, restarted);
+    const nextSignup = {
+      ...restarted,
+      attendanceConfirmations: [],
+      attendanceNotifiedMemberIds: [],
+    };
+    await this.persistSignupSheet(guild, nextSignup);
+    const roster = this.rosters.get(signup.rosterId);
+    if (!roster) {
+      throw new Error("The signup sheet's roster is unavailable.");
+    }
+    await this.sendAttendanceConfirmations(guild, nextSignup, roster);
     return cleared;
   }
 
@@ -3685,6 +4003,25 @@ export class RaidRosterService {
     }
 
     const parts = interaction.customId.split(":");
+    if (parts[1] === "attendance" && interaction.isButton()) {
+      await this.recordAttendanceConfirmation(
+        interaction,
+        parts[2] as "confirm" | "issue",
+        parts[3] ?? "",
+        Number(parts[4]),
+        parts[5] ?? "",
+      );
+      return true;
+    }
+    if (parts[1] === "attendance-issue" && interaction.isModalSubmit()) {
+      await this.recordAttendanceIssue(
+        interaction,
+        parts[2] ?? "",
+        Number(parts[3]),
+        parts[4] ?? "",
+      );
+      return true;
+    }
     if (parts[1] === "ack" && interaction.isButton()) {
       await this.recordAcknowledgement(
         interaction,

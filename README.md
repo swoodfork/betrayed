@@ -117,11 +117,10 @@ an immutable deleted-roster snapshot to `🗃️roster-archives`, permanently
 removes both roster posts, and preserves member roles. Both formats reserve
 ten numbered Bench positions, displayed as two five-slot columns, and an
 unnumbered Overflow list. Bench 2 restarts its visible numbering at 1 while
-retaining distinct internal slots 6–10. Finalization
-validates the team role, team channel, members, placements, and class/spec
-combinations, then sends change DMs only to affected members. Acknowledgements
-and reported issues are persisted; issues are forwarded to
-`🔐coordinator-affairs` without rolling back the finalized roster.
+retaining distinct internal slots 6–10. Finalization validates the team role, team channel, members, placements, and
+class/spec combinations. Every finalized roster member receives the bound team
+role immediately; attendance buttons never control channel access. Zors then
+sends a one-time assignment notice only to affected members.
 
 `/zors-roster show` is contextual and intentionally has no roster or role
 option. Every roster Forum thread is durably mapped to exactly one roster ID,
@@ -134,8 +133,12 @@ inside its roster post. Zors creates one reusable signup sheet in the roster's
 bound team channel. Members request a spot from that sheet, choose class/spec,
 and receive one durable private request post in `📨signup-requests`. Members
 already assigned to a Group or Bench cannot request another spot because their
-attendance is handled by Zors DM confirmations. Overflow members may request a
-spot, including with a different spec.
+attendance is handled by cycle-specific Zors DMs. Each DM includes the full
+signup name, Discord-localized raid date and time, roster spot, and a direct
+signup-sheet link. **I will be at raid** records a durable confirmation;
+**I cannot attend** records the response and forwards its explanation to
+`🔐coordinator-affairs`. Overflow members may request a spot, including with a
+different spec.
 
 Pending requests are projected into the roster and signup sheet without being
 mixed into approved Overflow. Move Member lists assigned members and pending
@@ -150,11 +153,12 @@ finish processing. A closed sheet offers **Restart +7 Days**, **Restart with
 New Schedule**, and **Clear and Archive**. Every Restart first writes an
 immutable cycle snapshot to `🗃️roster-archives`, then clears that sheet's
 requests, keeps the finalized roster—including Group, Bench, and Overflow—and
-reopens the same sheet. Clear and Archive also snapshots the cycle and clears
-its requests, but permanently clears that sheet and removes all restart
-controls. A new sheet can then be created from the roster post. Restart and
-Clear refuse while a request is staged in a roster Draft, requiring staff to
-Finalize or Revert first.
+clears the prior attendance responses, reopens the same sheet, and sends fresh
+attendance DMs to Group and Bench members. Clear and Archive also snapshots the
+cycle and clears its requests, but permanently clears that sheet and removes
+all restart controls. A new sheet can then be created from the roster post.
+Restart and Clear refuse while a request is staged in a roster Draft, requiring
+staff to Finalize or Revert first.
 
 Move, Swap, Change Spec, and Remove use roster-only member menus rather than
 Discord-wide member pickers. Rosters larger than Discord's 25-option select

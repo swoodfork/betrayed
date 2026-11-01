@@ -39,13 +39,29 @@ describe("raid signup sheet state", () => {
   });
 
   it("restarts a closed sheet seven days later without changing its roster", () => {
-    const restarted = shiftSignupSevenDays(signup);
+    const restarted = shiftSignupSevenDays({
+      ...signup,
+      attendanceConfirmations: [
+        {
+          memberId: "123456789012345678",
+          status: "confirmed",
+          recordedAt: "2026-11-01T01:00:00.000Z",
+        },
+      ],
+    });
 
     expect(restarted.status).toBe("open");
     expect(restarted.cycle).toBe(2);
     expect(restarted.rosterId).toBe(signup.rosterId);
     expect(restarted.startAt).toBe("2026-11-09T02:00:00.000Z");
     expect(restarted.endAt).toBe("2026-11-09T06:00:00.000Z");
+    expect(restarted.attendanceConfirmations).toEqual([]);
+    expect(restarted.attendanceNotifiedMemberIds).toEqual([]);
+  });
+
+  it("loads existing signup sheets with no attendance records", () => {
+    expect(signup.attendanceConfirmations).toEqual([]);
+    expect(signup.attendanceNotifiedMemberIds).toEqual([]);
   });
 
   it("rejects signup state whose end is not after its start", () => {

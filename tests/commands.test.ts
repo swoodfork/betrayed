@@ -153,5 +153,17 @@ describe("Zors Bot command registration", () => {
       "create",
       "help",
     ]);
+    const signupCreate = zorsSignupCommand
+      .toJSON()
+      .options?.find((option) => option.name === "create");
+    expect(signupCreate?.options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "date",
+          type: ApplicationCommandOptionType.String,
+          autocomplete: true,
+        }),
+      ]),
+    );
   });
 });

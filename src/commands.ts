@@ -352,7 +352,8 @@ export const zorsSignupCommand = new SlashCommandBuilder()
       .addStringOption((option) =>
         option
           .setName("date")
-          .setDescription("Raid date in YYYY-MM-DD format")
+          .setDescription("Choose Today or another YYYY-MM-DD raid date")
+          .setAutocomplete(true)
           .setRequired(true),
       )
       .addStringOption((option) =>

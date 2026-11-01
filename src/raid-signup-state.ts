@@ -3,6 +3,13 @@ import { z } from "zod";
 const snowflake = z.string().regex(/^\d{17,20}$/);
 const isoDateTime = z.string().datetime();
 
+const attendanceConfirmationSchema = z.object({
+  memberId: snowflake,
+  status: z.enum(["confirmed", "issue"]),
+  recordedAt: isoDateTime,
+  issue: z.string().max(1_000).optional(),
+});
+
 export const raidSignupSheetSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -20,6 +27,8 @@ export const raidSignupSheetSchema = z
     createdAt: isoDateTime,
     createdBy: snowflake,
     updatedAt: isoDateTime,
+    attendanceConfirmations: z.array(attendanceConfirmationSchema).default([]),
+    attendanceNotifiedMemberIds: z.array(snowflake).default([]),
   })
   .superRefine((signup, context) => {
     if (new Date(signup.endAt) <= new Date(signup.startAt)) {
@@ -66,6 +75,8 @@ export function shiftSignupSevenDays(
     endAt: new Date(new Date(signup.endAt).getTime() + sevenDays).toISOString(),
     status: "open",
     cycle: signup.cycle + 1,
+    attendanceConfirmations: [],
+    attendanceNotifiedMemberIds: [],
     updatedAt: new Date().toISOString(),
   });
 }
