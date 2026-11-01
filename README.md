@@ -188,8 +188,8 @@ Attendance DM buttons are single-use. Confirming removes all controls;
 Tentative and Not Attending replace the original controls with only the valid
 follow-up choices. A final follow-up removes the remaining buttons and locks
 the response against replayed or stale interactions.
-Attendance DMs use the team role's plain-text name in their title and Team
-field because guild role mentions cannot resolve inside a private DM.
+Attendance DMs use the team role's plain-text name in their title, description,
+and Team field because guild role mentions cannot resolve inside a private DM.
 When Finalize approves a staged signup request, the attendance DM description
 confirms that the spot request was approved instead of repeating its title.
 

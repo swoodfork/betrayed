@@ -594,7 +594,7 @@ export function attendanceAssignmentCopy(
     title: `You have a finalized ${spot} spot on ${teamName}.`,
     description: requestApproved
       ? "Your spot request was approved by the raid coordinators."
-      : `You have a finalized ${spot} spot on this team.`,
+      : `You have a finalized ${spot} spot on ${teamName}.`,
   };
 }
 
