@@ -299,6 +299,20 @@ describe("raid roster state", () => {
     expect(attendance.fields?.[0]?.value).toContain("🔴 Not Attending");
   });
 
+  it("renders signup placements one full-width group per row", () => {
+    const document = roster();
+    const embed = buildRosterEmbed(document, {
+      singleColumnPlacements: true,
+    }).toJSON();
+    const placementFields = embed.fields?.filter(
+      ({ name }) => name.startsWith("⚔️") || name.startsWith("🪑"),
+    );
+
+    expect(placementFields).toHaveLength(6);
+    expect(placementFields?.every(({ inline }) => inline === false)).toBe(true);
+    expect(embed.fields?.map(({ name }) => name)).not.toContain("\u200b");
+  });
+
   it("restarts Bench 2 display numbering and reduces contextual show output", () => {
     const document = roster();
     document.draftRevision?.assignments.push(

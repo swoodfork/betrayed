@@ -325,6 +325,7 @@ interface RosterEmbedOptions {
   includeSignupRequests?: boolean;
   signupRequests?: readonly RaidSignupRequest[];
   attendanceConfirmations?: RaidSignupSheet["attendanceConfirmations"];
+  singleColumnPlacements?: boolean;
 }
 
 export function buildRosterEmbed(
@@ -388,9 +389,9 @@ export function buildRosterEmbed(
         const assignment = bySlot.get(index + 1);
         return `**${index + 1}.** ${assignment ? assignmentLine(assignment, attendanceByMember.get(assignment.memberId)) : "—"}`;
       }).join("\n"),
-      inline: true,
+      inline: !options.singleColumnPlacements,
     });
-    if (group % 2 === 0) {
+    if (!options.singleColumnPlacements && group % 2 === 0) {
       embed.addFields({
         name: "\u200b",
         value: "\u200b",
@@ -416,14 +417,16 @@ export function buildRosterEmbed(
         const assignment = benchBySlot.get(slot);
         return `**${index + 1}.** ${assignment ? assignmentLine(assignment, attendanceByMember.get(assignment.memberId)) : "—"}`;
       }).join("\n"),
+      inline: !options.singleColumnPlacements,
+    });
+  }
+  if (!options.singleColumnPlacements) {
+    embed.addFields({
+      name: "\u200b",
+      value: "\u200b",
       inline: true,
     });
   }
-  embed.addFields({
-    name: "\u200b",
-    value: "\u200b",
-    inline: true,
-  });
 
   if (options.includeSignupRequests !== false) {
     const requests = (options.signupRequests ?? []).filter(
@@ -717,6 +720,7 @@ export class RaidRosterService {
       includeOverflow: false,
       signupRequests: this.signupRequestsForSheet(signup.raidId),
       attendanceConfirmations: signup.attendanceConfirmations,
+      singleColumnPlacements: true,
     }).setTitle(`📋 ${roster.name} — Signup View`);
     return signup.status === "cleared" ? [summary] : [summary, rosterView];
   }
@@ -3318,7 +3322,9 @@ export class RaidRosterService {
               .setTitle(`Raid Attendance — ${signup.name}`)
               .setColor(0x2ecc71)
               .setDescription(
-                "You have a finalized Group or Bench spot for this raid.",
+                assignment.placement.kind === "group"
+                  ? "You have a finalized Raid spot in this raid."
+                  : "You have a finalized Bench spot in this raid.",
               )
               .addFields(
                 { name: "Full Signup Name", value: signup.name },

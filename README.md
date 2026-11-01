@@ -180,6 +180,10 @@ the member's Discord mention, class/spec, roster spot, Discord-localized raid
 date/time, team-role tag, explanation, and direct signup-sheet link. Discord
 mentions are used throughout roster and signup displays so the member's current
 server display name is shown even when it differs from an in-game name.
+The member-facing signup roster renders each Group and Bench as a full-width
+row so Discord has the maximum available width for names, class/spec, and
+attendance status. The protected staff roster keeps its compact two-column
+layout.
 Declined members retain an **I can make it now** follow-up action. Tentative
 members retain **I can make it** and **I can not make it** actions; either change
 updates the signup indicator and alerts the officer core. Finalizing a changed
