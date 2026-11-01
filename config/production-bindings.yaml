@@ -6,9 +6,9 @@ guild:
   name: Betrayed
 
 inventory:
-  file: AFK_PRODUCTION_FINAL.json
-  generatedAt: "2026-11-01T00:31:15.022Z"
-  sha256: "3ff71a4dc86e66bd18b68b202964fc6eca0cb7f6ebaedba612aa7ecb3f049c24"
+  file: ICON_PRODUCTION_FINAL.json
+  generatedAt: "2026-11-01T00:35:48.464Z"
+  sha256: "f127385ddb9c2e54614a7c1206363760cb1b31c4fb50719c5bf9f857ee7ac432"
 
 roleBindings:
   guild-master: "705314740330561587"

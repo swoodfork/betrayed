@@ -903,13 +903,13 @@ categories:
         positionAfter: raid-voice-8
 
   - key: afk-inactive
-    name: "AFK/Inactive"
-    aliases: []
+    name: "🌙 AFK/Inactive 🌙"
+    aliases: ["AFK/Inactive"]
     permissionProfile: voice-community
     channels:
       - key: sleep
-        name: "sleep"
-        aliases: ["💤 Sleep", Sleep, AFK, Inactive]
+        name: "💤 sleep"
+        aliases: [sleep, "💤 Sleep", Sleep, AFK, Inactive]
         type: voice
         permissionProfile: voice-community
         preserveHistory: false
