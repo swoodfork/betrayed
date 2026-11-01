@@ -263,6 +263,42 @@ export const zorsRosterCommand = new SlashCommandBuilder()
       ),
   )
   .addSubcommand((command) =>
+    command
+      .setName("edit")
+      .setDescription("Edit this roster's name, format, role, or channel")
+      .addStringOption((option) =>
+        option
+          .setName("name")
+          .setDescription("New roster name")
+          .setMinLength(1)
+          .setMaxLength(100),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("size")
+          .setDescription("New roster format")
+          .addChoices(
+            { name: "20-player — four groups", value: "20" },
+            { name: "40-player — eight groups", value: "40" },
+          ),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("team-role")
+          .setDescription("New unused matching 20 Team or 40 Team role")
+          .setAutocomplete(true),
+      )
+      .addChannelOption((option) =>
+        option
+          .setName("team-channel")
+          .setDescription("New primary role-private signup channel")
+          .addChannelTypes(
+            ChannelType.GuildText,
+            ChannelType.GuildAnnouncement,
+          ),
+      ),
+  )
+  .addSubcommand((command) =>
     command.setName("show").setDescription("Show this roster's current state"),
   )
   .addSubcommand((command) =>
@@ -279,6 +315,11 @@ export const zorsRosterCommand = new SlashCommandBuilder()
     command
       .setName("archive")
       .setDescription("Archive a roster with no outstanding Draft"),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("delete")
+      .setDescription("Permanently archive and delete this roster"),
   )
   .addSubcommand((command) =>
     command.setName("help").setDescription("Explain Zors roster controls"),

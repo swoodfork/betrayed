@@ -20,6 +20,7 @@ import {
   type AutocompleteInteraction,
   type ForumChannel,
   type Guild,
+  type GuildMember,
   type Interaction,
   type ModalSubmitInteraction,
   type StringSelectMenuInteraction,
@@ -225,6 +226,45 @@ export function isMatchingTeamRoleName(
   return size
     ? normalized.includes(`${size} team`)
     : normalized.includes("20 team") || normalized.includes("40 team");
+}
+
+export function isTeamRoleAvailableForRoster(
+  rosters: Iterable<
+    Pick<RaidRosterDocument, "rosterId" | "teamRoleId" | "status">
+  >,
+  teamRoleId: string,
+  exceptRosterId?: string,
+): boolean {
+  return ![...rosters].some(
+    (roster) =>
+      roster.rosterId !== exceptRosterId &&
+      roster.status !== "archived" &&
+      roster.teamRoleId === teamRoleId,
+  );
+}
+
+export function validateRosterSizeChange(
+  roster: RaidRosterDocument,
+  nextSize: 20 | 40,
+): void {
+  if (nextSize >= roster.size) {
+    return;
+  }
+  const hasOutOfRangeAssignments = [
+    roster.finalizedRevision,
+    roster.draftRevision,
+  ].some((revision) =>
+    revision?.assignments.some(
+      (assignment) =>
+        assignment.placement.kind === "group" &&
+        assignment.placement.group > nextSize / 5,
+    ),
+  );
+  if (hasOutOfRangeAssignments) {
+    throw new Error(
+      "Move every member out of Groups 5–8 and finalize those moves before changing this roster to 20-player.",
+    );
+  }
 }
 
 function specLabel(classKey: string, specKey: string): string {
@@ -441,6 +481,7 @@ export function buildRosterControls(
       control("finalize", "Finalize", ButtonStyle.Success),
       control("revert", "Revert Draft", ButtonStyle.Danger),
       control("archive", "Archive", ButtonStyle.Secondary),
+      control("delete", "Delete Roster", ButtonStyle.Danger),
     ),
   ];
 }
@@ -551,6 +592,7 @@ export class RaidRosterService {
   private readonly signupSessions = new Map<string, SignupSession>();
   private readonly pendingSignupSubmissions = new Set<string>();
   private readonly archivedSignupCycles = new Set<string>();
+  private readonly archivedDeletedRosters = new Set<string>();
 
   public constructor(
     private readonly config: BotConfig,
@@ -866,6 +908,28 @@ export class RaidRosterService {
     );
   }
 
+  private async authorizeOfficer(
+    interaction: Interaction,
+    binding: RaidRosterBinding,
+  ): Promise<void> {
+    if (interaction.user.id === this.config.DISCORD_OWNER_USER_ID) {
+      return;
+    }
+    if (!interaction.guild) {
+      throw new Error("Roster controls must be used inside Betrayed.");
+    }
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    if (
+      member.permissions.has(PermissionFlagsBits.Administrator) ||
+      member.roles.cache.has(binding.officerRoleId)
+    ) {
+      return;
+    }
+    throw new Error(
+      "Only the owner, Administrators, and Officers can create, edit, or delete rosters.",
+    );
+  }
+
   private async ensureControlPanel(
     guild: Guild,
     binding: RaidRosterBinding & { rosterForumId: string },
@@ -1013,6 +1077,16 @@ export class RaidRosterService {
     for (const thread of archiveThreads.values()) {
       const starter = await thread.fetchStarterMessage();
       const embed = starter?.embeds[0]?.toJSON();
+      if (embed?.title === "Zors Deleted Roster Archive") {
+        const rosterId = fieldValue(embed, "Roster ID");
+        if (!rosterId?.match(/^[0-9a-f-]{36}$/i)) {
+          throw new Error(
+            `Deleted roster archive thread ${thread.id} has invalid metadata.`,
+          );
+        }
+        this.archivedDeletedRosters.add(rosterId);
+        continue;
+      }
       if (embed?.title !== "Zors Signup Cycle Archive") {
         continue;
       }
@@ -1051,6 +1125,12 @@ export class RaidRosterService {
         await presentation.setArchived(
           false,
           "Restore active Zors roster presentation",
+        );
+      }
+      if (presentation.name !== roster.name) {
+        await presentation.setName(
+          roster.name.slice(0, 100),
+          "Synchronize Zors roster name",
         );
       }
       const presentationStarter = await presentation.fetchStarterMessage();
@@ -1162,6 +1242,12 @@ export class RaidRosterService {
     }
     if (presentation.archived && validated.status !== "archived") {
       await presentation.setArchived(false, "Update Zors roster");
+    }
+    if (presentation.name !== validated.name) {
+      await presentation.setName(
+        validated.name.slice(0, 100),
+        "Update Zors roster name",
+      );
     }
     const presentationStarter = await presentation.fetchStarterMessage();
     if (!presentationStarter) {
@@ -1279,9 +1365,14 @@ export class RaidRosterService {
     );
     const teamRoleId = interaction.options.getString("team-role", true);
     const teamRole = await guild.roles.fetch(teamRoleId);
-    const teamChannel = interaction.options.getChannel("team-channel", true);
+    const selectedTeamChannel = interaction.options.getChannel(
+      "team-channel",
+      true,
+    );
+    const teamChannel = await guild.channels.fetch(selectedTeamChannel.id);
     if (
       !teamRole ||
+      teamRole.managed ||
       !isMatchingTeamRoleName(teamRole.name, size)
     ) {
       throw new Error(
@@ -1289,10 +1380,24 @@ export class RaidRosterService {
       );
     }
     if (
-      teamChannel.type !== ChannelType.GuildText &&
+      !isTeamRoleAvailableForRoster(this.rosters.values(), teamRole.id)
+    ) {
+      throw new Error("That team role is already bound to another active roster.");
+    }
+    if (
+      !teamChannel ||
+      (teamChannel.type !== ChannelType.GuildText &&
       teamChannel.type !== ChannelType.GuildAnnouncement
+      )
     ) {
       throw new Error("The primary team channel must be a text channel.");
+    }
+    if (
+      !teamChannel
+        .permissionsFor(teamRole)
+        ?.has(PermissionFlagsBits.ViewChannel)
+    ) {
+      throw new Error("The selected team role cannot view the primary channel.");
     }
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const [controlForum, rosterForum] = await Promise.all([
@@ -1366,6 +1471,175 @@ export class RaidRosterService {
       );
     }
     return roster;
+  }
+
+  private async rollbackAddedRole(
+    members: GuildMember[],
+    roleId: string,
+    reason: string,
+  ): Promise<void> {
+    for (const member of members) {
+      try {
+        await member.roles.remove(roleId, reason);
+      } catch (error) {
+        console.error(
+          `Could not roll back role ${roleId} from member ${member.id}.`,
+          error,
+        );
+      }
+    }
+  }
+
+  private async editRoster(
+    interaction: ChatInputCommandInteraction,
+    roster: RaidRosterDocument,
+  ): Promise<void> {
+    const guild = interaction.guild;
+    if (!guild) {
+      throw new Error("Roster editing requires a guild.");
+    }
+    if (roster.status === "archived") {
+      throw new Error("Archived rosters cannot be edited.");
+    }
+    const requestedName = interaction.options.getString("name");
+    const requestedSize = interaction.options.getString("size");
+    const requestedRoleId = interaction.options.getString("team-role");
+    const requestedChannel = interaction.options.getChannel("team-channel");
+    if (
+      requestedName === null &&
+      requestedSize === null &&
+      requestedRoleId === null &&
+      requestedChannel === null
+    ) {
+      throw new Error("Provide at least one roster field to edit.");
+    }
+
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const next = structuredClone(roster);
+    const changes: string[] = [];
+    const nextName = requestedName?.trim() || roster.name;
+    const nextSize = requestedSize
+      ? rosterSizeSchema.parse(Number(requestedSize))
+      : roster.size;
+    const nextRoleId = requestedRoleId ?? roster.teamRoleId;
+    const nextChannelId = requestedChannel?.id ?? roster.teamChannelId;
+
+    validateRosterSizeChange(roster, nextSize);
+
+    const nextRole = await guild.roles.fetch(nextRoleId);
+    if (
+      !nextRole ||
+      nextRole.managed ||
+      !isMatchingTeamRoleName(nextRole.name, nextSize)
+    ) {
+      throw new Error(
+        `Choose an unmanaged role whose name contains "${nextSize} Team".`,
+      );
+    }
+    if (
+      !isTeamRoleAvailableForRoster(
+        this.rosters.values(),
+        nextRole.id,
+        roster.rosterId,
+      )
+    ) {
+      throw new Error("That team role is already bound to another active roster.");
+    }
+
+    const nextChannel = await guild.channels.fetch(nextChannelId);
+    if (
+      !nextChannel ||
+      (nextChannel.type !== ChannelType.GuildText &&
+        nextChannel.type !== ChannelType.GuildAnnouncement)
+    ) {
+      throw new Error("The primary team channel must be a text channel.");
+    }
+    if (!nextChannel.permissionsFor(nextRole)?.has(PermissionFlagsBits.ViewChannel)) {
+      throw new Error("The selected team role cannot view the primary channel.");
+    }
+    if (
+      nextChannelId !== roster.teamChannelId &&
+      [...this.signupSheets.values()].some(
+        (signup) =>
+          signup.rosterId === roster.rosterId &&
+          signup.status !== "cleared",
+      )
+    ) {
+      throw new Error(
+        "Clear and Archive this roster's active signup sheet before changing its primary channel.",
+      );
+    }
+
+    if (nextName !== roster.name) {
+      next.name = nextName;
+      changes.push(`name to **${nextName}**`);
+    }
+    if (nextSize !== roster.size) {
+      next.size = nextSize;
+      changes.push(`format to **${nextSize}-player**`);
+    }
+    if (nextRole.id !== roster.teamRoleId) {
+      next.teamRoleId = nextRole.id;
+      changes.push(`team role to <@&${nextRole.id}>`);
+    }
+    if (nextChannel.id !== roster.teamChannelId) {
+      next.teamChannelId = nextChannel.id;
+      changes.push(`primary channel to <#${nextChannel.id}>`);
+    }
+    if (changes.length === 0) {
+      await interaction.editReply("No roster values changed.");
+      return;
+    }
+    if (next.draftRevision) {
+      next.draftRevision.editedAt = new Date().toISOString();
+      next.draftRevision.editedBy = interaction.user.id;
+    }
+
+    const membersGivenNewRole: GuildMember[] = [];
+    if (nextRole.id !== roster.teamRoleId && roster.finalizedRevision) {
+      if (!nextRole.editable) {
+        throw new Error(
+          "Zors cannot assign the new team role. Move the Zors role above it and grant Manage Roles.",
+        );
+      }
+      try {
+        for (const assignment of roster.finalizedRevision.assignments) {
+          const member = await guild.members.fetch(assignment.memberId);
+          if (!member.roles.cache.has(nextRole.id)) {
+            await member.roles.add(
+              nextRole,
+              `Roster role changed by ${interaction.user.id}`,
+            );
+            membersGivenNewRole.push(member);
+          }
+        }
+      } catch (error) {
+        await this.rollbackAddedRole(
+          membersGivenNewRole,
+          nextRole.id,
+          "Roll back failed Zors roster role change",
+        );
+        throw error;
+      }
+    }
+
+    try {
+      await this.persist(guild, next);
+    } catch (error) {
+      await this.rollbackAddedRole(
+        membersGivenNewRole,
+        nextRole.id,
+        "Roll back failed Zors roster metadata save",
+      );
+      throw error;
+    }
+    await interaction.editReply(
+      `Updated ${changes.join(", ")}. ${
+        membersGivenNewRole.length > 0
+          ? `Added the new role to ${membersGivenNewRole.length} finalized roster member(s); the old role was preserved.`
+          : ""
+      }`.trim(),
+    );
   }
 
   private async finalize(
@@ -1493,6 +1767,160 @@ export class RaidRosterService {
     }
   }
 
+  private async archiveDeletedRoster(
+    guild: Guild,
+    roster: RaidRosterDocument,
+    binding: CompleteRaidRosterBinding,
+    deletedBy: string,
+  ): Promise<void> {
+    if (this.archivedDeletedRosters.has(roster.rosterId)) {
+      return;
+    }
+    const forum = await guild.channels.fetch(binding.archiveForumId);
+    if (!forum || forum.type !== ChannelType.GuildForum) {
+      throw new Error("The configured Roster Archives channel is not a Forum.");
+    }
+    const archivedAt = new Date().toISOString();
+    const requests = [...this.signupRequests.values()].filter(
+      (request) => request.rosterId === roster.rosterId,
+    );
+    const signupSheets = [...this.signupSheets.values()].filter(
+      (signup) => signup.rosterId === roster.rosterId,
+    );
+    const archiveState = {
+      schemaVersion: 1,
+      archivedAt,
+      deletedBy,
+      roster,
+      signupSheets,
+      requests,
+    };
+    await forum.threads.create({
+      name: `Deleted Roster — ${roster.name}`.slice(0, 100),
+      message: {
+        embeds: [
+          new EmbedBuilder()
+            .setTitle("Zors Deleted Roster Archive")
+            .setColor(0xe74c3c)
+            .setDescription(
+              [
+                `**Roster:** ${roster.name}`,
+                `**Format:** ${roster.size}-player`,
+                `**Team Role:** <@&${roster.teamRoleId}>`,
+                `**Primary Channel:** <#${roster.teamChannelId}>`,
+                `**Deleted By:** <@${deletedBy}>`,
+                `**Archived:** <t:${Math.floor(new Date(archivedAt).getTime() / 1_000)}:F>`,
+              ].join("\n"),
+            )
+            .addFields({ name: "Roster ID", value: roster.rosterId })
+            .setFooter({
+              text: "Immutable deleted roster archive • schema 1",
+            }),
+          buildRosterEmbed(roster, {
+            signupRequests: this.signupRequestsForRoster(roster.rosterId),
+          }).setTitle(`📋 ${roster.name} — Deleted Snapshot`),
+        ],
+        files: [
+          new AttachmentBuilder(
+            Buffer.from(`${JSON.stringify(archiveState, null, 2)}\n`, "utf8"),
+            { name: "zors-deleted-roster-archive.json" },
+          ),
+        ],
+        allowedMentions: { parse: [] },
+      },
+      reason: `Archive deleted Zors roster ${roster.rosterId}`,
+    });
+    this.archivedDeletedRosters.add(roster.rosterId);
+  }
+
+  private async promptDeleteRoster(
+    interaction: ChatInputCommandInteraction | ButtonInteraction,
+    roster: RaidRosterDocument,
+  ): Promise<void> {
+    await interaction.reply({
+      content: `Permanently delete **${roster.name}**? Zors will first save an immutable snapshot in Roster Archives. Team roles will remain on members.`,
+      components: [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(
+              `${customIdPrefix}:control:delete-confirm:${roster.rosterId}`,
+            )
+            .setLabel("Confirm Delete Roster")
+            .setStyle(ButtonStyle.Danger),
+          new ButtonBuilder()
+            .setCustomId(
+              `${customIdPrefix}:control:delete-cancel:${roster.rosterId}`,
+            )
+            .setLabel("Cancel")
+            .setStyle(ButtonStyle.Secondary),
+        ),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  private async deleteRoster(
+    guild: Guild,
+    roster: RaidRosterDocument,
+    binding: CompleteRaidRosterBinding,
+    deletedBy: string,
+  ): Promise<void> {
+    if (
+      [...this.signupSheets.values()].some(
+        (signup) =>
+          signup.rosterId === roster.rosterId &&
+          signup.status !== "cleared",
+      )
+    ) {
+      throw new Error(
+        "Clear and Archive this roster's signup sheet before deleting the roster.",
+      );
+    }
+    if (this.signupRequestsForRoster(roster.rosterId).length > 0) {
+      throw new Error(
+        "Resolve or clear this roster's pending signup requests before deleting it.",
+      );
+    }
+    await this.archiveDeletedRoster(guild, roster, binding, deletedBy);
+    const [presentation, control] = await Promise.all([
+      guild.channels.fetch(roster.presentationThreadId),
+      guild.channels.fetch(roster.controlThreadId),
+    ]);
+    if (!presentation?.isThread() || !control?.isThread()) {
+      throw new Error("One or more roster threads are unavailable for deletion.");
+    }
+    const controlStarter = await control.fetchStarterMessage();
+    if (!controlStarter) {
+      throw new Error("The roster storage starter is unavailable.");
+    }
+    await controlStarter.edit({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("Zors Deleted Roster Tombstone")
+          .setColor(0xe74c3c)
+          .addFields(
+            { name: "Roster ID", value: roster.rosterId },
+            { name: "Deleted At", value: new Date().toISOString() },
+          ),
+      ],
+      components: [],
+    });
+    const timer = this.warningTimers.get(roster.rosterId);
+    if (timer) {
+      clearTimeout(timer);
+      this.warningTimers.delete(roster.rosterId);
+    }
+    await presentation.delete(`Delete Zors roster ${roster.rosterId}`);
+    await control.delete(`Delete Zors roster storage ${roster.rosterId}`);
+    this.rosters.delete(roster.rosterId);
+    this.rosterIdByThread.delete(roster.presentationThreadId);
+    for (const [sessionId, session] of this.sessions) {
+      if (session.rosterId === roster.rosterId) {
+        this.sessions.delete(sessionId);
+      }
+    }
+  }
+
   public async handleCommand(
     interaction: ChatInputCommandInteraction,
   ): Promise<void> {
@@ -1505,16 +1933,22 @@ export class RaidRosterService {
       throw new Error("Raid rosters are not enabled in this server.");
     }
     const subcommand = interaction.options.getSubcommand();
-    await this.authorize(interaction, binding);
+    if (["create", "edit", "delete"].includes(subcommand)) {
+      await this.authorizeOfficer(interaction, binding);
+    } else {
+      await this.authorize(interaction, binding);
+    }
     if (subcommand === "help") {
       await interaction.reply({
         content: [
           "**Zors roster commands**",
-          "`/zors-roster create` — Create one roster from the Roster Control post.",
+          "`/zors-roster create` — Officer-only roster creation from the Roster Control post.",
+          "`/zors-roster edit` — Officer-only roster name, format, role, or channel editing.",
           "`/zors-roster show` — Show the current roster state.",
           "`/zors-roster finalize` — Publish the working Draft.",
           "`/zors-roster revert` — Restore the last finalized snapshot.",
           "`/zors-roster archive` — Archive a finalized roster.",
+          "`/zors-roster delete` — Officer-only permanent deletion after an immutable archive.",
           "Use the buttons on a roster post to add, move, swap, change, or remove members.",
         ].join("\n"),
         flags: MessageFlags.Ephemeral,
@@ -1529,6 +1963,14 @@ export class RaidRosterService {
     const guild = interaction.guild;
     if (!guild) {
       throw new Error("Roster commands require a guild.");
+    }
+    if (subcommand === "edit") {
+      await this.editRoster(interaction, roster);
+      return;
+    }
+    if (subcommand === "delete") {
+      await this.promptDeleteRoster(interaction, roster);
+      return;
     }
     if (subcommand === "show") {
       await interaction.reply({
@@ -1701,15 +2143,21 @@ export class RaidRosterService {
       return false;
     }
     const requestedSize = interaction.options.getString("size");
+    const contextualRoster = this.rosterForThread(interaction.channelId);
     const size = requestedSize
       ? rosterSizeSchema.parse(Number(requestedSize))
-      : undefined;
+      : contextualRoster?.size;
     const roles = await interaction.guild.roles.fetch();
     const choices = [...roles.values()]
       .filter(
         (role) =>
           !role.managed &&
           isMatchingTeamRoleName(role.name, size) &&
+          isTeamRoleAvailableForRoster(
+            this.rosters.values(),
+            role.id,
+            contextualRoster?.rosterId,
+          ) &&
           role.name.toLowerCase().includes(focused),
       )
       .sort((left, right) => left.name.localeCompare(right.name))
@@ -2035,9 +2483,13 @@ export class RaidRosterService {
     interaction: ButtonInteraction,
     action: string,
     rosterId: string,
-    binding: RaidRosterBinding,
+    binding: CompleteRaidRosterBinding,
   ): Promise<void> {
-    await this.authorize(interaction, binding);
+    if (action.startsWith("delete")) {
+      await this.authorizeOfficer(interaction, binding);
+    } else {
+      await this.authorize(interaction, binding);
+    }
     const roster = this.rosters.get(rosterId);
     if (!roster || interaction.channelId !== roster.presentationThreadId) {
       throw new Error("This control does not belong to the current roster post.");
@@ -2045,6 +2497,31 @@ export class RaidRosterService {
     const guild = interaction.guild;
     if (!guild) {
       throw new Error("Roster controls require a guild.");
+    }
+    if (action === "delete") {
+      await this.promptDeleteRoster(interaction, roster);
+      return;
+    }
+    if (action === "delete-cancel") {
+      await interaction.update({
+        content: "Roster deletion cancelled.",
+        components: [],
+      });
+      return;
+    }
+    if (action === "delete-confirm") {
+      await interaction.deferUpdate();
+      await this.deleteRoster(
+        guild,
+        roster,
+        binding,
+        interaction.user.id,
+      );
+      await interaction.editReply({
+        content: `Deleted **${roster.name}** after saving its immutable archive. Team roles were preserved.`,
+        components: [],
+      });
+      return;
     }
     if (["continue", "finalize", "revert", "archive"].includes(action)) {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });

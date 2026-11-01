@@ -17,6 +17,8 @@ import {
   buildRosterControls,
   buildDraftWarningControls,
   isMatchingTeamRoleName,
+  isTeamRoleAvailableForRoster,
+  validateRosterSizeChange,
 } from "../src/raid-rosters.js";
 import {
   buildRaidSignupRequestEmbed,
@@ -229,6 +231,38 @@ describe("raid roster state", () => {
     expect(isMatchingTeamRoleName("Social Team")).toBe(false);
   });
 
+  it("allows each team role on only one active roster", () => {
+    const existing = roster();
+
+    expect(
+      isTeamRoleAvailableForRoster(
+        [existing],
+        existing.teamRoleId,
+        existing.rosterId,
+      ),
+    ).toBe(true);
+    expect(
+      isTeamRoleAvailableForRoster([existing], existing.teamRoleId),
+    ).toBe(false);
+    existing.status = "archived";
+    expect(
+      isTeamRoleAvailableForRoster([existing], existing.teamRoleId),
+    ).toBe(true);
+  });
+
+  it("blocks shrinking while any stored revision uses Groups 5–8", () => {
+    const existing = roster();
+    existing.size = 40;
+    existing.draftRevision?.assignments.push(
+      assignment(memberOne, { kind: "group", group: 5, slot: 1 }),
+    );
+
+    expect(() => validateRosterSizeChange(existing, 20)).toThrow(
+      "Move every member out of Groups 5–8",
+    );
+    expect(() => validateRosterSizeChange(existing, 40)).not.toThrow();
+  });
+
   it("renders two group fields per row with WoW class color markers", () => {
     const document = roster();
     document.draftRevision?.assignments.push(
@@ -343,6 +377,9 @@ describe("raid roster state", () => {
       controls.find(({ label }) => label === "Change Spec")?.style,
     ).toBe(1);
     expect(controls.map(({ label }) => label)).not.toContain("Bump");
+    expect(
+      controls.find(({ label }) => label === "Delete Roster")?.style,
+    ).toBe(4);
   });
 
   it("orders Draft warning actions as continue, finalize, then revert", () => {

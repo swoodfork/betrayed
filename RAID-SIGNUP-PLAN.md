@@ -77,10 +77,12 @@ Use a command group rather than adding many unrelated top-level commands:
 
 ```text
 /zors-roster create
+/zors-roster edit
 /zors-roster show
 /zors-roster finalize
 /zors-roster revert
 /zors-roster archive
+/zors-roster delete
 /zors-signup create
 ```
 
@@ -110,6 +112,20 @@ already maintained for raid applications.
 The raid-team role identifies the team and is automatically assigned when a
 coordinator approves a signup request. The individual member assigned to each
 slot is the person Zors will DM.
+
+`/zors-roster edit` runs contextually inside one active roster post. It can
+change the name, format, unique team role, and primary channel. Shrinking from
+40-player to 20-player is blocked until Groups 5–8 are empty in every stored
+revision. A primary channel cannot change while a non-cleared signup sheet is
+attached. A role change adds the new role to finalized members and preserves
+the old role. Existing archives are never rewritten.
+
+Create, Edit, and Delete are restricted to the owner, Administrators, and
+Officers. Raid Coordinators retain Add, Move, Swap, Change Spec, Remove,
+Finalize, Revert, and Archive. Delete requires confirmation, refuses while a
+non-cleared signup sheet is attached, writes an immutable final roster snapshot
+to `🗃️roster-archives`, permanently deletes the presentation/storage posts,
+and preserves Discord team roles on members.
 
 Roster lifecycle commands must refuse to run outside the configured
 `📋raid-rosters` Forum and its child posts, even when the caller has

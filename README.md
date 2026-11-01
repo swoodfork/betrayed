@@ -109,7 +109,12 @@ Officers and Raid Coordinators can use Zors controls but cannot manually create,
 reply to, react to, edit, delete, or manage roster/request Forum posts.
 
 Roster controls support Add Member, Move Member, Swap Members, Change Spec,
-Remove Member, Finalize, Revert Draft, and Archive. Both formats reserve
+Remove Member, Finalize, Revert Draft, Archive, and Delete Roster. Raid
+Coordinators may use every operational roster control through Archive. Create,
+Edit, and permanent Delete require the owner, an Administrator, or an Officer.
+Delete is blocked until attached signup sheets are Clear and Archived, writes
+an immutable deleted-roster snapshot to `🗃️roster-archives`, permanently
+removes both roster posts, and preserves member roles. Both formats reserve
 ten numbered Bench positions, displayed as two five-slot columns, and an
 unnumbered Overflow list. Bench 2 restarts its visible numbering at 1 while
 retaining distinct internal slots 6–10. Finalization
@@ -161,6 +166,15 @@ uses autocomplete and shows only roles containing `20 Team` or `40 Team`
 matching the selected format. Discord modals cannot contain role or channel
 pickers, so the slash-command form is the only native single-form experience
 that preserves those typed selectors.
+
+Run `/zors-roster edit` inside an active roster post to change any combination
+of its name, 20/40-player format, team role, or primary channel. Team roles are
+unique across active rosters. A 40-player roster cannot shrink until Groups
+5–8 are empty in both its finalized and Draft revisions. Primary-channel
+changes require its reusable signup sheet to be permanently cleared first.
+Changing the team role adds the new role to finalized roster members while
+preserving their old role. Historical cycle archives remain immutable and keep
+the roster metadata that was active when each archive was created.
 
 `💤 sleep` is the only voice channel in the final `🌙 AFK/Inactive 🌙` category and is
 intended for Discord's inactive-member destination. Select it manually under

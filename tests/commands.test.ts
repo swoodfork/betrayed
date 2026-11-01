@@ -123,10 +123,12 @@ describe("Zors Bot command registration", () => {
     expect(rosterCommand.name).toBe("zors-roster");
     expect(rosterCommand.options?.map((option) => option.name)).toEqual([
       "create",
+      "edit",
       "show",
       "finalize",
       "revert",
       "archive",
+      "delete",
       "help",
     ]);
     expect(create?.options).toEqual(
