@@ -6,6 +6,7 @@ This feature is feasible, but it is a medium-to-large Zors Bot subsystem rather
 than a single command. It combines:
 
 - Interactive roster construction.
+- Player signup requests with coordinator approval.
 - Individually dated raid creation.
 - Durable Discord-native state.
 - Scheduled direct-message confirmations.
@@ -21,11 +22,29 @@ pass.
 
 - Each roster slot is assigned to one Discord member and one class/spec.
 - Each roster also has one Discord raid-team role.
+- A saved roster must exist before a raid signup can be created.
+- Every signup is attached to exactly one saved roster.
+- Roster membership, class, spec, group, and Bench placement remain reusable
+  between weekly signups.
+- Raid times and confirmation history belong to the dated signup, never to the
+  reusable roster.
+- Any member who can see a signup sheet may request to join its roster.
+- Each request contains one class and one specialization.
+- Accepting a request permanently adds the member to the roster, automatically
+  assigns the roster's team role, and lets the coordinator choose a group slot
+  or Bench.
+- Rejected applicants receive a DM, as do accepted applicants.
+- Zors sends raid-confirmation DMs only to current members of the attached
+  roster. Pending or rejected requests never enter the reminder scheduler.
 - Phase one creates one specifically dated raid at a time.
 - The visible signup sheet is posted in the channel where the command runs.
 - Selecting **No** marks the member absent and stops automated reminders.
 - An absent member can press **I can attend after all** in the DM to rejoin the
   normal confirmation cadence.
+- Creating a signup immediately sends its first confirmation DM to every
+  current roster member.
+- Later confirmation checkpoints occur 3 days, 24 hours, and 6 hours before
+  raid start. Any checkpoint already in the past is skipped.
 - Unanswered members receive another DM every 24 hours.
 - Unanswered reminders stop when the raid begins.
 - Raid times are entered and stored in the `America/Los_Angeles` time zone.
@@ -63,14 +82,67 @@ select to 25 options, while the current WoW Forever roster has 27 specs. The
 existing class-first flow avoids that limit and reuses the class/spec data
 already maintained for raid applications.
 
-The raid-team role determines who is eligible for roster assignment and gives
-coordinators a quick way to identify the team. The individual member assigned
-to each slot is the person Zors will DM.
+The raid-team role identifies the team and is automatically assigned when a
+coordinator approves a signup request. The individual member assigned to each
+slot is the person Zors will DM.
 
-### 2. Publish or bump the roster
+### 2. Request roster membership from a signup sheet
 
-The roster has one live presentation message in its associated coordinator
-channel. `/zors roster bump` should:
+Every live signup sheet has a **Request to Join This Raid** button. Any server
+member who can see the sheet may use it.
+
+The request wizard:
+
+1. Verifies that the member is not already on the attached roster and does not
+   already have a pending request for it.
+2. Shows the raid, roster, and team role.
+3. Lets the member select one class.
+4. Filters the specialization select to that class.
+5. Shows a final class/spec preview.
+6. Creates a private request post in `📨signup-requests`.
+
+Each request post contains:
+
+- Applicant mention and member ID.
+- Source raid signup and attached roster.
+- Requested class/spec.
+- Submission timestamp.
+- Pending, accepted, or rejected status.
+- Coordinator decision and timestamp.
+- **Review**, **Accept**, **Reject**, and **Edit Class/Spec** controls as
+  appropriate.
+
+Creating the post alerts the Raid Coordinator role. Accept and reject decisions
+DM the applicant.
+
+When accepting, the coordinator:
+
+1. May change the requested class/spec.
+2. Chooses an open group/position or **Bench**.
+3. Reviews the resulting roster.
+4. Confirms the permanent roster addition.
+
+Zors then assigns the roster's raid-team Discord role, updates the canonical
+roster, refreshes the roster Forum post, refreshes every active signup attached
+to that roster, and sends the new member an immediate confirmation DM for the
+source signup. The new member receives only checkpoint DMs that are still in
+the future.
+
+If all main slots are occupied, Bench remains available. A coordinator can
+later move a benched member into a group through the roster editor.
+
+The roster editor has two addition paths:
+
+- **Add Discord Member** uses a Discord member select, followed by class, spec,
+  and placement.
+- **Add from Signup Requests** provides a paginated dropdown of pending request
+  posts. Discord selects allow at most 25 options, so the builder must paginate
+  rather than silently omit older requests.
+
+### 3. Publish or bump the roster
+
+Each saved roster has one post in the private `📋raid-rosters` Forum beneath
+`📨signup-requests`. `/zors roster bump` should:
 
 1. Render and send the new roster message successfully.
 2. Update the canonical pointer to the new message.
@@ -79,7 +151,7 @@ channel. `/zors roster bump` should:
 The roster's durable source of truth must not be the presentation message.
 Deleting or bumping the visible message therefore cannot destroy the roster.
 
-### 3. Create a dated raid
+### 4. Create a dated raid
 
 Use a second command group:
 
@@ -95,13 +167,15 @@ Use a second command group:
 `/zors raid create` is limited to Raid Coordinator, Officer, Administrator, and
 the configured server owner. It starts an ephemeral wizard:
 
-1. Select a saved roster.
+1. Select a saved roster. If none exists, stop and direct the coordinator to
+   `/zors roster create`.
 2. Enter the raid name.
 3. Enter the calendar date as `YYYY-MM-DD`.
 4. Select the start hour.
 5. Select the end hour.
 6. Preview the resolved PST/PDT timestamps and roster.
 7. Confirm creation.
+8. Persist the signup and immediately DM every current roster member.
 
 Discord has no native calendar-date picker. A validated date field is therefore
 needed, but the start and end times can use dropdowns containing hourly values.
@@ -117,7 +191,12 @@ If the selected end hour is earlier than or equal to the start hour, the wizard
 must explicitly ask whether the raid ends on the following calendar day. It
 must never silently infer an overnight raid.
 
-### 4. Display the live signup sheet
+The raid date and time are always explicitly supplied. Reminder timing is
+calculated from the selected raid start, never from the signup creation date.
+If the signup is created after a checkpoint boundary, that checkpoint is
+skipped rather than sent late.
+
+### 5. Display the live signup sheet
 
 Zors posts one embed in the channel where `/zors raid create` was run. The
 embed should include:
@@ -129,13 +208,14 @@ embed should include:
 - Member, class, and spec for each slot.
 - Current attendance state.
 - Confirmation history for each checkpoint.
+- **Request to Join This Raid** button.
 
 Recommended compact history:
 
 ```text
 Feral Druid — @Member
 Current: Confirmed
-7d ✅  3d ✅  24h ⏳  6h —
+Initial ✅  3d ✅  24h ⏳  6h —
 ```
 
 Status icons:
@@ -148,25 +228,34 @@ Status icons:
 - `—` checkpoint not reached.
 
 The signup sheet is a projection of durable state. Zors edits it after every
-response. Updates should be debounced briefly so several simultaneous
-responses produce one Discord edit rather than a burst of edits.
+response or attached-roster change. The roster supplies current membership and
+class/spec placement; the signup supplies raid times and confirmations.
+Updates should be debounced briefly so several simultaneous responses produce
+one Discord edit rather than a burst of edits.
 
 ## Confirmation Cadence
 
-Each raid has four independent confirmation checkpoints:
+Each raid has an immediate confirmation plus three scheduled checkpoints:
 
 | Checkpoint | First DM |
 |---|---:|
-| Seven-day | 7 days before start |
+| Initial | Immediately when the signup is created or a member is later added |
 | Three-day | 3 days before start |
 | One-day | 24 hours before start |
 | Final | 6 hours before start |
+
+Only future scheduled checkpoints are created. For example:
+
+- A signup created 10 days early sends Initial, then 3d, 24h, and 6h.
+- A signup created 2 days early sends Initial, skips 3d, then sends 24h and 6h.
+- A signup created 5 hours early sends Initial and skips all three scheduled
+  checkpoints.
 
 ### Yes behavior
 
 - **Yes, I will be there** marks that checkpoint confirmed.
 - A previous Yes does not suppress later checkpoint DMs.
-- The member is asked again at 3 days, 24 hours, and 6 hours.
+- The member is asked again at every remaining future checkpoint.
 - Every answer remains visible in the checkpoint history.
 
 ### No behavior
@@ -230,23 +319,41 @@ re-read before applying a response.
 
 ## Discord-Native Storage
 
-### Recommended phase-one design
+### Recommended channel design
 
-Create one private Forum channel in the Raid Coordinator category:
+Create three private Forum channels with increasingly separated purposes:
 
 ```text
-🗄️zors-raid-control
+🔒 Officer 🔒
+  🗝️officer-affairs
+  📜zors-command-log
+  🗄️zors-raid-control
+
+🔒 Raid Coordinator 🔒
+  🔐coordinator-affairs
+  📨signup-requests
+  📋raid-rosters
 ```
 
-It should be visible only to:
+`🗄️zors-raid-control` sits directly beneath `📜zors-command-log` and contains
+the machine-readable durable state. It uses the Officer section permissions and
+is visible only to the Guild Master/owner, Discord Admin, Officer, and Zors Bot.
+Raid Coordinators operate through bot controls and do not need direct access to
+the lower-level storage records.
 
-- Guild Master/owner.
-- Discord Admin.
-- Officer.
-- Raid Coordinator.
-- Zors Bot.
+`📨signup-requests` sits directly beneath `🔐coordinator-affairs`. It uses the
+Raid Coordinator section permissions and contains one Forum post per player
+request.
 
-Use one Forum post per roster and one Forum post per raid event.
+`📋raid-rosters` sits directly beneath `📨signup-requests`. It uses the Raid
+Coordinator section permissions and contains one presentation post per saved
+roster.
+
+The desired-state planner should bind all three channel IDs immutably in
+Production and preserve this exact order.
+
+Use one control Forum post per roster and one control Forum post per raid
+event.
 
 #### Roster control post
 
@@ -256,9 +363,8 @@ Contains:
 - Stable roster ID.
 - Roster name.
 - Raid-team role ID.
-- Associated coordinator channel ID.
-- Current presentation message ID.
-- All member, class, spec, and group assignments.
+- Current `📋raid-rosters` presentation post ID.
+- All member, class, spec, group, position, and Bench assignments.
 - Created/updated timestamps and actor IDs.
 
 #### Raid control post
@@ -267,7 +373,7 @@ Contains:
 
 - Schema version.
 - Stable raid ID.
-- Source roster ID and a roster snapshot.
+- Exactly one attached roster ID.
 - Raid name.
 - Start/end Unix timestamps.
 - Signup channel and message IDs.
@@ -280,14 +386,31 @@ append-only history of deliveries, responses, coordinator changes, and errors.
 On restart, Zors reads the current snapshot and history to reconstruct every
 active raid.
 
+The roster does not store raid times or confirmation responses. The raid event
+does not own a disconnected copy of roster membership. It references exactly
+one roster and projects current member/class/spec placement into its live
+sheet. Participant confirmation records remain attached to the raid event by
+member ID.
+
+When a roster changes:
+
+- Added members are added to every active future signup attached to it.
+- A member approved from a request receives an immediate confirmation for the
+  source signup and only future scheduled checkpoints.
+- Removed members stop receiving reminders and are marked removed in each
+  affected signup's audit history.
+- Class/spec, group, position, and Bench changes refresh attached live sheets
+  without erasing existing confirmation history.
+
 This matches the existing Discord-native raid-application approach and avoids
 depending on Render's ephemeral filesystem.
 
 ### Why not use the visible roster message as storage?
 
-A presentation message is routinely edited, bumped, or deleted. It is not a
-safe canonical record. The private Forum record survives those operations and
-also keeps sensitive delivery history away from the public signup channel.
+A presentation post is routinely edited, bumped, or deleted. It is not a safe
+canonical record. The Officer-only control Forum survives those operations and
+also keeps member delivery and confirmation history away from the coordinator
+presentation Forums and public signup channel.
 
 ### SQLite on Render is possible
 
@@ -318,7 +441,7 @@ every deploy.
 
 On startup:
 
-1. Load all active raid control posts.
+1. Load all roster, request, and active raid control posts.
 2. Validate schema versions and message bindings.
 3. Rebuild the next due checkpoint or reminder for every participant.
 4. Immediately process overdue work in a bounded, rate-limited batch.
@@ -353,12 +476,17 @@ Roster and raid management commands are available to:
 Member DM buttons are available only to the member represented by that
 participant record.
 
+The public **Request to Join This Raid** button is available to any guild member
+who can view the signup sheet. Request review, spec changes, placement,
+acceptance, and rejection remain limited to the management roles above.
+
 The existing `📜zors-command-log` should audit:
 
 - Roster creation and edits.
 - Raid creation, cancellation, and closure.
 - Manual resend requests.
 - Roster bumps.
+- Signup-request acceptance, rejection, spec edits, and placement.
 - Actor, values, result, and failures.
 
 Automated scheduler activity belongs in the private raid control thread rather
@@ -372,10 +500,10 @@ Roster
   guildId
   name
   teamRoleId
-  coordinatorChannelId
-  presentationMessageId
+  presentationThreadId
   status
   slots[]
+  bench[]
 
 RosterSlot
   memberId
@@ -383,12 +511,28 @@ RosterSlot
   specialization
   groupNumber
   position
+  placementStatus
+
+SignupRequest
+  id
+  guildId
+  applicantMemberId
+  sourceRaidId
+  rosterId
+  requestedClassName
+  requestedSpecialization
+  finalClassName
+  finalSpecialization
+  requestedAt
+  status
+  decisionByMemberId
+  decidedAt
+  requestThreadId
 
 RaidEvent
   id
   guildId
   rosterId
-  rosterSnapshot
   name
   startAt
   endAt
@@ -408,6 +552,7 @@ RaidParticipant
   currentStatus
   dmUnavailable
   checkpoints[]
+  removedAt
 
 ConfirmationCheckpoint
   kind
@@ -423,15 +568,25 @@ ConfirmationCheckpoint
 No member display name is authoritative. Store Discord IDs and resolve current
 names when rendering.
 
+The roster is authoritative for membership and class/spec placement. The raid
+participant record is authoritative only for that raid's confirmation state
+and delivery history.
+
 ## Failure Handling
 
 - If the signup message was deleted, `/zors raid refresh` creates a replacement
   and updates the canonical binding.
 - If the roster presentation was deleted, `/zors roster bump` recreates it.
+- If a member requests a roster they already belong to, show the existing
+  roster assignment instead of creating a duplicate request.
+- If a member already has a pending request for the same roster, link the
+  existing request instead of creating another Forum post.
+- If automatic team-role assignment fails, do not partially accept the
+  request. Keep it pending and show the permission error to the coordinator.
 - If a member leaves the guild, mark the slot unavailable and notify the
   coordinator; do not silently assign another member.
-- If a roster changes after a raid is created, the existing raid keeps its
-  snapshot unless a coordinator explicitly runs a reconcile action.
+- If a roster changes after a raid is created, refresh every active attached
+  signup while preserving its existing confirmation history.
 - If Zors lacks permission to post, edit, or DM, show the failure in the
   control thread and command audit log where applicable.
 - If stored state is invalid or uses an unknown schema, refuse mutation and
@@ -443,7 +598,9 @@ names when rendering.
 ### Unit tests
 
 - PST/PDT conversion around daylight-saving boundaries.
-- 7-day, 3-day, 24-hour, and 6-hour due calculations.
+- Immediate, 3-day, 24-hour, and 6-hour due calculations.
+- Passed checkpoint boundaries are skipped.
+- A late roster addition receives Immediate and only future checkpoints.
 - Yes still receives the next checkpoint.
 - No suppresses all future reminders.
 - **I can attend after all** resumes the latest and future cadence.
@@ -455,6 +612,12 @@ names when rendering.
 - Stale and wrong-user button rejection.
 - Class/spec validation.
 - Roster member and team-role validation.
+- Saved-roster prerequisite for raid creation.
+- Duplicate membership and duplicate pending-request prevention.
+- Applicant class/spec capture and coordinator spec override.
+- Accept, reject, role assignment, slot placement, and Bench placement.
+- Roster changes propagate to attached signup sheets without erasing
+  confirmations.
 - Embed and component limits.
 
 ### Restart tests
@@ -469,9 +632,11 @@ names when rendering.
 
 - Use a raid scheduled minutes rather than days ahead with test-only compressed
   checkpoint offsets.
-- Verify all four confirmation stages.
+- Verify Initial plus all three scheduled confirmation stages.
 - Verify repeated 24-hour behavior with a compressed test interval.
 - Verify Yes, No, absence reversion, closed DMs, and simultaneous responses.
+- Verify public signup request, coordinator spec edit, acceptance, rejection,
+  automatic role assignment, group placement, and Bench placement.
 - Restart the Render worker between stages and confirm recovery.
 - Confirm the live signup sheet remains accurate.
 - Confirm command logging and private control-channel permissions.
@@ -483,36 +648,50 @@ only behind an explicit Test-guild configuration.
 
 ### Phase 1: Durable rosters
 
-- Add immutable Raid Coordinator role and control Forum bindings.
+- Add immutable `🗄️zors-raid-control`, `📨signup-requests`, and
+  `📋raid-rosters` Forum bindings in their specified category order.
 - Add `/zors roster` command group.
 - Build the interactive class/spec/member roster editor.
 - Persist and reconstruct roster control posts.
 - Render and bump roster presentation messages.
 
-### Phase 2: Raid creation and live sheet
+### Phase 2: Signup requests
+
+- Add the public **Request to Join This Raid** workflow.
+- Create one private Forum post per request.
+- Alert Raid Coordinators.
+- Add class/spec editing, accept, and reject controls.
+- Add automatic team-role assignment.
+- Add coordinator-selected group slot or Bench placement.
+- Refresh the canonical roster and all attached active signup sheets.
+
+### Phase 3: Raid creation and live sheet
 
 - Add `/zors raid create`.
+- Require one saved roster.
 - Validate date and hourly time selections.
-- Snapshot the selected roster.
 - Create the raid control post and visible signup sheet.
+- Immediately DM all current roster members.
 - Add manual refresh, cancel, and close operations.
 
-### Phase 3: DM responses
+### Phase 4: DM responses
 
 - Send manually triggered confirmation DMs in Betrayed Test.
 - Implement Yes, No, and **I can attend after all**.
 - Validate user ownership and stale interactions.
 - Update the live signup sheet after every response.
 
-### Phase 4: Scheduler and recovery
+### Phase 5: Scheduler and recovery
 
-- Add the four production checkpoints.
+- Add the 3-day, 24-hour, and 6-hour production checkpoints.
+- Skip checkpoint boundaries that passed before signup creation or member
+  addition.
 - Add 24-hour unanswered retries.
 - Add closed-DM handling and staff notifications.
 - Reconstruct schedules after restart.
 - Add test-only compressed timing.
 
-### Phase 5: Production rollout
+### Phase 6: Production rollout
 
 - Run the complete Test acceptance suite.
 - Bind Production channels and roles immutably.
@@ -526,8 +705,22 @@ The first production release is complete only when:
 
 - A coordinator can create, edit, show, bump, and archive a saved roster.
 - Every roster slot has a valid member, class, spec, and group.
+- Bench members are preserved without occupying a main group slot.
+- Raid creation is impossible until a saved roster is selected.
+- Every signup is attached to exactly one roster.
 - A dated raid can be created with hourly start/end selections.
 - The sheet posts in the command channel and updates after responses.
+- Signup creation immediately contacts every current roster member.
+- Passed reminder checkpoints are skipped.
+- Any visible member can submit one class/spec request from the signup sheet.
+- Coordinators receive a private request post and can edit its spec, reject it,
+  or accept it into a chosen slot or Bench.
+- Accepted members receive the team role, become persistent roster members,
+  appear on attached signup sheets, and receive Immediate plus only future
+  confirmations.
+- Rejected and accepted applicants receive decision DMs.
+- Roster membership and spec changes update attached signup sheets without
+  moving confirmation history into the roster.
 - Every eligible member receives each required checkpoint after prior Yes
   responses.
 - No suppresses reminders until explicitly reverted.
@@ -541,7 +734,8 @@ The first production release is complete only when:
 
 ## Recommended First Build
 
-Start with Phase 1 only: the private control Forum and roster builder. The
-reminder scheduler should not be started until roster reconstruction survives a
-full bot restart. This establishes the durable foundation before any raider
-depends on automated attendance messages.
+Start with Phase 1 only: the three private Forums, Officer-only canonical
+storage, and reusable roster builder. The request workflow and reminder
+scheduler should not be started until roster reconstruction survives a full
+bot restart. This establishes the durable foundation before any raider depends
+on automated attendance messages.
