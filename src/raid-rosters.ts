@@ -595,6 +595,21 @@ export function attendanceAssignmentCopy(
   };
 }
 
+export function signupRequestIdFromMoveSelection(
+  action: string,
+  stage: string,
+  selectedId: string,
+): string | null {
+  if (
+    action !== "move" ||
+    stage !== "member" ||
+    !selectedId.startsWith("request:")
+  ) {
+    return null;
+  }
+  return selectedId.slice("request:".length) || null;
+}
+
 function interactionBinding(
   guildId: string | null,
   config: BotConfig,
@@ -2892,7 +2907,9 @@ export class RaidRosterService {
       content:
         action === "add"
           ? "Choose the Discord member to add."
-          : "Choose a member already on this roster.",
+          : action === "move"
+            ? "Choose a roster member or pending signup request."
+            : "Choose a member already on this roster.",
       components,
       flags: MessageFlags.Ephemeral,
     });
@@ -2910,30 +2927,6 @@ export class RaidRosterService {
     const selectedId = interaction.values[0];
     if (!selectedId) {
       throw new Error("Choose one Discord member.");
-    }
-    if (
-      session.action === "move" &&
-      stage === "member" &&
-      selectedId.startsWith("request:")
-    ) {
-      const requestId = selectedId.slice("request:".length);
-      const request = this.signupRequests.get(requestId);
-      if (
-        !request ||
-        request.rosterId !== roster.rosterId ||
-        request.status !== "pending"
-      ) {
-        throw new Error("That signup request is no longer pending.");
-      }
-      session.signupRequestId = request.requestId;
-      session.memberId = request.applicantId;
-      session.classKey = request.classKey;
-      session.specKey = request.specKey;
-      await interaction.update({
-        content: "Choose where to place this signup request.",
-        components: [this.placementPicker(session, roster)],
-      });
-      return;
     }
     const rosterMemberIds = new Set(
       (activeRevision(roster)?.assignments ?? []).map(({ memberId }) => memberId),
@@ -2960,6 +2953,30 @@ export class RaidRosterService {
     const selectedId = interaction.values[0];
     if (!selectedId) {
       throw new Error("Choose one roster member.");
+    }
+    const requestId = signupRequestIdFromMoveSelection(
+      session.action,
+      stage,
+      selectedId,
+    );
+    if (requestId) {
+      const request = this.signupRequests.get(requestId);
+      if (
+        !request ||
+        request.rosterId !== roster.rosterId ||
+        request.status !== "pending"
+      ) {
+        throw new Error("That signup request is no longer pending.");
+      }
+      session.signupRequestId = request.requestId;
+      session.memberId = request.applicantId;
+      session.classKey = request.classKey;
+      session.specKey = request.specKey;
+      await interaction.update({
+        content: "Choose where to place this signup request.",
+        components: [this.placementPicker(session, roster)],
+      });
+      return;
     }
     const rosterMemberIds = new Set(
       (activeRevision(roster)?.assignments ?? []).map(({ memberId }) => memberId),

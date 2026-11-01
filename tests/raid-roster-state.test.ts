@@ -19,6 +19,7 @@ import {
   buildDraftWarningControls,
   isMatchingTeamRoleName,
   isTeamRoleAvailableForRoster,
+  signupRequestIdFromMoveSelection,
   validateRosterSizeChange,
 } from "../src/raid-rosters.js";
 import {
@@ -171,6 +172,7 @@ describe("raid roster state", () => {
       group: 1,
       slot: 1,
     });
+
     const benched = assignment(memberOne, { kind: "bench", slot: 1 });
     const movedGroup = assignment(memberOne, {
       kind: "group",
@@ -206,6 +208,28 @@ describe("raid roster state", () => {
         after: grouped,
       }),
     ).toBe(false);
+  });
+
+  it("recognizes signup requests selected from the Move Member menu", () => {
+    const requestId = "d6a13cc8-39ce-48fc-a220-63b6e1313252";
+
+    expect(
+      signupRequestIdFromMoveSelection(
+        "move",
+        "member",
+        `request:${requestId}`,
+      ),
+    ).toBe(requestId);
+    expect(
+      signupRequestIdFromMoveSelection("move", "member", memberOne),
+    ).toBeNull();
+    expect(
+      signupRequestIdFromMoveSelection(
+        "swap",
+        "member",
+        `request:${requestId}`,
+      ),
+    ).toBeNull();
   });
 
   it("does not mutate state when a requested placement is invalid", () => {
