@@ -92,6 +92,24 @@ describe("test apply policy", () => {
     });
   });
 
+  it("accepts a hash-gated announcement conversion", () => {
+    const announcementPlan = parseDryRunPlan({
+      ...plan,
+      actions: [
+        {
+          action: "update-channel-type",
+          channelKey: "announcements",
+          channelId: "323456789012345678",
+          from: "text",
+          to: "announcement",
+        },
+      ],
+    });
+
+    const hash = planHash(announcementPlan);
+    expect(authorizeTestApply(announcementPlan, hash, boundaries)).toBe(hash);
+  });
+
   it("accepts a bounded channel positioning action", () => {
     const positionPlan = parseDryRunPlan({
       ...plan,

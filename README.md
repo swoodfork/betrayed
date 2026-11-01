@@ -79,7 +79,7 @@ profile-card DM. Discord's native member-join notices use the same channel.
 Closed DMs are reported but do not stop the public welcome.
 
 Mature access is handled by Discord onboarding rather than Zors Bot and gates
-only `🍆nsfw` and `🍝copy-pasta`. Controversial remains manually assigned by
+`🤣zors-talk`, `🍆nsfw`, and `🍝copy-pasta`. Controversial remains manually assigned by
 staff. When bound, the welcome DM links to the raid application channel and can
 move a connected member into PUG Voice. It can also link members who are
 looking around directly to Forever Discussion. Discord cannot move a
@@ -87,8 +87,11 @@ disconnected member into voice, so the member must join any server voice
 channel before pressing the PUG button.
 
 Channels in Welcome to Betrayed are public-readable but staff-published.
-`📌server-guide`, `👋welcome`, and `📝raid-application` deny member messages
+`🔔announcements` is an official Discord announcement channel. `📌server-rules`,
+`👋welcome`, and `📝raid-application` deny member messages
 while allowing Guild Master, Discord Admin, Officer, and Zors Bot to publish.
+The Test guild has Community enabled so it can mirror the announcement channel;
+`📌server-rules` is its rules channel and `👋welcome` receives Community updates.
 
 `💤 sleep` is the only voice channel in the final `🌙 AFK/Inactive 🌙` category and is
 intended for Discord's inactive-member destination. Select it manually under

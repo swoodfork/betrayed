@@ -58,9 +58,16 @@ export type PlanAction =
       action: "create-channel";
       channelKey: string;
       name: string;
-      channelType: "text" | "voice" | "forum";
+      channelType: "text" | "announcement" | "voice" | "forum";
       targetCategoryKey: string;
       targetCategoryId: string | null;
+    }
+  | {
+      action: "update-channel-type";
+      channelKey: string;
+      channelId: string;
+      from: "text" | "announcement";
+      to: "text" | "announcement";
     }
   | {
       action: "rename-channel";
@@ -119,7 +126,7 @@ export type PlanAction =
       channelKey: string;
       channelId: string;
       currentType: string;
-      desiredType: "text" | "voice" | "forum";
+      desiredType: "text" | "announcement" | "voice" | "forum";
     }
   | {
       action: "review-unmanaged-existing";
@@ -160,10 +167,15 @@ function isCategory(type: string): boolean {
 
 function desiredTypeMatches(
   currentType: string,
-  desiredType: "text" | "voice" | "forum",
+  desiredType: "text" | "announcement" | "voice" | "forum",
 ) {
   if (desiredType === "text") {
-    return currentType === "GuildText" || currentType === "GuildAnnouncement";
+    return currentType === "GuildText";
+  }
+  if (desiredType === "announcement") {
+    return (
+      currentType === "GuildAnnouncement" || currentType === "GuildNews"
+    );
   }
   return desiredType === "voice"
     ? currentType === "GuildVoice"
@@ -174,6 +186,7 @@ function sortableChannelGroup(type: string): string {
   if (
     type === "GuildText" ||
     type === "GuildAnnouncement" ||
+    type === "GuildNews" ||
     type === "GuildForum" ||
     type === "GuildMedia"
   ) {
@@ -511,14 +524,34 @@ export function createDryRunPlan(
 
       matchedIds.add(currentChannel.id);
       if (!desiredTypeMatches(currentChannel.type, channel.type)) {
-        actions.push({
-          action: "review-type-mismatch",
-          channelKey: channel.key,
-          channelId: currentChannel.id,
-          currentType: currentChannel.type,
-          desiredType: channel.type,
-        });
-        continue;
+        if (
+          (currentChannel.type === "GuildText" &&
+            channel.type === "announcement") ||
+          ((currentChannel.type === "GuildAnnouncement" ||
+            currentChannel.type === "GuildNews") &&
+            channel.type === "text")
+        ) {
+          actions.push({
+            action: "update-channel-type",
+            channelKey: channel.key,
+            channelId: currentChannel.id,
+            from:
+              currentChannel.type === "GuildAnnouncement" ||
+              currentChannel.type === "GuildNews"
+                ? "announcement"
+                : "text",
+            to: channel.type,
+          });
+        } else {
+          actions.push({
+            action: "review-type-mismatch",
+            channelKey: channel.key,
+            channelId: currentChannel.id,
+            currentType: currentChannel.type,
+            desiredType: channel.type,
+          });
+          continue;
+        }
       }
 
       if (currentChannel.name !== channel.name) {

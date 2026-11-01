@@ -103,6 +103,54 @@ describe("createDryRunPlan", () => {
     ).toThrow(/production guild/i);
   });
 
+  it("plans a bounded text-to-announcement conversion", () => {
+    const announcementDesired = desiredStateSchema.parse({
+      ...desired,
+      categories: [
+        {
+          ...desired.categories[0],
+          channels: [
+            {
+              ...desired.categories[0]!.channels[0],
+              type: "announcement",
+            },
+          ],
+        },
+      ],
+    });
+    const plan = createDryRunPlan(
+      announcementDesired,
+      {
+        guild: { id: boundaries.testGuildId, name: "Betrayed Test" },
+        channels: [
+          {
+            id: "323456789012345678",
+            name: "Community Chat",
+            type: "GuildCategory",
+            parentId: null,
+            position: 0,
+          },
+          {
+            id: "423456789012345678",
+            name: "general",
+            type: "GuildText",
+            parentId: "323456789012345678",
+            position: 1,
+          },
+        ],
+      },
+      boundaries,
+    );
+
+    expect(plan.actions).toContainEqual({
+      action: "update-channel-type",
+      channelKey: "general",
+      channelId: "423456789012345678",
+      from: "text",
+      to: "announcement",
+    });
+  });
+
   it("positions a channel after its declared anchor", () => {
     const orderedDesired = desiredStateSchema.parse({
       version: 1,

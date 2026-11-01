@@ -23,6 +23,7 @@ roles:
       - Administrator
   - key: officer
     name: Officer
+    aliases: [Officers]
     createIfMissing: true
     hierarchyRank: 2
     color: "#AD1457"
@@ -527,13 +528,15 @@ categories:
         name: "🔔announcements"
         aliases:
           - announcements
-        type: text
+        type: announcement
         permissionProfile: announcements-read-only
         preserveHistory: true
       - key: server-guide
-        name: "📌server-guide"
+        name: "📌server-rules"
         aliases:
           - server-guide
+          - "📌server-guide"
+          - server-rules
         type: text
         permissionProfile: welcome-feed
         preserveHistory: false
@@ -558,10 +561,11 @@ categories:
     permissionProfile: staff-private
     channels:
       - key: internal-affairs
-        name: "🔒officer-affairs"
+        name: "🗝️officer-affairs"
         aliases:
           - internal-affairs
           - "🔒internal-affairs"
+          - "🔒officer-affairs"
         type: text
         permissionProfile: staff-private
         preserveHistory: true
@@ -580,9 +584,10 @@ categories:
     permissionProfile: raid-coordinator-private
     channels:
       - key: coordinator-chat
-        name: "🔒coordinator-affairs"
+        name: "🔐coordinator-affairs"
         aliases:
           - "📋coordinator-chat"
+          - "🔒coordinator-affairs"
         type: text
         permissionProfile: raid-coordinator-private
         preserveHistory: false
@@ -758,7 +763,7 @@ categories:
         name: "🤣zors-talk"
         aliases: [zors-talk]
         type: text
-        permissionProfile: member-chat
+        permissionProfile: nsfw-private
         preserveHistory: true
       - key: pictures
         name: "📷pictures"

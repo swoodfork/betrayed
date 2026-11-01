@@ -64,9 +64,16 @@ const planActionSchema = z.discriminatedUnion("action", [
     action: z.literal("create-channel"),
     channelKey: z.string(),
     name: z.string(),
-    channelType: z.enum(["text", "voice", "forum"]),
+    channelType: z.enum(["text", "announcement", "voice", "forum"]),
     targetCategoryKey: z.string(),
     targetCategoryId: z.string().nullable(),
+  }),
+  z.object({
+    action: z.literal("update-channel-type"),
+    channelKey: z.string(),
+    channelId: z.string(),
+    from: z.enum(["text", "announcement"]),
+    to: z.enum(["text", "announcement"]),
   }),
   z.object({
     action: z.literal("rename-channel"),
@@ -129,7 +136,7 @@ const planActionSchema = z.discriminatedUnion("action", [
     channelKey: z.string(),
     channelId: z.string(),
     currentType: z.string(),
-    desiredType: z.enum(["text", "voice", "forum"]),
+    desiredType: z.enum(["text", "announcement", "voice", "forum"]),
   }),
   z.object({
     action: z.literal("review-unmanaged-existing"),
@@ -184,6 +191,7 @@ export function authorizeTestApply(
         action.action !== "review-missing-role-binding" &&
         action.action !== "rename-category" &&
         action.action !== "create-channel" &&
+        action.action !== "update-channel-type" &&
         action.action !== "rename-channel" &&
         action.action !== "move-channel" &&
         action.action !== "position-channel-after" &&

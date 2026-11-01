@@ -287,12 +287,39 @@ async function applyAction(
         type:
           action.channelType === "text"
             ? ChannelType.GuildText
+            : action.channelType === "announcement"
+              ? ChannelType.GuildAnnouncement
             : action.channelType === "voice"
               ? ChannelType.GuildVoice
               : ChannelType.GuildForum,
         parent,
         reason: "Approved Betrayed production reconstruction",
       });
+      channelIds.set(action.channelKey, channel.id);
+      return { action, status: "applied", resourceId: channel.id };
+    }
+    case "update-channel-type": {
+      const channel = await guild.channels.fetch(action.channelId);
+      const expectedType =
+        action.from === "announcement"
+          ? ChannelType.GuildAnnouncement
+          : ChannelType.GuildText;
+      if (!channel || channel.type !== expectedType) {
+        throw new Error(
+          `Channel ${action.channelId} is missing or has changed type.`,
+        );
+      }
+      if (channel.type === ChannelType.GuildText) {
+        await channel.setType(
+          ChannelType.GuildAnnouncement,
+          "Approved Betrayed production reconstruction",
+        );
+      } else {
+        await channel.setType(
+          ChannelType.GuildText,
+          "Approved Betrayed production reconstruction",
+        );
+      }
       channelIds.set(action.channelKey, channel.id);
       return { action, status: "applied", resourceId: channel.id };
     }
