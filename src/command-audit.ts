@@ -42,6 +42,13 @@ function optionValue(option: CommandInteractionOption): string {
     return `<@&${value}> (${value})`;
   }
   if (
+    option.type === ApplicationCommandOptionType.String &&
+    option.name === "team-role" &&
+    /^\d{17,20}$/.test(String(value))
+  ) {
+    return `<@&${value}> (${value})`;
+  }
+  if (
     option.type === ApplicationCommandOptionType.User ||
     option.type === ApplicationCommandOptionType.Mentionable
   ) {

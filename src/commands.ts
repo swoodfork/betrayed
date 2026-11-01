@@ -244,10 +244,11 @@ export const zorsRosterCommand = new SlashCommandBuilder()
           )
           .setRequired(true),
       )
-      .addRoleOption((option) =>
+      .addStringOption((option) =>
         option
           .setName("team-role")
-          .setDescription("Role assigned to this raid team")
+          .setDescription("Matching 20 Team or 40 Team role")
+          .setAutocomplete(true)
           .setRequired(true),
       )
       .addChannelOption((option) =>

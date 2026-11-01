@@ -538,6 +538,12 @@ export function createBot(config: BotConfig): Client {
         raidApplications,
         raidRosters,
       ]);
+      if (
+        interaction.isAutocomplete() &&
+        (await rosterService.handleAutocomplete(interaction))
+      ) {
+        return;
+      }
       if (await rosterService.handleInteraction(interaction)) {
         return;
       }

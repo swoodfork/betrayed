@@ -133,7 +133,8 @@ describe("Zors Bot command registration", () => {
       expect.arrayContaining([
         expect.objectContaining({
           name: "team-role",
-          type: ApplicationCommandOptionType.Role,
+          type: ApplicationCommandOptionType.String,
+          autocomplete: true,
         }),
         expect.objectContaining({
           name: "team-channel",

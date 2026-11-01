@@ -116,6 +116,12 @@ combinations, then sends change DMs only to affected members. Acknowledgements
 and reported issues are persisted; issues are forwarded to
 `🔐coordinator-affairs` without rolling back the finalized roster.
 
+Roster creation remains one `/zors-roster create` command. Its team-role field
+uses autocomplete and shows only roles containing `20 Team` or `40 Team`
+matching the selected format. Discord modals cannot contain role or channel
+pickers, so the slash-command form is the only native single-form experience
+that preserves those typed selectors.
+
 `💤 sleep` is the only voice channel in the final `🌙 AFK/Inactive 🌙` category and is
 intended for Discord's inactive-member destination. Select it manually under
 **Server Settings → Overview → Inactive Channel** and choose the desired

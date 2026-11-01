@@ -12,6 +12,10 @@ import {
   type RaidRosterDocument,
   type RosterAssignment,
 } from "../src/raid-roster-state.js";
+import {
+  buildRosterEmbed,
+  isMatchingTeamRoleName,
+} from "../src/raid-rosters.js";
 
 const ownerId = "123456789012345678";
 const memberOne = "223456789012345678";
@@ -207,5 +211,35 @@ describe("raid roster state", () => {
         },
       }),
     ).toThrow();
+  });
+
+  it("limits selectable team roles to matching 20 Team or 40 Team names", () => {
+    expect(isMatchingTeamRoleName("Zors 20 Team", 20)).toBe(true);
+    expect(isMatchingTeamRoleName("Herc 40 Team", 40)).toBe(true);
+    expect(isMatchingTeamRoleName("Zors 40 Team", 20)).toBe(false);
+    expect(isMatchingTeamRoleName("Officer", 20)).toBe(false);
+    expect(isMatchingTeamRoleName("Social Team")).toBe(false);
+  });
+
+  it("renders two group fields per row with WoW class color markers", () => {
+    const document = roster();
+    document.draftRevision?.assignments.push(
+      assignment(memberOne, { kind: "group", group: 1, slot: 1 }),
+    );
+    const embed = buildRosterEmbed(document).toJSON();
+
+    expect(embed.fields?.map(({ name }) => name)).toEqual([
+      "⚔️ Group 1",
+      "⚔️ Group 2",
+      "\u200b",
+      "⚔️ Group 3",
+      "⚔️ Group 4",
+      "\u200b",
+      "🪑 Bench",
+      "📦 Overflow",
+    ]);
+    expect(embed.fields?.[0]?.value).toContain(
+      "🟧 <@223456789012345678>",
+    );
   });
 });

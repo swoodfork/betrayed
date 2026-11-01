@@ -17,6 +17,7 @@ import {
   type ButtonInteraction,
   type ChatInputCommandInteraction,
   type AnyThreadChannel,
+  type AutocompleteInteraction,
   type ForumChannel,
   type Guild,
   type Interaction,
@@ -57,6 +58,21 @@ const controlPanelEmbedTitle = "Zors Roster Control";
 const storageAttachmentName = "zors-roster-state.json";
 const draftWarningDelayMs = 30 * 60 * 1_000;
 const sessionLifetimeMs = 15 * 60 * 1_000;
+
+const classColorMarkers: Record<
+  keyof typeof wowForeverClassSpecializations,
+  string
+> = {
+  druid: "🟧",
+  hunter: "🟩",
+  mage: "🟦",
+  paladin: "🩷",
+  priest: "⬜",
+  rogue: "🟨",
+  shaman: "🔵",
+  warlock: "🟪",
+  warrior: "🟫",
+};
 
 type EditAction = "add" | "move" | "spec" | "remove" | "swap";
 
@@ -131,6 +147,16 @@ function classLabel(classKey: string): string {
   ]?.label ?? classKey;
 }
 
+export function isMatchingTeamRoleName(
+  roleName: string,
+  size?: 20 | 40,
+): boolean {
+  const normalized = roleName.toLowerCase();
+  return size
+    ? normalized.includes(`${size} team`)
+    : normalized.includes("20 team") || normalized.includes("40 team");
+}
+
 function specLabel(classKey: string, specKey: string): string {
   return (
     wowForeverClassSpecializations[
@@ -140,7 +166,11 @@ function specLabel(classKey: string, specKey: string): string {
 }
 
 function assignmentLine(assignment: RosterAssignment): string {
-  return `<@${assignment.memberId}> — ${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}`;
+  const marker =
+    classColorMarkers[
+      assignment.classKey as keyof typeof wowForeverClassSpecializations
+    ] ?? "◆";
+  return `${marker} <@${assignment.memberId}> — **${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}**`;
 }
 
 function sortedAssignments(
@@ -207,13 +237,20 @@ export function buildRosterEmbed(roster: RaidRosterDocument): EmbedBuilder {
       ]),
     );
     embed.addFields({
-      name: `Group ${group}`,
+      name: `⚔️ Group ${group}`,
       value: Array.from({ length: 5 }, (_, index) => {
         const assignment = bySlot.get(index + 1);
-        return `${index + 1}. ${assignment ? assignmentLine(assignment) : "—"}`;
+        return `**${index + 1}.** ${assignment ? assignmentLine(assignment) : "—"}`;
       }).join("\n"),
       inline: true,
     });
+    if (group % 2 === 0) {
+      embed.addFields({
+        name: "\u200b",
+        value: "\u200b",
+        inline: true,
+      });
+    }
   }
 
   const bench = assignments.filter(
@@ -226,10 +263,10 @@ export function buildRosterEmbed(roster: RaidRosterDocument): EmbedBuilder {
     ]),
   );
   embed.addFields({
-    name: "Bench",
+    name: "🪑 Bench",
     value: Array.from({ length: 10 }, (_, index) => {
       const assignment = benchBySlot.get(index + 1);
-      return `${index + 1}. ${assignment ? assignmentLine(assignment) : "—"}`;
+      return `**${index + 1}.** ${assignment ? assignmentLine(assignment) : "—"}`;
     }).join("\n"),
   });
 
@@ -238,7 +275,7 @@ export function buildRosterEmbed(roster: RaidRosterDocument): EmbedBuilder {
   );
   const visibleOverflow = overflow.slice(0, 30);
   if (visibleOverflow.length === 0) {
-    embed.addFields({ name: "Overflow", value: "—" });
+    embed.addFields({ name: "📦 Overflow", value: "—" });
   } else {
     for (let index = 0; index < visibleOverflow.length; index += 10) {
       const chunk = visibleOverflow.slice(index, index + 10);
@@ -247,7 +284,8 @@ export function buildRosterEmbed(roster: RaidRosterDocument): EmbedBuilder {
           ? overflow.length - visibleOverflow.length
           : 0;
       embed.addFields({
-        name: index === 0 ? "Overflow" : "Overflow (continued)",
+        name:
+          index === 0 ? "📦 Overflow" : "📦 Overflow (continued)",
         value: [
           ...chunk.map(assignmentLine),
           ...(remaining > 0 ? [`*and ${remaining} more*`] : []),
@@ -286,17 +324,6 @@ function rosterControls(
       control("revert", "Revert Draft", ButtonStyle.Danger),
       control("bump", "Bump", ButtonStyle.Secondary),
       control("archive", "Archive", ButtonStyle.Secondary),
-    ),
-  ];
-}
-
-function controlPanelComponents(): ActionRowBuilder<ButtonBuilder>[] {
-  return [
-    new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`${customIdPrefix}:panel:create`)
-        .setLabel("Create Roster")
-        .setStyle(ButtonStyle.Primary),
     ),
   ];
 }
@@ -398,7 +425,7 @@ export class RaidRosterService {
                 ].join("\n"),
               ),
           ],
-          components: controlPanelComponents(),
+          components: [],
         });
         this.controlPanelByGuild.set(guild.id, thread.id);
         return;
@@ -420,7 +447,7 @@ export class RaidRosterService {
               "Use `/zors-roster create` in this post to create a durable roster.",
             ),
         ],
-        components: controlPanelComponents(),
+        components: [],
         allowedMentions: { parse: [] },
       },
       reason: "Zors roster control panel",
@@ -698,10 +725,16 @@ export class RaidRosterService {
     const size = rosterSizeSchema.parse(
       Number(interaction.options.getString("size", true)),
     );
-    const teamRole = interaction.options.getRole("team-role", true);
+    const teamRoleId = interaction.options.getString("team-role", true);
+    const teamRole = await guild.roles.fetch(teamRoleId);
     const teamChannel = interaction.options.getChannel("team-channel", true);
-    if (!teamRole.name.includes(String(size))) {
-      throw new Error(`The team role name must contain ${size}.`);
+    if (
+      !teamRole ||
+      !isMatchingTeamRoleName(teamRole.name, size)
+    ) {
+      throw new Error(
+        `Choose a role whose name contains "${size} Team".`,
+      );
     }
     if (
       teamChannel.type !== ChannelType.GuildText &&
@@ -940,6 +973,44 @@ export class RaidRosterService {
       return;
     }
     throw new Error("Unknown Zors roster command.");
+  }
+
+  public async handleAutocomplete(
+    interaction: AutocompleteInteraction,
+  ): Promise<boolean> {
+    if (
+      interaction.commandName !== "zors-roster" ||
+      interaction.options.getFocused(true).name !== "team-role"
+    ) {
+      return false;
+    }
+    const binding = interactionBinding(
+      interaction.guildId,
+      this.config,
+      this.rosterConfig,
+    );
+    if (!binding || !isRaidRosterBindingComplete(binding) || !interaction.guild) {
+      await interaction.respond([]);
+      return true;
+    }
+    const focused = interaction.options.getFocused().toLowerCase();
+    const requestedSize = interaction.options.getString("size");
+    const size = requestedSize
+      ? rosterSizeSchema.parse(Number(requestedSize))
+      : undefined;
+    const roles = await interaction.guild.roles.fetch();
+    const choices = [...roles.values()]
+      .filter(
+        (role) =>
+          !role.managed &&
+          isMatchingTeamRoleName(role.name, size) &&
+          role.name.toLowerCase().includes(focused),
+      )
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .slice(0, 25)
+      .map((role) => ({ name: role.name, value: role.id }));
+    await interaction.respond(choices);
+    return true;
   }
 
   private createSession(
@@ -1574,15 +1645,6 @@ export class RaidRosterService {
     );
     if (!binding || !isRaidRosterBindingComplete(binding)) {
       throw new Error("Raid roster controls are not enabled in this server.");
-    }
-    if (parts[1] === "panel" && parts[2] === "create" && interaction.isButton()) {
-      await this.authorize(interaction, binding);
-      await interaction.reply({
-        content:
-          "Use `/zors-roster create` in this post. Discord will provide role and channel pickers for the required bindings.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return true;
     }
     if (parts[1] === "control" && interaction.isButton()) {
       await this.handleControlButton(
