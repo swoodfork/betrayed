@@ -73,6 +73,8 @@ const signupStorageEmbedTitle = "Zors Raid Signup Storage";
 const signupStorageAttachmentName = "zors-raid-signup-state.json";
 const draftWarningDelayMs = 30 * 60 * 1_000;
 const sessionLifetimeMs = 15 * 60 * 1_000;
+const draftWarningContent =
+  "⚠️ This roster Draft has been inactive for 30 minutes. Continue drafting, finalize it, or revert it to the last finalized snapshot.";
 
 const classColorMarkers: Record<
   keyof typeof wowForeverClassSpecializations,
@@ -1004,6 +1006,20 @@ export class RaidRosterService {
         components: buildRosterControls(roster),
         allowedMentions: { parse: [] },
       });
+      if (roster.warningMessageId) {
+        const warning = await presentation.messages
+          .fetch(roster.warningMessageId)
+          .catch(() => null);
+        if (warning) {
+          await warning.edit({
+            content: draftWarningContent,
+            components: [buildDraftWarningControls(roster.rosterId)],
+            allowedMentions: { parse: [] },
+          });
+        } else {
+          roster.warningMessageId = null;
+        }
+      }
       this.scheduleWarning(guild, roster);
       reconstructed += 1;
     }
@@ -1156,8 +1172,7 @@ export class RaidRosterService {
       await thread.setArchived(false, "Post Zors Draft inactivity warning");
     }
     const warning = await thread.send({
-      content:
-        "⚠️ This roster Draft has been inactive for 30 minutes. Continue drafting, finalize it, or revert it to the last finalized snapshot.",
+      content: draftWarningContent,
       components: [
         buildDraftWarningControls(roster.rosterId),
       ],
