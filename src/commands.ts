@@ -385,8 +385,8 @@ export const zorsSignupAdminCommand = new SlashCommandBuilder()
   )
   .addSubcommand((command) =>
     command
-      .setName("restart-seven")
-      .setDescription("Archive and restart the signup exactly seven days later"),
+      .setName("restart-week")
+      .setDescription("Archive and restart the signup exactly one week later"),
   )
   .addSubcommand((command) =>
     command

@@ -80,3 +80,19 @@ export function shiftSignupSevenDays(
     updatedAt: new Date().toISOString(),
   });
 }
+
+export function resetSignupAttendanceForMembers(
+  signup: RaidSignupSheet,
+  memberIds: ReadonlySet<string>,
+): RaidSignupSheet {
+  return raidSignupSheetSchema.parse({
+    ...signup,
+    attendanceConfirmations: signup.attendanceConfirmations.filter(
+      ({ memberId }) => !memberIds.has(memberId),
+    ),
+    attendanceNotifiedMemberIds: signup.attendanceNotifiedMemberIds.filter(
+      (memberId) => !memberIds.has(memberId),
+    ),
+    updatedAt: new Date().toISOString(),
+  });
+}

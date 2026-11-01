@@ -61,6 +61,7 @@ import {
 import {
   pdtDateHour,
   raidSignupSheetSchema,
+  resetSignupAttendanceForMembers,
   shiftSignupSevenDays,
   type RaidSignupSheet,
 } from "./raid-signup-state.js";
@@ -500,7 +501,7 @@ export function buildRosterControls(
       control("add", "Add Member", ButtonStyle.Primary),
       control("move", "Move Member", ButtonStyle.Primary),
       control("swap", "Swap Members", ButtonStyle.Primary),
-      control("spec", "Change Spec", ButtonStyle.Primary),
+      control("spec", "Change Class / Spec", ButtonStyle.Primary),
       control("remove", "Remove Member", ButtonStyle.Danger),
     ),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -544,6 +545,31 @@ export function buildSignupSheetControls(
         .setStyle(ButtonStyle.Primary),
     ),
   ];
+}
+
+export function buildAttendanceFollowupControls(
+  signup: RaidSignupSheet,
+  memberId: string,
+  response: "declined" | "tentative",
+): ActionRowBuilder<ButtonBuilder> {
+  const confirm = new ButtonBuilder()
+    .setCustomId(
+      `${customIdPrefix}:attend-followup:confirm:${signup.raidId}:${signup.cycle}:${memberId}`,
+    )
+    .setLabel(response === "tentative" ? "I can make it" : "I can make it now")
+    .setStyle(ButtonStyle.Success);
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(confirm);
+  if (response === "tentative") {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(
+          `${customIdPrefix}:attend-followup:decline:${signup.raidId}:${signup.cycle}:${memberId}`,
+        )
+        .setLabel("I can not make it")
+        .setStyle(ButtonStyle.Danger),
+    );
+  }
+  return row;
 }
 
 function interactionBinding(
@@ -1801,21 +1827,30 @@ export class RaidRosterService {
       (signup) =>
         signup.rosterId === roster.rosterId && signup.status === "open",
     );
-    if (activeSignup) {
-      await this.sendAttendanceConfirmations(
-        guild,
+    if (activeSignup && diff.length > 0) {
+      const changedMemberIds = new Set(diff.map(({ memberId }) => memberId));
+      const refreshedSignup = resetSignupAttendanceForMembers(
         activeSignup,
-        roster,
-        new Set(
-          diff
-            .filter(
-              ({ after }) =>
-                after?.placement.kind === "group" ||
-                after?.placement.kind === "bench",
-            )
-            .map(({ memberId }) => memberId),
-        ),
+        changedMemberIds,
       );
+      await this.persistSignupSheet(guild, refreshedSignup);
+      const assignedMemberIds = new Set(
+        diff
+          .filter(
+            ({ after }) =>
+              after?.placement.kind === "group" ||
+              after?.placement.kind === "bench",
+          )
+          .map(({ memberId }) => memberId),
+      );
+      if (assignedMemberIds.size > 0) {
+        await this.sendAttendanceConfirmations(
+          guild,
+          refreshedSignup,
+          roster,
+          assignedMemberIds,
+        );
+      }
     }
     return diff;
   }
@@ -2232,7 +2267,7 @@ export class RaidRosterService {
           "**Zors signup administration**",
           "Run these commands inside the roster's `📋raid-rosters` post.",
           "`/zors-signup-admin close` — Close the active sheet while preserving requests and attendance.",
-          "`/zors-signup-admin restart-seven` — Archive the cycle and restart exactly seven days later.",
+          "`/zors-signup-admin restart-week` — Archive the cycle and restart exactly one week later.",
           "`/zors-signup-admin restart-custom` — Archive the cycle and restart with a new date and time.",
           "`/zors-signup-admin clear` — Archive and permanently clear the active sheet after confirmation.",
         ].join("\n"),
@@ -2268,17 +2303,17 @@ export class RaidRosterService {
       );
       return;
     }
-    if (subcommand === "restart-seven") {
+    if (subcommand === "restart-week") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const cleared = await this.restartSignupSheet(
         guild,
         signup,
         shiftSignupSevenDays(signup),
         binding,
-        "restart-seven",
+        "restart-week",
       );
       await interaction.editReply(
-        `Archived and restarted the signup seven days later. Cleared ${cleared} pending request(s).`,
+        `Archived and restarted the signup one week later. Cleared ${cleared} pending request(s).`,
       );
       return;
     }
@@ -3432,9 +3467,8 @@ export class RaidRosterService {
     }
     const reason = interaction.fields.getTextInputValue(fieldName).trim();
     const guild = await interaction.client.guilds.fetch(signup.guildId);
-    const binding = this.bindingsByGuild.get(signup.guildId);
     const roster = this.rosters.get(signup.rosterId);
-    if (!binding || !roster) {
+    if (!roster) {
       throw new Error("The roster server binding is unavailable.");
     }
     const assignment = roster.finalizedRevision?.assignments.find(
@@ -3442,10 +3476,6 @@ export class RaidRosterService {
     );
     if (!assignment) {
       throw new Error("This member no longer has a finalized roster spot.");
-    }
-    const channel = await guild.channels.fetch(binding.coordinatorChannelId);
-    if (!channel?.isSendable()) {
-      throw new Error("The coordinator channel cannot receive attendance responses.");
     }
     await this.persistSignupSheet(guild, {
       ...signup,
@@ -3462,18 +3492,71 @@ export class RaidRosterService {
       ],
       updatedAt: new Date().toISOString(),
     });
+    await this.sendAttendanceCoordinatorUpdate(
+      guild,
+      signup,
+      roster,
+      assignment,
+      response,
+      reason,
+      false,
+    );
+    const followupButtons = buildAttendanceFollowupControls(
+      signup,
+      memberId,
+      response,
+    );
+    await interaction.reply({
+      content:
+        response === "tentative"
+          ? "🟡 Your Attendance is Tentative. Raid Coordinators received your explanation.\n\nIf events finalize and you ultimately figure out whether you can come, reopen this direct message and press one of the buttons below."
+          : "🔴 You are marked Not Attending. Raid Coordinators received your reason.\n\nIf plans change and you ultimately end up being able to come, press the button below to alert the officer core.",
+      components: [followupButtons],
+    });
+  }
+
+  private async sendAttendanceCoordinatorUpdate(
+    guild: Guild,
+    signup: RaidSignupSheet,
+    roster: RaidRosterDocument,
+    assignment: RosterAssignment,
+    response: "confirmed" | "declined" | "tentative",
+    reason: string,
+    changed: boolean,
+  ): Promise<void> {
+    const binding = this.bindingsByGuild.get(signup.guildId);
+    if (!binding) {
+      throw new Error("The roster server binding is unavailable.");
+    }
+    const channel = await guild.channels.fetch(binding.coordinatorChannelId);
+    if (!channel?.isSendable()) {
+      throw new Error("The coordinator channel cannot receive attendance responses.");
+    }
     const start = Math.floor(new Date(signup.startAt).getTime() / 1_000);
     const end = Math.floor(new Date(signup.endAt).getTime() / 1_000);
     const signupUrl = `https://discord.com/channels/${guild.id}/${signup.channelId}/${signup.messageId}`;
+    const statusLabel =
+      response === "confirmed"
+        ? "🟢 Confirmed"
+        : response === "tentative"
+          ? "🟡 Tentative"
+          : "🔴 Not Attending";
     await channel.send({
       embeds: [
         new EmbedBuilder()
           .setTitle(
-            `${response === "tentative" ? "Tentative Raid Attendance" : "Raid Attendance Declined"} — ${signup.name}`,
+            `${changed ? "Raid Attendance Updated" : response === "tentative" ? "Tentative Raid Attendance" : "Raid Attendance Declined"} — ${signup.name}`,
           )
-          .setColor(response === "tentative" ? 0xf1c40f : 0xe74c3c)
+          .setColor(
+            response === "confirmed"
+              ? 0x2ecc71
+              : response === "tentative"
+                ? 0xf1c40f
+                : 0xe74c3c,
+          )
           .addFields(
-            { name: "Discord Member", value: `<@${memberId}>` },
+            { name: "Discord Member", value: `<@${assignment.memberId}>` },
+            { name: "Attendance Status", value: statusLabel },
             {
               name: "Class / Specialization",
               value: `${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}`,
@@ -3488,7 +3571,12 @@ export class RaidRosterService {
             },
             { name: "Team Role", value: `<@&${roster.teamRoleId}>` },
             {
-              name: response === "tentative" ? "Explanation" : "Reason",
+              name:
+                response === "tentative"
+                  ? "Explanation"
+                  : changed
+                    ? "Update"
+                    : "Reason",
               value: reason,
             },
             {
@@ -3499,11 +3587,69 @@ export class RaidRosterService {
       ],
       allowedMentions: { parse: [] },
     });
-    await interaction.reply({
+  }
+
+  private async recordAttendanceFollowup(
+    interaction: ButtonInteraction,
+    response: "confirm" | "decline",
+    raidId: string,
+    cycle: number,
+    memberId: string,
+  ): Promise<void> {
+    if (interaction.user.id !== memberId) {
+      throw new Error("This attendance follow-up belongs to another member.");
+    }
+    const signup = this.signupSheets.get(raidId);
+    if (!signup || signup.cycle !== cycle || signup.status === "cleared") {
+      throw new Error("This attendance follow-up is stale.");
+    }
+    const roster = this.rosters.get(signup.rosterId);
+    const assignment = roster?.finalizedRevision?.assignments.find(
+      ({ memberId: assignedMemberId }) => assignedMemberId === memberId,
+    );
+    if (!roster || !assignment) {
+      throw new Error("This member no longer has a finalized roster spot.");
+    }
+    const existing = signup.attendanceConfirmations.find(
+      (entry) => entry.memberId === memberId,
+    );
+    const nextStatus = response === "confirm" ? "confirmed" : "declined";
+    const updateReason =
+      response === "confirm"
+        ? "The member reported that their plans changed and they can now attend."
+        : existing?.issue ??
+          "The member finalized their tentative response as not attending.";
+    const guild = await interaction.client.guilds.fetch(signup.guildId);
+    await this.persistSignupSheet(guild, {
+      ...signup,
+      attendanceConfirmations: [
+        ...signup.attendanceConfirmations.filter(
+          (entry) => entry.memberId !== memberId,
+        ),
+        {
+          memberId,
+          status: nextStatus,
+          recordedAt: new Date().toISOString(),
+          ...(nextStatus === "declined" ? { issue: updateReason } : {}),
+        },
+      ],
+      updatedAt: new Date().toISOString(),
+    });
+    await this.sendAttendanceCoordinatorUpdate(
+      guild,
+      signup,
+      roster,
+      assignment,
+      nextStatus,
+      updateReason,
+      true,
+    );
+    await interaction.update({
       content:
-        response === "tentative"
-          ? "🟡 Your Attendance is Tentative. Raid Coordinators received your explanation."
-          : "🔴 You are marked Not Attending. Raid Coordinators received your reason.",
+        nextStatus === "confirmed"
+          ? "✅ Your Attendance is Confirmed. The officer core was alerted."
+          : "🔴 You are marked Not Attending. The officer core was alerted.",
+      components: [],
     });
   }
 
@@ -3831,7 +3977,7 @@ export class RaidRosterService {
     guild: Guild,
     signup: RaidSignupSheet,
     binding: RaidRosterBinding & { archiveForumId: string },
-    reason: "restart-seven" | "restart-custom" | "clear",
+    reason: "restart-week" | "restart-custom" | "clear",
   ): Promise<void> {
     const archiveKey = `${signup.raidId}:${signup.cycle}`;
     if (this.archivedSignupCycles.has(archiveKey)) {
@@ -3957,7 +4103,7 @@ export class RaidRosterService {
     signup: RaidSignupSheet,
     restarted: RaidSignupSheet,
     binding: RaidRosterBinding & { archiveForumId: string },
-    reason: "restart-seven" | "restart-custom",
+    reason: "restart-week" | "restart-custom",
   ): Promise<number> {
     if (signup.status !== "closed") {
       throw new Error("Close this signup sheet before restarting it.");
@@ -4024,7 +4170,7 @@ export class RaidRosterService {
       );
       return;
     }
-    if (action === "restart-seven") {
+    if (action === "restart-week") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const restarted = shiftSignupSevenDays(signup);
       const cleared = await this.restartSignupSheet(
@@ -4032,10 +4178,10 @@ export class RaidRosterService {
         signup,
         restarted,
         binding,
-        "restart-seven",
+        "restart-week",
       );
       await interaction.editReply(
-        `Restarted the sheet seven days later and cleared ${cleared} pending request(s).`,
+        `Restarted the sheet one week later and cleared ${cleared} pending request(s).`,
       );
       return;
     }
@@ -4209,6 +4355,16 @@ export class RaidRosterService {
       await this.recordAttendanceConfirmation(
         interaction,
         parts[2] as "confirm" | "decline" | "tentative" | "issue",
+        parts[3] ?? "",
+        Number(parts[4]),
+        parts[5] ?? "",
+      );
+      return true;
+    }
+    if (parts[1] === "attend-followup" && interaction.isButton()) {
+      await this.recordAttendanceFollowup(
+        interaction,
+        parts[2] as "confirm" | "decline",
         parts[3] ?? "",
         Number(parts[4]),
         parts[5] ?? "",

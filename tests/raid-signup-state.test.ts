@@ -3,9 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   pdtDateHour,
   raidSignupSheetSchema,
+  resetSignupAttendanceForMembers,
   shiftSignupSevenDays,
 } from "../src/raid-signup-state.js";
-import { buildSignupSheetControls } from "../src/raid-rosters.js";
+import {
+  buildAttendanceFollowupControls,
+  buildSignupSheetControls,
+} from "../src/raid-rosters.js";
 
 const signup = raidSignupSheetSchema.parse({
   schemaVersion: 1,
@@ -62,6 +66,51 @@ describe("raid signup sheet state", () => {
   it("loads existing signup sheets with no attendance records", () => {
     expect(signup.attendanceConfirmations).toEqual([]);
     expect(signup.attendanceNotifiedMemberIds).toEqual([]);
+  });
+
+  it("clears only changed members before sending fresh attendance prompts", () => {
+    const secondMember = "223456789012345678";
+    const reset = resetSignupAttendanceForMembers(
+      {
+        ...signup,
+        attendanceConfirmations: [
+          {
+            memberId: signup.createdBy,
+            status: "declined",
+            recordedAt: signup.createdAt,
+            issue: "Conflict",
+          },
+          {
+            memberId: secondMember,
+            status: "confirmed",
+            recordedAt: signup.createdAt,
+          },
+        ],
+        attendanceNotifiedMemberIds: [signup.createdBy, secondMember],
+      },
+      new Set([signup.createdBy]),
+    );
+
+    expect(reset.attendanceConfirmations.map(({ memberId }) => memberId)).toEqual([
+      secondMember,
+    ]);
+    expect(reset.attendanceNotifiedMemberIds).toEqual([secondMember]);
+  });
+
+  it("offers the correct follow-up actions for declined and tentative members", () => {
+    const declined = buildAttendanceFollowupControls(
+      signup,
+      signup.createdBy,
+      "declined",
+    ).components.map((button) => button.toJSON().label);
+    const tentative = buildAttendanceFollowupControls(
+      signup,
+      signup.createdBy,
+      "tentative",
+    ).components.map((button) => button.toJSON().label);
+
+    expect(declined).toEqual(["I can make it now"]);
+    expect(tentative).toEqual(["I can make it", "I can not make it"]);
   });
 
   it("rejects signup state whose end is not after its start", () => {

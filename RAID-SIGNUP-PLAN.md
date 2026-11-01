@@ -121,7 +121,7 @@ attached. A role change adds the new role to finalized members and preserves
 the old role. Existing archives are never rewritten.
 
 Create, Edit, and Delete are restricted to the owner, Administrators, and
-Officers. Raid Coordinators retain Add, Move, Swap, Change Spec, Remove,
+Officers. Raid Coordinators retain Add, Move, Swap, Change Class / Spec, Remove,
 Finalize, Revert, and Archive. Delete requires confirmation, refuses while a
 non-cleared signup sheet is attached, writes an immutable final roster snapshot
 to `🗃️roster-archives`, permanently deletes the presentation/storage posts,
@@ -135,7 +135,7 @@ Zors should
 create one permanent **Roster Control** post during setup so the first roster
 can be created without exposing a builder in a public channel. Every roster
 post then contains interactive controls for Add Member, Move Member, Swap
-Members, Change Spec, Remove Member, Finalize, Revert, and Archive. Slash
+Members, Change Class / Spec, Remove Member, Finalize, Revert, and Archive. Slash
 commands remain
 available as a fallback inside the protected Forum.
 
@@ -160,7 +160,7 @@ Use hierarchical buttons and dropdowns instead:
   class/spec into the Draft without prompting again.
 - **Swap Members**: select the first member and second occupied position, then
   preview the swap.
-- **Change Spec**: select the member, class, and filtered spec.
+- **Change Class / Spec**: select the member, class, and filtered spec.
 - **Remove Member**: select the member and confirm.
 
 A 40-player roster plus ten Bench slots exceeds Discord's 25-option select
@@ -304,8 +304,9 @@ member and class/spec, then the coordinator:
 Zors marks the request **Accepted — awaiting roster finalization**, adds the
 member to the Draft, and sends a decision DM explaining that the assignment is
 pending Finalize. It does not update active signup sheets or send attendance
-confirmations yet. If the coordinator needs a different class/spec, the normal
-**Change Spec** control remains available after the request enters the Draft.
+confirmations until Finalize. If the coordinator needs a different class/spec,
+the normal **Change Class / Spec** control remains available after the request
+enters the Draft.
 
 On Finalize, Zors assigns the team role, publishes the roster change, sends the
 member's assignment-change DM, refreshes every attached signup, and sends

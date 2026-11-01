@@ -385,7 +385,7 @@ describe("raid roster state", () => {
       controls.find(({ label }) => label === "Swap Members")?.style,
     ).toBe(1);
     expect(
-      controls.find(({ label }) => label === "Change Spec")?.style,
+      controls.find(({ label }) => label === "Change Class / Spec")?.style,
     ).toBe(1);
     expect(controls.map(({ label }) => label)).not.toContain("Bump");
     expect(controls.map(({ label }) => label)).not.toContain("Delete Roster");

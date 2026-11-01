@@ -168,7 +168,7 @@ describe("Zors Bot command registration", () => {
     );
     expect(zorsSignupAdminCommand.toJSON().options?.map(({ name }) => name)).toEqual([
       "close",
-      "restart-seven",
+      "restart-week",
       "restart-custom",
       "clear",
       "help",

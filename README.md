@@ -108,11 +108,11 @@ then reconstructed at startup; no Render filesystem or database is required.
 Officers and Raid Coordinators can use Zors controls but cannot manually create,
 reply to, react to, edit, delete, or manage roster/request Forum posts.
 
-Roster buttons support Add Member, Move Member, Swap Members, Change Spec,
-Remove Member, Finalize, Revert Draft, and Archive. Raid Coordinators may use
-every operational roster control through Archive. Create, Edit, and permanent
-Delete require the owner, an Administrator, or an Officer; Delete is available
-only through `/zors-roster delete` to prevent accidental clicks. Delete is
+Roster buttons support Add Member, Move Member, Swap Members, Change Class /
+Spec, Remove Member, Finalize, Revert Draft, and Archive. Raid Coordinators may
+use every operational roster control through Archive. Create, Edit, and
+permanent Delete require the owner, an Administrator, or an Officer; Delete is
+available only through `/zors-roster delete` to prevent accidental clicks. Delete is
 blocked until attached signup sheets are Clear and Archived, writes an immutable
 deleted-roster snapshot to `🗃️roster-archives`, permanently removes both roster
 posts, and preserves member roles. Both formats reserve ten numbered Bench
@@ -152,7 +152,7 @@ Pending. Staff can reject a still-pending request from its private post.
 Regular members see only **Request a Spot** on an open signup sheet. Authorized
 Raid Coordinators, Officers, Administrators, and the owner manage its lifecycle
 contextually from the roster post with `/zors-signup-admin close`,
-`restart-seven`, `restart-custom`, or `clear`. Close preserves current requests
+`restart-week`, `restart-custom`, or `clear`. Close preserves current requests
 and attendance responses for staff to finish processing. Every Restart writes an
 immutable cycle snapshot to `🗃️roster-archives`, then clears that sheet's
 requests, keeps the finalized roster—including Group, Bench, and Overflow—and
@@ -171,8 +171,13 @@ the member's Discord mention, class/spec, roster spot, Discord-localized raid
 date/time, team-role tag, explanation, and direct signup-sheet link. Discord
 mentions are used throughout roster and signup displays so the member's current
 server display name is shown even when it differs from an in-game name.
+Declined members retain an **I can make it now** follow-up action. Tentative
+members retain **I can make it** and **I can not make it** actions; either change
+updates the signup indicator and alerts the officer core. Finalizing a changed
+class/spec or placement clears that member's prior attendance response and sends
+a fresh confirmation DM for the active signup cycle.
 
-Move, Swap, Change Spec, and Remove use roster-only member menus rather than
+Move, Swap, Change Class / Spec, and Remove use roster-only member menus rather than
 Discord-wide member pickers. Rosters larger than Discord's 25-option select
 limit are paginated. Add Member intentionally retains Discord's searchable
 server member picker because it selects someone not yet assigned to the roster.
