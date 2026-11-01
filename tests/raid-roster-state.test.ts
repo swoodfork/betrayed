@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   addRosterAssignment,
+  describePlacement,
   draftWarningDueAt,
+  findRosterEditConflict,
   finalizeRoster,
   isDisputableRosterChange,
   moveRosterAssignment,
@@ -44,6 +46,7 @@ function roster(): RaidRosterDocument {
     teamChannelId: "623456789012345678",
     controlThreadId: "723456789012345678",
     presentationThreadId: "823456789012345678",
+    responseThreadId: null,
     status: "draft",
     createdAt: "2026-11-01T00:00:00.000Z",
     createdBy: ownerId,
@@ -57,6 +60,8 @@ function roster(): RaidRosterDocument {
     warningMessageId: null,
     bumpMessageId: null,
     acknowledgements: [],
+    pendingMemberNotifications: [],
+    assignmentControlMessages: [],
   };
 }
 
@@ -73,6 +78,49 @@ function assignment(
 }
 
 describe("raid roster state", () => {
+  it("merges disjoint edits and rejects overlapping members or destinations", () => {
+    const baseline = [
+      assignment(memberOne, { kind: "group", group: 1, slot: 1 }),
+      assignment(memberTwo, { kind: "group", group: 7, slot: 1 }),
+    ];
+    const disjointCurrent = baseline.map((entry) =>
+      entry.memberId === memberTwo
+        ? { ...entry, placement: { kind: "group" as const, group: 8, slot: 1 } }
+        : entry,
+    );
+
+    expect(
+      findRosterEditConflict(
+        baseline,
+        disjointCurrent,
+        [memberOne],
+        { kind: "group", group: 2, slot: 1 },
+        memberOne,
+      ),
+    ).toBeNull();
+    expect(
+      findRosterEditConflict(baseline, disjointCurrent, [memberTwo]),
+    ).toEqual({ kind: "member", memberId: memberTwo });
+    expect(
+      findRosterEditConflict(
+        baseline,
+        disjointCurrent,
+        [memberOne],
+        { kind: "group", group: 8, slot: 1 },
+        memberOne,
+      ),
+    ).toEqual({ kind: "placement", memberId: memberTwo });
+  });
+
+  it("presents canonical Bench slots as two five-slot benches", () => {
+    expect(describePlacement({ kind: "bench", slot: 1 })).toBe(
+      "Bench 1, Slot 1",
+    );
+    expect(describePlacement({ kind: "bench", slot: 10 })).toBe(
+      "Bench 2, Slot 5",
+    );
+  });
+
   it("validates class/spec combinations and fixed 20-player groups", () => {
     expect(() =>
       validateClassSpecialization("druid", "restoration"),

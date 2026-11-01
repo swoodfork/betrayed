@@ -30,6 +30,15 @@ export const raidSignupSheetSchema = z
     updatedAt: isoDateTime,
     attendanceConfirmations: z.array(attendanceConfirmationSchema).default([]),
     attendanceNotifiedMemberIds: z.array(snowflake).default([]),
+    attendancePromptMessages: z
+      .array(
+        z.object({
+          memberId: snowflake,
+          channelId: snowflake,
+          messageId: snowflake,
+        }),
+      )
+      .default([]),
   })
   .superRefine((signup, context) => {
     if (new Date(signup.endAt) <= new Date(signup.startAt)) {
@@ -121,6 +130,7 @@ export function shiftSignupSevenDays(
     cycle: signup.cycle + 1,
     attendanceConfirmations: [],
     attendanceNotifiedMemberIds: [],
+    attendancePromptMessages: [],
     updatedAt: new Date().toISOString(),
   });
 }

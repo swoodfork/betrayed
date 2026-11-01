@@ -62,6 +62,7 @@ export const raidRosterDocumentSchema = z
     teamChannelId: snowflake,
     controlThreadId: snowflake,
     presentationThreadId: snowflake,
+    responseThreadId: snowflake.nullable().default(null),
     status: z.enum(["draft", "finalized", "archived"]),
     createdAt: z.string().datetime(),
     createdBy: snowflake,
@@ -70,6 +71,23 @@ export const raidRosterDocumentSchema = z
     warningMessageId: snowflake.nullable(),
     bumpMessageId: snowflake.nullable(),
     acknowledgements: z.array(acknowledgementSchema),
+    pendingMemberNotifications: z
+      .array(
+        z.object({
+          memberId: snowflake,
+          notify: z.boolean(),
+        }),
+      )
+      .default([]),
+    assignmentControlMessages: z
+      .array(
+        z.object({
+          memberId: snowflake,
+          channelId: snowflake,
+          messageId: snowflake,
+        }),
+      )
+      .default([]),
   })
   .superRefine((roster, context) => {
     try {
@@ -114,6 +132,39 @@ export interface RosterDiff {
   memberId: string;
   before: RosterAssignment | null;
   after: RosterAssignment | null;
+}
+
+export type RosterEditConflict =
+  | { kind: "member"; memberId: string }
+  | { kind: "placement"; memberId: string };
+
+export function findRosterEditConflict(
+  baseline: readonly RosterAssignment[],
+  current: readonly RosterAssignment[],
+  editedMemberIds: readonly string[],
+  destination?: RosterPlacement,
+  movingMemberId?: string,
+): RosterEditConflict | null {
+  for (const memberId of editedMemberIds) {
+    const before =
+      baseline.find((assignment) => assignment.memberId === memberId) ?? null;
+    const now =
+      current.find((assignment) => assignment.memberId === memberId) ?? null;
+    if (JSON.stringify(before) !== JSON.stringify(now)) {
+      return { kind: "member", memberId };
+    }
+  }
+  if (destination && destination.kind !== "overflow") {
+    const occupant = current.find(
+      (assignment) =>
+        assignment.memberId !== movingMemberId &&
+        JSON.stringify(assignment.placement) === JSON.stringify(destination),
+    );
+    if (occupant) {
+      return { kind: "placement", memberId: occupant.memberId };
+    }
+  }
+  return null;
 }
 
 export function isDisputableRosterChange(change: RosterDiff): boolean {
@@ -411,7 +462,7 @@ export function describePlacement(placement: RosterPlacement): string {
     case "group":
       return `Group ${placement.group}, Slot ${placement.slot}`;
     case "bench":
-      return `Bench ${placement.slot}`;
+      return `Bench ${Math.ceil(placement.slot / 5)}, Slot ${((placement.slot - 1) % 5) + 1}`;
     case "overflow":
       return "Overflow";
   }

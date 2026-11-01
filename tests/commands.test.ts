@@ -171,6 +171,7 @@ describe("Zors Bot command registration", () => {
       "restart-week",
       "restart-custom",
       "clear",
+      "bump",
       "help",
     ]);
     const customRestart = zorsSignupAdminCommand

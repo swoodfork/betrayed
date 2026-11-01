@@ -658,13 +658,20 @@ categories:
         permissionProfile: raid-management-readonly
         preserveHistory: true
         positionAfter: raid-rosters
+      - key: raider-response-forum
+        name: "📨raider-response-forum"
+        aliases: ["Raider Response Forum"]
+        type: forum
+        permissionProfile: raid-management-readonly
+        preserveHistory: true
+        positionAfter: roster-archives
       - key: raider-responses
         name: "📨raider-responses"
         aliases: ["Raider Responses", raider-responses]
         type: text
         permissionProfile: raid-management-readonly
         preserveHistory: true
-        positionAfter: roster-archives
+        positionAfter: raider-response-forum
       - key: signup-requests
         name: "📨signup-requests"
         aliases: [signup-requests]
@@ -915,7 +922,8 @@ categories:
         permissionProfile: voice-community
         preserveHistory: false
       - key: voice-chat-2
-        name: "🔊Qzark’s Rage Room"
+        name: "🔊 Qzark’s Rage Room"
+        aliases: ["🔊Qzark’s Rage Room"]
         type: voice
         permissionProfile: voice-community
         preserveHistory: false

@@ -105,6 +105,9 @@ The permanent Roster Control post and all roster posts live in
 slot, Bench, and Overflow selectors. Every saved revision is stored as a
 versioned JSON attachment in the Officer-visible `🗄️zors-raid-control` Forum,
 then reconstructed at startup; no Render filesystem or database is required.
+Multiple coordinators may edit the same Draft concurrently: unrelated member
+and destination changes merge against the latest revision, while overlapping
+member or occupied-slot edits stop with the exact conflict reason.
 Officers and Raid Coordinators can use Zors controls but cannot manually create,
 reply to, react to, edit, delete, or manage roster/request Forum posts.
 
@@ -116,12 +119,15 @@ available only through `/zors-roster delete` to prevent accidental clicks. Delet
 blocked until attached signup sheets are Clear and Archived, writes an immutable
 deleted-roster snapshot to `🗃️roster-archives`, permanently removes both roster
 posts, and preserves member roles. Both formats reserve ten numbered Bench
-positions, displayed as two five-slot columns, and an
+positions, selected and displayed as **Bench 1** and **Bench 2** with five
+local slots each, and an
 unnumbered Overflow list. Bench 2 restarts its visible numbering at 1 while
 retaining distinct internal slots 6–10. Finalization validates the team role, team channel, members, placements, and
 class/spec combinations. Every finalized roster member receives the bound team
 role immediately; attendance buttons never control channel access. Zors then
-sends a one-time assignment notice only to affected members.
+sends new and approved assignments automatically. Group-to-Bench moves and
+removals ask the executor whether to notify, defaulting to silent; Group moves,
+Bench-to-Group moves, swaps, and class/spec-only edits do not notify members.
 
 `/zors-roster show` is contextual and intentionally has no roster or role
 option. Every roster Forum thread is durably mapped to exactly one roster ID,
@@ -161,7 +167,9 @@ Pending. Staff can reject a still-pending request from its private post.
 Regular members see only **Request a Spot** on an open signup sheet. Authorized
 Raid Coordinators, Officers, Administrators, and the owner manage its lifecycle
 contextually from the roster post with `/zors-signup-admin close`,
-`restart-week`, `restart-custom`, or `clear`. Close preserves current requests
+`restart-week`, `restart-custom`, `clear`, or `bump`. Bump posts the replacement
+first, persists its new durable message link, and only then deletes the old
+sheet without changing its cycle, requests, attendance, or status. Close preserves current requests
 and attendance responses for staff to finish processing. Every Restart writes an
 immutable cycle snapshot to `🗃️roster-archives`, then clears that sheet's
 requests, keeps the finalized roster—including Group, Bench, and Overflow—and
@@ -198,8 +206,10 @@ to Bench, the assignment-change DM includes **Dispute this with Raid
 Coordinators**. The single-use modal forwards the member's message, previous
 and new placement, roster revision, and roster link to Raider Responses.
 Automated attendance responses, withdrawal explanations, assignment issues,
-and roster disputes are delivered to the protected, bot-managed
-`📨raider-responses` channel instead of `🔐coordinator-affairs`.
+and roster disputes are delivered to one persistent team post in the
+protected, bot-managed Raider Responses Forum instead of
+`🔐coordinator-affairs`. A newer actionable DM removes controls from the
+member's superseded attendance, withdrawal, or dispute DM.
 Declined members retain an **I can make it now** follow-up action. Tentative
 members retain **I can make it** and **I can not make it** actions; either change
 updates the signup indicator and alerts the officer core. Finalizing a changed

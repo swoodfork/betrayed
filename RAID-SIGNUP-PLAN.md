@@ -166,9 +166,10 @@ Use hierarchical buttons and dropdowns instead:
 A 40-player roster plus ten Bench slots exceeds Discord's 25-option select
 limit. Placement therefore uses a hierarchy:
 
-1. Select Group, Bench, or Overflow.
+1. Select Group, Bench 1, Bench 2, or Overflow.
 2. For Group, select Group 1 through Group 8 and then Slot 1 through Slot 5.
-3. For Bench, select Bench 1 through Bench 10.
+3. For either Bench, select its local Slot 1 through Slot 5. Bench 2 maps
+   durably to canonical slots 6 through 10.
 4. Overflow requires no numbered position.
 
 Every mutation shows a complete before/after preview before it is added to the
@@ -202,6 +203,12 @@ Editing an already finalized roster creates a new Draft revision. Existing
 signup sheets and reminders continue using the last finalized snapshot while
 coordinators theorycraft. Draft changes are not shown publicly and do not alter
 the scheduler until Finalize.
+
+Open editors rebase onto the latest shared Draft at confirmation time.
+Disjoint member and destination changes merge; changes to the same member,
+swap participant, resolved request, or newly occupied destination reject with
+an exact workflow reason. Every successful save immediately refreshes the
+shared roster post and attached signup projections.
 
 Finalizing a later revision:
 
@@ -463,6 +470,9 @@ Finalized assignment-change DMs offer **Dispute this with Raid Coordinators**
 when a member is removed from the roster or moved from a Group to Bench. The
 single-use modal forwards the member's explanation and the Before/After roster
 context to Raider Responses without rolling back the finalized roster.
+Raider Responses is a protected Forum with one persistent post per roster/team.
+New actionable DMs durably supersede and remove buttons from the prior
+attendance, withdrawal, or roster-dispute DM.
 
 The **Pending Approval** section is rendered on the primary sheet and every
 mirror so members and staff can see that a request is waiting without opening

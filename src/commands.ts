@@ -420,6 +420,11 @@ export const zorsSignupAdminCommand = new SlashCommandBuilder()
       .setDescription("Archive and permanently clear the active signup"),
   )
   .addSubcommand((command) =>
+    command
+      .setName("bump")
+      .setDescription("Repost the active signup and remove its old message"),
+  )
+  .addSubcommand((command) =>
     command.setName("help").setDescription("Explain signup administration"),
   );
 

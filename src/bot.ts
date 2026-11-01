@@ -12,6 +12,7 @@ import {
 import { registerGuildCommands } from "./commands.js";
 import { logZorsCommand } from "./command-audit.js";
 import type { BotConfig } from "./config.js";
+import { safeInteractionErrorMessage } from "./interaction-errors.js";
 import { createInventory, type GuildInventory } from "./inventory.js";
 import {
   createInventoryResponse,
@@ -597,15 +598,18 @@ export function createBot(config: BotConfig): Client {
       if (!interaction.isRepliable()) {
         return;
       }
+      const safeMessage = safeInteractionErrorMessage(error);
       if (interaction.deferred) {
         await interaction.editReply({
           content:
+            safeMessage ??
             "Zors Bot could not complete that request. Wait a few seconds and try again.",
           files: [],
         });
       } else if (!interaction.replied) {
         await interaction.reply({
-          content: "Zors Bot could not complete that command.",
+          content:
+            safeMessage ?? "Zors Bot could not complete that command.",
           ...(interaction.inGuild() ? { flags: MessageFlags.Ephemeral } : {}),
         });
       }
