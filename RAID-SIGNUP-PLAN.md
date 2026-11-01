@@ -24,6 +24,13 @@ pass.
 - Each roster also has one Discord raid-team role.
 - A saved roster must exist before a raid signup can be created.
 - Every signup is attached to exactly one saved roster.
+- Each roster is explicitly either 20-player with four five-player groups or
+  40-player with eight five-player groups.
+- Each roster has exactly one team role whose name contains its matching roster
+  size, such as `Zors-20` or `Zors-40`.
+- Each roster has one primary team channel where new signup sheets are posted.
+- A signup may also have synchronized mirror sheets in additional channels for
+  recruiting. Every copy represents the same signup event and roster.
 - Roster membership, class, spec, group, and Bench placement remain reusable
   between weekly signups.
 - Raid times and confirmation history belong to the dated signup, never to the
@@ -37,7 +44,8 @@ pass.
 - Zors sends raid-confirmation DMs only to current members of the attached
   roster. Pending or rejected requests never enter the reminder scheduler.
 - Phase one creates one specifically dated raid at a time.
-- The visible signup sheet is posted in the channel where the command runs.
+- The primary signup sheet is posted in the roster's bound team channel.
+- Authorized staff can publish the same active signup into additional channels.
 - Selecting **No** marks the member absent and stops automated reminders.
 - An absent member can press **I can attend after all** in the DM to rejoin the
   normal confirmation cadence.
@@ -67,15 +75,21 @@ Use a command group rather than adding many unrelated top-level commands:
 
 `/zors roster create` starts an ephemeral builder:
 
-1. Enter the roster name.
-2. Select the raid-team Discord role.
-3. Add roster slots:
+1. Verify that the command is running inside the configured
+   `📋raid-rosters` Forum control post or a roster post.
+2. Enter the roster name.
+3. Select **20-player** or **40-player**.
+4. Select exactly one raid-team Discord role. Its name must contain `20` or
+   `40` matching the selected format.
+5. Select the primary team channel and verify that the team role can view it.
+6. Add roster slots:
    - Select a Discord member.
    - Select one of the nine WoW Forever classes.
    - Select a specialization filtered to that class.
-   - Select the raid group, from Group 1 through Group 4.
-4. Review the complete 20-player roster.
-5. Save it.
+   - Select Group 1 through Group 4 for a 20-player roster, or Group 1 through
+     Group 8 for a 40-player roster.
+7. Review the complete roster.
+8. Save it as a new Forum post.
 
 Class and specialization should use separate selects. Discord limits a string
 select to 25 options, while the current WoW Forever roster has 27 specs. The
@@ -85,6 +99,14 @@ already maintained for raid applications.
 The raid-team role identifies the team and is automatically assigned when a
 coordinator approves a signup request. The individual member assigned to each
 slot is the person Zors will DM.
+
+Roster commands must refuse to run outside the configured `📋raid-rosters`
+Forum and its child posts, even when the caller has permission. Zors should
+create one permanent **Roster Control** post during setup so the first roster
+can be created without exposing a builder in a public channel. Every roster
+post then contains interactive controls for Edit, Add Member, Pending Requests,
+Bump, Create Signup, and Archive. Slash commands remain available as a fallback
+inside the protected Forum.
 
 ### 2. Request roster membership from a signup sheet
 
@@ -141,15 +163,22 @@ The roster editor has two addition paths:
 
 ### 3. Publish or bump the roster
 
-Each saved roster has one post in the private `📋raid-rosters` Forum beneath
-`📨signup-requests`. `/zors roster bump` should:
+Each saved 20-player or 40-player roster has one post in the private
+`📋raid-rosters` Forum beneath `📨signup-requests`. Coordinators move between
+Forum posts to view and operate different raid teams. Recommended Forum tags
+are `20-player`, `40-player`, `Active`, and `Archived`.
 
-1. Render and send the new roster message successfully.
-2. Update the canonical pointer to the new message.
-3. Delete the old presentation message only after the new message exists.
+`/zors roster bump` or the post's **Bump** button should:
 
-The roster's durable source of truth must not be the presentation message.
-Deleting or bumping the visible message therefore cannot destroy the roster.
+1. Re-render the roster's starter display from canonical state.
+2. Add a compact bot-authored bump reply so the same Forum post returns to the
+   top of recent activity.
+3. Record the new bump reply ID.
+4. Delete the previous bot-authored bump reply only after the new reply exists.
+
+This can be repeated indefinitely without creating duplicate roster posts. The
+roster's durable source of truth remains the Officer-only control record, so
+editing, bumping, or archiving the coordinator presentation cannot destroy it.
 
 ### 4. Create a dated raid
 
@@ -159,6 +188,8 @@ Use a second command group:
 /zors raid create
 /zors raid show
 /zors raid refresh
+/zors raid publish
+/zors raid bump
 /zors raid resend
 /zors raid cancel
 /zors raid close
@@ -175,7 +206,8 @@ the configured server owner. It starts an ephemeral wizard:
 5. Select the end hour.
 6. Preview the resolved PST/PDT timestamps and roster.
 7. Confirm creation.
-8. Persist the signup and immediately DM every current roster member.
+8. Post the primary sheet in the roster's bound team channel.
+9. Persist the signup and immediately DM every current roster member.
 
 Discord has no native calendar-date picker. A validated date field is therefore
 needed, but the start and end times can use dropdowns containing hourly values.
@@ -196,15 +228,17 @@ calculated from the selected raid start, never from the signup creation date.
 If the signup is created after a checkpoint boundary, that checkpoint is
 skipped rather than sent late.
 
-### 5. Display the live signup sheet
+### 5. Display and mirror the live signup sheet
 
-Zors posts one embed in the channel where `/zors raid create` was run. The
-embed should include:
+Zors posts the primary embed in the team channel bound to the selected roster.
+That channel can remain visible only to the roster's team role. The embed
+should include:
 
 - Raid name.
 - Start and end timestamps.
 - Roster and team role.
-- Group 1 through Group 4.
+- Group 1 through Group 4 for 20-player rosters, or Group 1 through Group 8
+  for 40-player rosters.
 - Member, class, and spec for each slot.
 - Current attendance state.
 - Confirmation history for each checkpoint.
@@ -232,6 +266,25 @@ response or attached-roster change. The roster supplies current membership and
 class/spec placement; the signup supplies raid times and confirmations.
 Updates should be debounced briefly so several simultaneous responses produce
 one Discord edit rather than a burst of edits.
+
+An authorized coordinator or Officer can run `/zors raid publish` in another
+channel to manifest a synchronized copy:
+
+1. Zors shows a paginated ephemeral list of active signups.
+2. The executor selects one signup and previews it.
+3. Zors verifies that it can post and edit messages in the current channel.
+4. Zors posts a new projection and stores its channel/message binding.
+
+This enables a private team-only primary sheet and one or more public recruiting
+mirrors. Anyone who can see a particular projection can use its **Request to
+Join This Raid** button. All projections use the same signup and roster IDs;
+they are not separate signups.
+
+`/zors raid bump` similarly shows active signups, then their existing
+projections. The executor can bump one projection or all projections. For a
+normal text channel, bumping sends the replacement first, updates the binding,
+and only then deletes the old message. Every later response or roster mutation
+edits every currently bound projection.
 
 ## Confirmation Cadence
 
@@ -347,7 +400,9 @@ request.
 
 `📋raid-rosters` sits directly beneath `📨signup-requests`. It uses the Raid
 Coordinator section permissions and contains one presentation post per saved
-roster.
+20-player or 40-player roster plus one permanent Roster Control post. Roster
+commands and components validate that their channel's parent is this configured
+Forum before opening any builder.
 
 The desired-state planner should bind all three channel IDs immutably in
 Production and preserve this exact order.
@@ -362,7 +417,9 @@ Contains:
 - Schema version.
 - Stable roster ID.
 - Roster name.
+- Roster size and fixed group count.
 - Raid-team role ID.
+- Primary team channel ID.
 - Current `📋raid-rosters` presentation post ID.
 - All member, class, spec, group, position, and Bench assignments.
 - Created/updated timestamps and actor IDs.
@@ -376,7 +433,7 @@ Contains:
 - Exactly one attached roster ID.
 - Raid name.
 - Start/end Unix timestamps.
-- Signup channel and message IDs.
+- Primary signup projection plus zero or more mirror channel/message bindings.
 - Lifecycle status.
 - One participant state record per member.
 - Append-only confirmation and delivery events.
@@ -401,6 +458,8 @@ When a roster changes:
   affected signup's audit history.
 - Class/spec, group, position, and Bench changes refresh attached live sheets
   without erasing existing confirmation history.
+- Every active projection of each affected signup is updated from the same
+  rendered state.
 
 This matches the existing Discord-native raid-application approach and avoids
 depending on Render's ephemeral filesystem.
@@ -499,7 +558,10 @@ Roster
   id
   guildId
   name
+  size
+  groupCount
   teamRoleId
+  primaryTeamChannelId
   presentationThreadId
   status
   slots[]
@@ -537,11 +599,18 @@ RaidEvent
   startAt
   endAt
   timeZone
-  signupChannelId
-  signupMessageId
+  signupProjections[]
   controlThreadId
   status
   participants[]
+
+SignupProjection
+  channelId
+  messageId
+  isPrimary
+  publishedByMemberId
+  publishedAt
+  lastBumpedAt
 
 RaidParticipant
   memberId
@@ -576,7 +645,13 @@ and delivery history.
 
 - If the signup message was deleted, `/zors raid refresh` creates a replacement
   and updates the canonical binding.
+- If one mirrored signup projection was deleted, remove only that projection's
+  stale binding; the underlying signup and other projections remain active.
 - If the roster presentation was deleted, `/zors roster bump` recreates it.
+- If a roster command or control is used outside `📋raid-rosters` or one of its
+  child posts, reject it before showing any builder.
+- If a selected team role name does not contain the roster's `20` or `40`
+  designation, reject roster creation.
 - If a member requests a roster they already belong to, show the existing
   roster assignment instead of creating a duplicate request.
 - If a member already has a pending request for the same roster, link the
@@ -613,11 +688,18 @@ and delivery history.
 - Class/spec validation.
 - Roster member and team-role validation.
 - Saved-roster prerequisite for raid creation.
+- Fixed 20-player/four-group and 40-player/eight-group validation.
+- Exactly one matching numbered team role per roster.
+- Roster command parent-Forum restrictions.
 - Duplicate membership and duplicate pending-request prevention.
 - Applicant class/spec capture and coordinator spec override.
 - Accept, reject, role assignment, slot placement, and Bench placement.
 - Roster changes propagate to attached signup sheets without erasing
   confirmations.
+- Primary and mirrored signup projections remain identical.
+- Publishing uses a paginated active-signup selector.
+- Bumping one or all signup projections replaces messages without losing their
+  canonical bindings.
 - Embed and component limits.
 
 ### Restart tests
@@ -639,6 +721,10 @@ and delivery history.
   automatic role assignment, group placement, and Bench placement.
 - Restart the Render worker between stages and confirm recovery.
 - Confirm the live signup sheet remains accurate.
+- Confirm team-role-only primary visibility and a public recruiting mirror.
+- Confirm requests from both projections enter the same request queue.
+- Confirm repeated roster Forum bumps keep one roster post.
+- Confirm signup bumps replace one or all selected projections safely.
 - Confirm command logging and private control-channel permissions.
 
 Production timing must always use the real cadence. Compressed timing is allowed
@@ -651,6 +737,9 @@ only behind an explicit Test-guild configuration.
 - Add immutable `🗄️zors-raid-control`, `📨signup-requests`, and
   `📋raid-rosters` Forum bindings in their specified category order.
 - Add `/zors roster` command group.
+- Restrict every roster builder and control to `📋raid-rosters` and its posts.
+- Add fixed 20-player and 40-player formats.
+- Bind exactly one numbered team role and one primary team channel per roster.
 - Build the interactive class/spec/member roster editor.
 - Persist and reconstruct roster control posts.
 - Render and bump roster presentation messages.
@@ -670,7 +759,10 @@ only behind an explicit Test-guild configuration.
 - Add `/zors raid create`.
 - Require one saved roster.
 - Validate date and hourly time selections.
-- Create the raid control post and visible signup sheet.
+- Create the raid control post and primary sheet in the roster's team channel.
+- Add `/zors raid publish` with a paginated active-signup selector.
+- Support synchronized public recruiting mirrors.
+- Add roster and signup projection bump controls.
 - Immediately DM all current roster members.
 - Add manual refresh, cancel, and close operations.
 
@@ -706,10 +798,22 @@ The first production release is complete only when:
 - A coordinator can create, edit, show, bump, and archive a saved roster.
 - Every roster slot has a valid member, class, spec, and group.
 - Bench members are preserved without occupying a main group slot.
+- A 20-player roster has four groups and a 40-player roster has eight groups.
+- Every roster has exactly one matching numbered team role and one primary team
+  channel.
+- Roster builders and controls refuse to operate outside `📋raid-rosters`.
+- Each saved roster remains one persistent Forum post that can be bumped
+  repeatedly.
 - Raid creation is impossible until a saved roster is selected.
 - Every signup is attached to exactly one roster.
 - A dated raid can be created with hourly start/end selections.
-- The sheet posts in the command channel and updates after responses.
+- The primary sheet posts in the roster's role-restricted team channel.
+- Authorized staff can select an active signup and publish synchronized mirrors
+  in additional channels.
+- Primary and mirrored sheets update together after every response, request
+  acceptance, roster edit, and spec change.
+- Signup sheets can be bumped individually or together without creating a new
+  underlying signup.
 - Signup creation immediately contacts every current roster member.
 - Passed reminder checkpoints are skipped.
 - Any visible member can submit one class/spec request from the signup sheet.
