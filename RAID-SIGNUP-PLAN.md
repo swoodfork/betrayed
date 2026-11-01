@@ -456,6 +456,11 @@ buttons. Tentative and Not Attending responses replace the original controls
 with only their valid follow-up choices; choosing a final follow-up removes the
 remaining buttons and durably locks the response against replay.
 
+Finalized assignment-change DMs offer **Dispute this with Raid Coordinators**
+when a member is removed from the roster or moved from a Group to Bench. The
+single-use modal forwards the member's explanation and the Before/After roster
+context to Coordinator Affairs without rolling back the finalized roster.
+
 The **Pending Approval** section is rendered on the primary sheet and every
 mirror so members and staff can see that a request is waiting without opening
 the request Forum. To stay within Discord embed limits, show the first ten

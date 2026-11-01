@@ -188,6 +188,11 @@ Attendance DM buttons are single-use. Confirming removes all controls;
 Tentative and Not Attending replace the original controls with only the valid
 follow-up choices. A final follow-up removes the remaining buttons and locks
 the response against replayed or stale interactions.
+
+When Finalize removes a member from the roster or moves a member from a Group
+to Bench, the assignment-change DM includes **Dispute this with Raid
+Coordinators**. The single-use modal forwards the member's message, previous
+and new placement, roster revision, and roster link to Coordinator Affairs.
 Declined members retain an **I can make it now** follow-up action. Tentative
 members retain **I can make it** and **I can not make it** actions; either change
 updates the signup indicator and alerts the officer core. Finalizing a changed

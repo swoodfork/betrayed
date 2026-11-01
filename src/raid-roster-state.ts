@@ -116,6 +116,14 @@ export interface RosterDiff {
   after: RosterAssignment | null;
 }
 
+export function isDisputableRosterChange(change: RosterDiff): boolean {
+  return (
+    (change.before !== null && change.after === null) ||
+    (change.before?.placement.kind === "group" &&
+      change.after?.placement.kind === "bench")
+  );
+}
+
 function classDefinition(classKey: string) {
   return wowForeverClassSpecializations[
     classKey as keyof typeof wowForeverClassSpecializations

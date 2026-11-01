@@ -4,6 +4,7 @@ import {
   addRosterAssignment,
   draftWarningDueAt,
   finalizeRoster,
+  isDisputableRosterChange,
   moveRosterAssignment,
   raidRosterDocumentSchema,
   revertRoster,
@@ -153,6 +154,7 @@ describe("raid roster state", () => {
       group: 1,
       slot: 1,
     });
+
     expect(document.draftRevision?.assignments[0]?.placement).toEqual({
       kind: "bench",
       slot: 1,
@@ -161,6 +163,49 @@ describe("raid roster state", () => {
     revertRoster(document, ownerId, "2026-11-01T00:04:00.000Z");
     expect(document.status).toBe("finalized");
     expect(document.draftRevision).toBeNull();
+  });
+
+  it("offers disputes only for removals and Group-to-Bench moves", () => {
+    const grouped = assignment(memberOne, {
+      kind: "group",
+      group: 1,
+      slot: 1,
+    });
+    const benched = assignment(memberOne, { kind: "bench", slot: 1 });
+    const movedGroup = assignment(memberOne, {
+      kind: "group",
+      group: 2,
+      slot: 1,
+    });
+
+    expect(
+      isDisputableRosterChange({
+        memberId: memberOne,
+        before: grouped,
+        after: null,
+      }),
+    ).toBe(true);
+    expect(
+      isDisputableRosterChange({
+        memberId: memberOne,
+        before: grouped,
+        after: benched,
+      }),
+    ).toBe(true);
+    expect(
+      isDisputableRosterChange({
+        memberId: memberOne,
+        before: grouped,
+        after: movedGroup,
+      }),
+    ).toBe(false);
+    expect(
+      isDisputableRosterChange({
+        memberId: memberOne,
+        before: null,
+        after: grouped,
+      }),
+    ).toBe(false);
   });
 
   it("does not mutate state when a requested placement is invalid", () => {

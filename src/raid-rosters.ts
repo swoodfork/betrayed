@@ -40,6 +40,7 @@ import {
   describePlacement,
   draftWarningDueAt,
   finalizeRoster,
+  isDisputableRosterChange,
   moveRosterAssignment,
   raidRosterDocumentSchema,
   removeRosterAssignment,
@@ -627,6 +628,7 @@ export class RaidRosterService {
   private readonly signupSessions = new Map<string, SignupSession>();
   private readonly pendingSignupSubmissions = new Set<string>();
   private readonly pendingAttendanceResponses = new Set<string>();
+  private readonly pendingRosterDisputes = new Set<string>();
   private readonly archivedSignupCycles = new Set<string>();
   private readonly archivedDeletedRosters = new Set<string>();
 
@@ -3268,6 +3270,7 @@ export class RaidRosterService {
             : change.before && !change.after
               ? `You Have Been Removed from the Raid Roster — ${roster.name}`
               : `Your Raid Roster Spot Was Updated — ${roster.name}`;
+        const canDispute = isDisputableRosterChange(change);
         await user.send({
           embeds: [
             new EmbedBuilder()
@@ -3285,6 +3288,18 @@ export class RaidRosterService {
                 text: `Finalized revision ${revision} • roster ${roster.rosterId}`,
               }),
           ],
+          components: canDispute
+            ? [
+                new ActionRowBuilder<ButtonBuilder>().addComponents(
+                  new ButtonBuilder()
+                    .setCustomId(
+                      `${customIdPrefix}:roster-dispute:${roster.rosterId}:${revision}:${change.memberId}`,
+                    )
+                    .setLabel("Dispute this with Raid Coordinators")
+                    .setStyle(ButtonStyle.Secondary),
+                ),
+              ]
+            : [],
         });
       } catch (error) {
         console.warn(
@@ -3819,6 +3834,168 @@ export class RaidRosterService {
       });
     } finally {
       this.pendingAttendanceResponses.delete(responseKey);
+    }
+  }
+
+  private async beginRosterDispute(
+    interaction: ButtonInteraction,
+    rosterId: string,
+    revision: number,
+    memberId: string,
+  ): Promise<void> {
+    if (interaction.user.id !== memberId) {
+      throw new Error("This roster dispute control belongs to another member.");
+    }
+    const roster = this.rosters.get(rosterId);
+    if (
+      !roster?.finalizedRevision ||
+      revision > roster.finalizedRevision.revision
+    ) {
+      throw new Error("This roster dispute control is stale.");
+    }
+    const existing = roster.acknowledgements.find(
+      (entry) =>
+        entry.revision === revision &&
+        entry.memberId === memberId &&
+        entry.status === "issue",
+    );
+    if (existing) {
+      await interaction.update({
+        content:
+          "✅ Your roster dispute was already sent to Raid Coordinators.",
+        components: [],
+      });
+      return;
+    }
+    await interaction.showModal(
+      new ModalBuilder()
+        .setCustomId(
+          `${customIdPrefix}:roster-dispute-submit:${rosterId}:${revision}:${memberId}`,
+        )
+        .setTitle("Dispute Roster Change")
+        .addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId("dispute")
+              .setLabel("Why are you disputing this roster change?")
+              .setStyle(TextInputStyle.Paragraph)
+              .setMaxLength(1_000)
+              .setRequired(true),
+          ),
+        ),
+    );
+  }
+
+  private async submitRosterDispute(
+    interaction: ModalSubmitInteraction,
+    rosterId: string,
+    revision: number,
+    memberId: string,
+  ): Promise<void> {
+    if (interaction.user.id !== memberId) {
+      throw new Error("This roster dispute belongs to another member.");
+    }
+    if (!interaction.isFromMessage()) {
+      throw new Error("This roster dispute is not attached to a DM.");
+    }
+    const disputeKey = `${rosterId}:${revision}:${memberId}`;
+    if (this.pendingRosterDisputes.has(disputeKey)) {
+      await interaction.deferUpdate();
+      return;
+    }
+    this.pendingRosterDisputes.add(disputeKey);
+    try {
+      const roster = this.rosters.get(rosterId);
+      if (
+        !roster?.finalizedRevision ||
+        revision > roster.finalizedRevision.revision
+      ) {
+        throw new Error("This roster dispute is stale.");
+      }
+      const existing = roster.acknowledgements.find(
+        (entry) =>
+          entry.revision === revision &&
+          entry.memberId === memberId &&
+          entry.status === "issue",
+      );
+      if (existing) {
+        await interaction.update({
+          content:
+            "✅ Your roster dispute was already sent to Raid Coordinators.",
+          components: [],
+        });
+        return;
+      }
+      const dispute = interaction.fields
+        .getTextInputValue("dispute")
+        .trim();
+      const sourceEmbed = interaction.message.embeds[0];
+      const before =
+        sourceEmbed?.fields.find(({ name }) => name === "Before")?.value ??
+        "Unavailable";
+      const after =
+        sourceEmbed?.fields.find(({ name }) => name === "After")?.value ??
+        "Unavailable";
+      const guild = await interaction.client.guilds.fetch(roster.guildId);
+      const binding = this.bindingsByGuild.get(roster.guildId);
+      if (!binding) {
+        throw new Error("The roster server binding is unavailable.");
+      }
+      const channel = await guild.channels.fetch(binding.coordinatorChannelId);
+      if (!channel?.isSendable()) {
+        throw new Error("Coordinator Affairs cannot receive roster disputes.");
+      }
+      const previousAcknowledgements = structuredClone(
+        roster.acknowledgements,
+      );
+      roster.acknowledgements = roster.acknowledgements.filter(
+        (entry) =>
+          !(entry.revision === revision && entry.memberId === memberId),
+      );
+      roster.acknowledgements.push({
+        revision,
+        memberId,
+        status: "issue",
+        recordedAt: new Date().toISOString(),
+        issue: dispute,
+      });
+      await this.persist(guild, roster);
+      const rosterUrl = `https://discord.com/channels/${guild.id}/${roster.presentationThreadId}`;
+      try {
+        await channel.send({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle(`Roster Change Dispute — ${roster.name}`)
+              .setColor(0xe67e22)
+              .addFields(
+                {
+                  name: "Discord Member",
+                  value: `<@${memberId}> (${memberId})`,
+                },
+                {
+                  name: "Roster",
+                  value: `[${roster.name}](${rosterUrl}) — revision ${revision}`,
+                },
+                { name: "Before", value: before },
+                { name: "After", value: after },
+                { name: "Member Message", value: dispute },
+              )
+              .setTimestamp(),
+          ],
+          allowedMentions: { parse: [] },
+        });
+      } catch (error) {
+        roster.acknowledgements = previousAcknowledgements;
+        await this.persist(guild, roster);
+        throw error;
+      }
+      await interaction.update({
+        content:
+          "✅ Your message was sent to Raid Coordinators. They can follow up with you directly.",
+        components: [],
+      });
+    } finally {
+      this.pendingRosterDisputes.delete(disputeKey);
     }
   }
 
@@ -4663,6 +4840,27 @@ export class RaidRosterService {
     }
 
     const parts = interaction.customId.split(":");
+    if (parts[1] === "roster-dispute" && interaction.isButton()) {
+      await this.beginRosterDispute(
+        interaction,
+        parts[2] ?? "",
+        Number(parts[3]),
+        parts[4] ?? "",
+      );
+      return true;
+    }
+    if (
+      parts[1] === "roster-dispute-submit" &&
+      interaction.isModalSubmit()
+    ) {
+      await this.submitRosterDispute(
+        interaction,
+        parts[2] ?? "",
+        Number(parts[3]),
+        parts[4] ?? "",
+      );
+      return true;
+    }
     if (parts[1] === "attendance" && interaction.isButton()) {
       await this.recordAttendanceConfirmation(
         interaction,
