@@ -593,6 +593,32 @@ export function buildAttendanceFollowupControls(
   return row;
 }
 
+function buildInitialAttendanceControls(
+  signup: RaidSignupSheet,
+  memberId: string,
+): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(
+        `${customIdPrefix}:attendance:confirm:${signup.raidId}:${signup.cycle}:${memberId}`,
+      )
+      .setLabel("I will be at raid")
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(
+        `${customIdPrefix}:attendance:tentative:${signup.raidId}:${signup.cycle}:${memberId}`,
+      )
+      .setLabel("Tentative")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(
+        `${customIdPrefix}:attendance:decline:${signup.raidId}:${signup.cycle}:${memberId}`,
+      )
+      .setLabel("I cannot attend")
+      .setStyle(ButtonStyle.Danger),
+  );
+}
+
 export function isAttendanceControlFor(
   customId: string,
   raidId: string,
@@ -1430,12 +1456,58 @@ export class RaidRosterService {
           (response.status === "tentative" ||
             response.status === "declined" ||
             response.status === "issue");
+        try {
+          const promptChannel = await guild.client.channels.fetch(
+            reference.channelId,
+          );
+          if (promptChannel?.isTextBased()) {
+            const prompt = await promptChannel.messages.fetch(
+              reference.messageId,
+            );
+            if (!response) {
+              await prompt.edit({
+                components: [
+                  buildInitialAttendanceControls(
+                    signup,
+                    reference.memberId,
+                  ),
+                ],
+              });
+            } else if (hasActiveFollowup) {
+              await prompt.edit({
+                content:
+                  response.status === "tentative"
+                    ? "🟡 Your Attendance is Tentative. Raid Coordinators received your explanation.\n\nWhen your plans are final, press one of the buttons below."
+                    : "🔴 You are marked Not Attending. Raid Coordinators received your reason.\n\nIf your plans change and you can attend, press the button below to alert the officer core.",
+                embeds: [],
+                components: [
+                  buildAttendanceFollowupControls(
+                    signup,
+                    reference.memberId,
+                    response.status === "tentative"
+                      ? "tentative"
+                      : "declined",
+                  ),
+                ],
+              });
+            } else {
+              await prompt.edit({ components: [] });
+            }
+          }
+        } catch (error) {
+          console.warn(
+            `Could not reconcile attendance prompt ${reference.messageId}.`,
+            error,
+          );
+        }
         await this.disableAttendanceControlsInChannel(
           guild,
           reference.channelId,
           signup.raidId,
           reference.memberId,
-          hasActiveFollowup ? reference.messageId : undefined,
+          !response || hasActiveFollowup
+            ? reference.messageId
+            : undefined,
         );
       }
       const channel = await guild.channels.fetch(signup.channelId);
@@ -3958,26 +4030,7 @@ export class RaidRosterService {
               }),
           ],
           components: [
-            new ActionRowBuilder<ButtonBuilder>().addComponents(
-              new ButtonBuilder()
-                .setCustomId(
-                  `${customIdPrefix}:attendance:confirm:${signup.raidId}:${signup.cycle}:${assignment.memberId}`,
-                )
-                .setLabel("I will be at raid")
-                .setStyle(ButtonStyle.Success),
-              new ButtonBuilder()
-                .setCustomId(
-                  `${customIdPrefix}:attendance:tentative:${signup.raidId}:${signup.cycle}:${assignment.memberId}`,
-                )
-                .setLabel("Tentative")
-                .setStyle(ButtonStyle.Primary),
-              new ButtonBuilder()
-                .setCustomId(
-                  `${customIdPrefix}:attendance:decline:${signup.raidId}:${signup.cycle}:${assignment.memberId}`,
-                )
-                .setLabel("I cannot attend")
-                .setStyle(ButtonStyle.Danger),
-            ),
+            buildInitialAttendanceControls(signup, assignment.memberId),
           ],
         });
         await this.disableAttendanceControlsInChannel(
