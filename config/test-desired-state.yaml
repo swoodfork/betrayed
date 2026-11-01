@@ -901,10 +901,15 @@ categories:
         permissionProfile: voice-community
         preserveHistory: false
         positionAfter: raid-voice-8
+
+  - key: afk-inactive
+    name: "AFK/Inactive"
+    aliases: []
+    permissionProfile: voice-community
+    channels:
       - key: sleep
-        name: "💤 Sleep"
-        aliases: [Sleep, AFK, Inactive]
+        name: "sleep"
+        aliases: ["💤 Sleep", Sleep, AFK, Inactive]
         type: voice
         permissionProfile: voice-community
         preserveHistory: false
-        positionAfter: pug-voice

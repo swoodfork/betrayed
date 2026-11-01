@@ -6,9 +6,9 @@ guild:
   name: Betrayed
 
 inventory:
-  file: SLEEP_PRODUCTION_FINAL.json
-  generatedAt: "2026-11-01T00:15:16.691Z"
-  sha256: "0bf6148ed69057853f52d3d44a3194008e3bb43dfbe16454458f0b42c5eb13e5"
+  file: AFK_PRODUCTION_FINAL.json
+  generatedAt: "2026-11-01T00:31:15.022Z"
+  sha256: "3ff71a4dc86e66bd18b68b202964fc6eca0cb7f6ebaedba612aa7ecb3f049c24"
 
 roleBindings:
   guild-master: "705314740330561587"
@@ -75,6 +75,7 @@ categoryBindings:
   community-chat: "705320457343336509"
   community-voice: "705235406974615605"
   raid-voice: "842468522423484426"
+  afk-inactive: "1566248180696227941"
 
 channelBindings:
   announcements: "813866893798146080"
