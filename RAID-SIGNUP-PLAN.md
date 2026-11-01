@@ -416,6 +416,9 @@ should include:
   for 40-player rosters.
 - Bench 1 through Bench 10 with the same confirmation history as grouped
   members.
+- One full-width field per Group and Bench in the member-facing signup view;
+  Discord controls embed width, so non-inline fields provide the most room for
+  names, class/spec, and attendance status.
 - Unnumbered Overflow, explicitly labeled as not receiving automated attendance
   reminders.
 - Member, class, and spec for each slot.
