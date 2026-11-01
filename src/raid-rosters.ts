@@ -616,6 +616,58 @@ export function signupRequestIdFromMoveSelection(
   return selectedId.slice("request:".length) || null;
 }
 
+export function signupAdminContextForChannel(
+  rosters: Iterable<RaidRosterDocument>,
+  signups: Iterable<RaidSignupSheet>,
+  channelId: string,
+): { roster: RaidRosterDocument; signup: RaidSignupSheet } | null {
+  const rosterList = [...rosters];
+  const activeSignups = [...signups].filter(
+    ({ status }) => status !== "cleared",
+  );
+  const rosterFromPost = rosterList.find(
+    ({ presentationThreadId }) => presentationThreadId === channelId,
+  );
+  if (rosterFromPost) {
+    const signup = activeSignups.find(
+      ({ rosterId }) => rosterId === rosterFromPost.rosterId,
+    );
+    return signup ? { roster: rosterFromPost, signup } : null;
+  }
+  const channelSignups = activeSignups.filter(
+    (signup) => signup.channelId === channelId,
+  );
+  if (channelSignups.length > 1) {
+    throw new Error(
+      "This channel has multiple active signup sheets. Clear the duplicate sheet before using signup administration here.",
+    );
+  }
+  const signup = channelSignups[0];
+  if (!signup) {
+    return null;
+  }
+  const roster = rosterList.find(
+    (candidate) =>
+      candidate.rosterId === signup.rosterId &&
+      candidate.teamChannelId === channelId,
+  );
+  return roster ? { roster, signup } : null;
+}
+
+export function activeSignupConflictForRoster(
+  signups: Iterable<RaidSignupSheet>,
+  roster: RaidRosterDocument,
+): RaidSignupSheet | null {
+  return (
+    [...signups].find(
+      (signup) =>
+        signup.status !== "cleared" &&
+        (signup.rosterId === roster.rosterId ||
+          signup.channelId === roster.teamChannelId),
+    ) ?? null
+  );
+}
+
 function interactionBinding(
   guildId: string | null,
   config: BotConfig,
@@ -659,6 +711,7 @@ export class RaidRosterService {
   private readonly signupRequestThreadIds = new Map<string, string>();
   private readonly signupSheets = new Map<string, RaidSignupSheet>();
   private readonly signupSessions = new Map<string, SignupSession>();
+  private readonly pendingSignupCreations = new Set<string>();
   private readonly pendingSignupSubmissions = new Set<string>();
   private readonly pendingAttendanceResponses = new Set<string>();
   private readonly pendingRosterDisputes = new Set<string>();
@@ -2241,88 +2294,106 @@ export class RaidRosterService {
     if (!roster.finalizedRevision) {
       throw new Error("Finalize this roster before creating its signup sheet.");
     }
-    const existing = [...this.signupSheets.values()].find(
-      (signup) =>
-        signup.rosterId === roster.rosterId && signup.status !== "cleared",
+    const existing = activeSignupConflictForRoster(
+      this.signupSheets.values(),
+      roster,
     );
     if (existing) {
+      if (existing.rosterId !== roster.rosterId) {
+        throw new Error(
+          `The roster's team channel already contains **${existing.name}**. Clear that signup before creating another sheet in <#${existing.channelId}>.`,
+        );
+      }
       throw new Error(
         `This roster already has a reusable signup sheet in <#${existing.channelId}>. Close and restart that sheet instead.`,
       );
     }
+    const creationKey = `${guild.id}:${roster.teamChannelId}`;
+    if (this.pendingSignupCreations.has(creationKey)) {
+      throw new Error(
+        "A signup sheet is already being created in this team channel. Wait for it to finish.",
+      );
+    }
+    this.pendingSignupCreations.add(creationKey);
 
-    const name = interaction.options.getString("name", true).trim();
-    const date = interaction.options.getString("date", true);
-    const startHour = Number(
-      interaction.options.getString("start-hour", true),
-    );
-    const endHour = Number(interaction.options.getString("end-hour", true));
-    const startAt = pdtDateHour(date, startHour);
-    let endAt = pdtDateHour(date, endHour);
-    if (new Date(endAt) <= new Date(startAt)) {
-      endAt = new Date(
-        new Date(endAt).getTime() + 24 * 60 * 60 * 1_000,
-      ).toISOString();
-    }
+    try {
+      const name = interaction.options.getString("name", true).trim();
+      const date = interaction.options.getString("date", true);
+      const startHour = Number(
+        interaction.options.getString("start-hour", true),
+      );
+      const endHour = Number(interaction.options.getString("end-hour", true));
+      const startAt = pdtDateHour(date, startHour);
+      let endAt = pdtDateHour(date, endHour);
+      if (new Date(endAt) <= new Date(startAt)) {
+        endAt = new Date(
+          new Date(endAt).getTime() + 24 * 60 * 60 * 1_000,
+        ).toISOString();
+      }
 
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const [teamChannel, controlForum] = await Promise.all([
-      guild.channels.fetch(roster.teamChannelId),
-      guild.channels.fetch(binding.controlForumId),
-    ]);
-    if (!teamChannel?.isSendable()) {
-      throw new Error("The roster's team channel cannot receive signup sheets.");
-    }
-    if (!controlForum || controlForum.type !== ChannelType.GuildForum) {
-      throw new Error("The configured raid control channel is not a Forum.");
-    }
-    const placeholderMessage = await teamChannel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle(`🗓️ ${name}`)
-          .setDescription("Zors is creating this signup sheet."),
-      ],
-      allowedMentions: { parse: [] },
-    });
-    const raidId = randomUUID();
-    const controlThread = await controlForum.threads.create({
-      name: `Raid Signup — ${name}`.slice(0, 100),
-      message: {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const [teamChannel, controlForum] = await Promise.all([
+        guild.channels.fetch(roster.teamChannelId),
+        guild.channels.fetch(binding.controlForumId),
+      ]);
+      if (!teamChannel?.isSendable()) {
+        throw new Error(
+          "The roster's team channel cannot receive signup sheets.",
+        );
+      }
+      if (!controlForum || controlForum.type !== ChannelType.GuildForum) {
+        throw new Error("The configured raid control channel is not a Forum.");
+      }
+      const placeholderMessage = await teamChannel.send({
         embeds: [
           new EmbedBuilder()
-            .setTitle(signupStorageEmbedTitle)
-            .setDescription(`Initializing raid signup ${raidId}.`),
+            .setTitle(`🗓️ ${name}`)
+            .setDescription("Zors is creating this signup sheet."),
         ],
         allowedMentions: { parse: [] },
-      },
-      reason: `Zors raid signup storage ${raidId}`,
-    });
-    const now = new Date().toISOString();
-    const signup = raidSignupSheetSchema.parse({
-      schemaVersion: 1,
-      raidId,
-      guildId: guild.id,
-      rosterId: roster.rosterId,
-      name,
-      startAt,
-      endAt,
-      status: "open",
-      cycle: 1,
-      channelId: teamChannel.id,
-      messageId: placeholderMessage.id,
-      controlThreadId: controlThread.id,
-      createdAt: now,
-      createdBy: interaction.user.id,
-      updatedAt: now,
-      attendanceConfirmations: [],
-      attendanceNotifiedMemberIds: [],
-      attendancePromptMessages: [],
-    });
-    await this.persistSignupSheet(guild, signup);
-    await this.sendAttendanceConfirmations(guild, signup, roster);
-    await interaction.editReply(
-      `Created **${name}** in <#${teamChannel.id}>.`,
-    );
+      });
+      const raidId = randomUUID();
+      const controlThread = await controlForum.threads.create({
+        name: `Raid Signup — ${name}`.slice(0, 100),
+        message: {
+          embeds: [
+            new EmbedBuilder()
+              .setTitle(signupStorageEmbedTitle)
+              .setDescription(`Initializing raid signup ${raidId}.`),
+          ],
+          allowedMentions: { parse: [] },
+        },
+        reason: `Zors raid signup storage ${raidId}`,
+      });
+      const now = new Date().toISOString();
+      const signup = raidSignupSheetSchema.parse({
+        schemaVersion: 1,
+        raidId,
+        guildId: guild.id,
+        rosterId: roster.rosterId,
+        name,
+        startAt,
+        endAt,
+        status: "open",
+        cycle: 1,
+        channelId: teamChannel.id,
+        messageId: placeholderMessage.id,
+        controlThreadId: controlThread.id,
+        createdAt: now,
+        createdBy: interaction.user.id,
+        updatedAt: now,
+        attendanceConfirmations: [],
+        attendanceNotifiedMemberIds: [],
+        attendancePromptMessages: [],
+      });
+      await this.persistSignupSheet(guild, signup);
+      await this.sendAttendanceConfirmations(guild, signup, roster);
+      await interaction.editReply(
+        `Created **${name}** in <#${teamChannel.id}>.`,
+      );
+    } finally {
+      this.pendingSignupCreations.delete(creationKey);
+    }
   }
 
   public async handleSignupAdminCommand(
@@ -2342,7 +2413,7 @@ export class RaidRosterService {
       await interaction.reply({
         content: [
           "**Zors signup administration**",
-          "Run these commands inside the roster's `📋raid-rosters` post.",
+          "Run these commands inside the roster's `📋raid-rosters` post or the team channel containing its active signup sheet.",
           "`/zors-signup-admin close` — Close the active sheet while preserving requests and attendance.",
           "`/zors-signup-admin restart-week` — Archive the cycle and restart exactly one week later.",
           "`/zors-signup-admin restart-custom` — Archive the cycle and restart with a new date and time.",
@@ -2357,15 +2428,20 @@ export class RaidRosterService {
     if (!guild) {
       throw new Error("Signup administration requires a guild.");
     }
-    const roster = await this.rosterFromCommand(interaction);
-    const signup = [...this.signupSheets.values()].find(
-      (candidate) =>
-        candidate.rosterId === roster.rosterId &&
-        candidate.status !== "cleared",
+    const context = signupAdminContextForChannel(
+      this.rosters.values(),
+      this.signupSheets.values(),
+      interaction.channelId,
     );
-    if (!signup) {
-      throw new Error("This roster has no active signup sheet.");
+    if (!context) {
+      if (this.rosterForThread(interaction.channelId)) {
+        throw new Error("This roster has no active signup sheet.");
+      }
+      throw new Error(
+        "Run this command inside the roster's 📋raid-rosters post or the team channel containing its active signup sheet.",
+      );
     }
+    const { roster, signup } = context;
     if (subcommand === "bump") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const channel = await guild.channels.fetch(signup.channelId);

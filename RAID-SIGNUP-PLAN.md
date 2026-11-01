@@ -373,6 +373,11 @@ Use a second command group:
 `/zors-signup create` is limited to Raid Coordinator, Officer, Administrator, and
 the configured server owner. It starts an ephemeral wizard:
 
+Signup administration resolves context from either the roster's Forum post or
+the bound team channel containing its active signup. Unrelated channels are
+rejected, and a team channel may contain only one non-cleared signup even if
+multiple roster records reference that channel.
+
 1. Select a saved roster. If none exists, stop and direct the coordinator to
    `/zors-roster create`.
 2. Enter the raid name.

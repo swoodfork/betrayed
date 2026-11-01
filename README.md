@@ -166,7 +166,8 @@ Pending. Staff can reject a still-pending request from its private post.
 
 Regular members see only **Request a Spot** on an open signup sheet. Authorized
 Raid Coordinators, Officers, Administrators, and the owner manage its lifecycle
-contextually from the roster post with `/zors-signup-admin close`,
+contextually from either the roster post or the bound team channel containing
+that roster's active sheet with `/zors-signup-admin close`,
 `restart-week`, `restart-custom`, `clear`, or `bump`. Bump posts the replacement
 first, persists its new durable message link, and only then deletes the old
 sheet without changing its cycle, requests, attendance, or status. Close preserves current requests
@@ -179,6 +180,8 @@ cycle and clears its requests, but permanently clears that sheet and removes
 all restart controls. A new sheet can then be created from the roster post.
 Restart and Clear refuse while a request is staged in a roster Draft, requiring
 staff to Finalize or Revert first.
+Zors permits only one non-cleared signup sheet in a team channel, even when
+multiple rosters reference that channel.
 
 Group and Bench attendance DMs offer **I will be at raid**, **Tentative**, and
 **I cannot attend**. Tentative and declined responses require an explanation.

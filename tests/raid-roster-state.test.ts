@@ -19,11 +19,14 @@ import {
   buildRosterEmbed,
   buildRosterControls,
   buildDraftWarningControls,
+  activeSignupConflictForRoster,
   isMatchingTeamRoleName,
   isTeamRoleAvailableForRoster,
+  signupAdminContextForChannel,
   signupRequestIdFromMoveSelection,
   validateRosterSizeChange,
 } from "../src/raid-rosters.js";
+import type { RaidSignupSheet } from "../src/raid-signup-state.js";
 import {
   buildRaidSignupRequestEmbed,
   raidSignupRequestFromEmbed,
@@ -77,7 +80,93 @@ function assignment(
   };
 }
 
+function signup(
+  document: RaidRosterDocument,
+  overrides: Partial<RaidSignupSheet> = {},
+): RaidSignupSheet {
+  return {
+    schemaVersion: 1,
+    raidId: "d6a13cc8-39ce-48fc-a220-63b6e1313252",
+    guildId: document.guildId,
+    rosterId: document.rosterId,
+    name: "Sunday Raid",
+    startAt: "2026-11-08T02:00:00.000Z",
+    endAt: "2026-11-08T05:00:00.000Z",
+    status: "open",
+    cycle: 1,
+    channelId: document.teamChannelId,
+    messageId: "923456789012345678",
+    controlThreadId: "933456789012345678",
+    createdAt: "2026-11-01T00:00:00.000Z",
+    createdBy: ownerId,
+    updatedAt: "2026-11-01T00:00:00.000Z",
+    attendanceConfirmations: [],
+    attendanceNotifiedMemberIds: [],
+    attendancePromptMessages: [],
+    ...overrides,
+  };
+}
+
 describe("raid roster state", () => {
+  it("resolves signup administration only from its roster post or team channel", () => {
+    const document = roster();
+    const activeSignup = signup(document);
+
+    expect(
+      signupAdminContextForChannel(
+        [document],
+        [activeSignup],
+        document.presentationThreadId,
+      ),
+    ).toEqual({ roster: document, signup: activeSignup });
+    expect(
+      signupAdminContextForChannel(
+        [document],
+        [activeSignup],
+        document.teamChannelId,
+      ),
+    ).toEqual({ roster: document, signup: activeSignup });
+    expect(
+      signupAdminContextForChannel(
+        [document],
+        [activeSignup],
+        "943456789012345678",
+      ),
+    ).toBeNull();
+  });
+
+  it("allows only one non-cleared signup in a team channel", () => {
+    const document = roster();
+    const existing = signup(document);
+    const secondRoster = {
+      ...roster(),
+      rosterId: "e6a13cc8-39ce-48fc-a220-63b6e1313252",
+      presentationThreadId: "953456789012345678",
+    };
+
+    expect(activeSignupConflictForRoster([existing], secondRoster)).toBe(
+      existing,
+    );
+    expect(
+      activeSignupConflictForRoster(
+        [{ ...existing, status: "cleared" }],
+        secondRoster,
+      ),
+    ).toBeNull();
+    expect(() =>
+      signupAdminContextForChannel(
+        [document, secondRoster],
+        [
+          existing,
+          signup(secondRoster, {
+            raidId: "f6a13cc8-39ce-48fc-a220-63b6e1313252",
+          }),
+        ],
+        document.teamChannelId,
+      ),
+    ).toThrow("multiple active signup sheets");
+  });
+
   it("merges disjoint edits and rejects overlapping members or destinations", () => {
     const baseline = [
       assignment(memberOne, { kind: "group", group: 1, slot: 1 }),
