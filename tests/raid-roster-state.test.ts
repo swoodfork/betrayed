@@ -377,9 +377,7 @@ describe("raid roster state", () => {
       controls.find(({ label }) => label === "Change Spec")?.style,
     ).toBe(1);
     expect(controls.map(({ label }) => label)).not.toContain("Bump");
-    expect(
-      controls.find(({ label }) => label === "Delete Roster")?.style,
-    ).toBe(4);
+    expect(controls.map(({ label }) => label)).not.toContain("Delete Roster");
   });
 
   it("orders Draft warning actions as continue, finalize, then revert", () => {

@@ -453,6 +453,7 @@ export function buildRosterEmbed(
 
 export function buildRosterControls(
   roster: RaidRosterDocument,
+  signup?: RaidSignupSheet,
 ): ActionRowBuilder<ButtonBuilder>[] {
   if (roster.status === "archived") {
     return [];
@@ -481,8 +482,8 @@ export function buildRosterControls(
       control("finalize", "Finalize", ButtonStyle.Success),
       control("revert", "Revert Draft", ButtonStyle.Danger),
       control("archive", "Archive", ButtonStyle.Secondary),
-      control("delete", "Delete Roster", ButtonStyle.Danger),
     ),
+    ...(signup ? buildSignupStaffControls(signup) : []),
   ];
 }
 
@@ -508,16 +509,28 @@ export function buildDraftWarningControls(
 export function buildSignupSheetControls(
   signup: RaidSignupSheet,
 ): ActionRowBuilder<ButtonBuilder>[] {
+  if (signup.status !== "open") {
+    return [];
+  }
+  return [
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${customIdPrefix}:raid:request:${signup.raidId}`)
+        .setLabel("Request a Spot")
+        .setStyle(ButtonStyle.Primary),
+    ),
+  ];
+}
+
+export function buildSignupStaffControls(
+  signup: RaidSignupSheet,
+): ActionRowBuilder<ButtonBuilder>[] {
   if (signup.status === "cleared") {
     return [];
   }
   if (signup.status === "open") {
     return [
       new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`${customIdPrefix}:raid:request:${signup.raidId}`)
-          .setLabel("Request a Spot")
-          .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
           .setCustomId(`${customIdPrefix}:raid:close:${signup.raidId}`)
           .setLabel("Close Signup")
@@ -697,6 +710,36 @@ export class RaidRosterService {
     return buildSignupSheetControls(signup);
   }
 
+  private activeSignupForRoster(rosterId: string): RaidSignupSheet | undefined {
+    return [...this.signupSheets.values()].find(
+      (signup) => signup.rosterId === rosterId && signup.status !== "cleared",
+    );
+  }
+
+  private async refreshRosterPresentation(
+    guild: Guild,
+    roster: RaidRosterDocument,
+  ): Promise<void> {
+    const presentation = await guild.channels.fetch(
+      roster.presentationThreadId,
+    );
+    if (!presentation?.isThread()) {
+      throw new Error("The roster presentation thread is unavailable.");
+    }
+    const starter = await presentation.fetchStarterMessage();
+    if (!starter) {
+      throw new Error("The roster presentation starter message is unavailable.");
+    }
+    await starter.edit({
+      embeds: [this.rosterPresentationEmbed(roster)],
+      components: buildRosterControls(
+        roster,
+        this.activeSignupForRoster(roster.rosterId),
+      ),
+      allowedMentions: { parse: [] },
+    });
+  }
+
   private async fetchStoredSignupSheet(
     thread: AnyThreadChannel,
     metadata: { raidId: string; latestRevisionMessageId: string },
@@ -785,6 +828,7 @@ export class RaidRosterService {
       allowedMentions: { parse: [] },
     });
     this.signupSheets.set(validated.raidId, structuredClone(validated));
+    await this.refreshRosterPresentation(guild, roster);
   }
 
   private async refreshSignupSheetPresentation(
@@ -864,21 +908,7 @@ export class RaidRosterService {
     this.signupRequests.set(validated.requestId, structuredClone(validated));
     this.signupRequestThreadIds.set(validated.requestId, threadId);
 
-    const presentation = await guild.channels.fetch(
-      roster.presentationThreadId,
-    );
-    if (!presentation?.isThread()) {
-      throw new Error("The roster presentation thread is unavailable.");
-    }
-    const presentationStarter = await presentation.fetchStarterMessage();
-    if (!presentationStarter) {
-      throw new Error("The roster presentation starter message is unavailable.");
-    }
-    await presentationStarter.edit({
-      embeds: [this.rosterPresentationEmbed(roster)],
-      components: buildRosterControls(roster),
-      allowedMentions: { parse: [] },
-    });
+    await this.refreshRosterPresentation(guild, roster);
     const signup = this.signupSheets.get(validated.raidId);
     if (signup) {
       await this.refreshSignupSheetPresentation(guild, signup);
@@ -1190,6 +1220,10 @@ export class RaidRosterService {
         components: this.signupSheetComponents(signup),
         allowedMentions: { parse: [] },
       });
+      await this.refreshRosterPresentation(
+        guild,
+        this.rosters.get(signup.rosterId)!,
+      );
       if (signup.status === "open") {
         await this.sendAttendanceConfirmations(
           guild,
@@ -1263,7 +1297,10 @@ export class RaidRosterService {
     }
     await presentationStarter.edit({
       embeds: [this.rosterPresentationEmbed(validated)],
-      components: buildRosterControls(validated),
+      components: buildRosterControls(
+        validated,
+        this.activeSignupForRoster(validated.rosterId),
+      ),
       allowedMentions: { parse: [] },
     });
     for (const signup of this.signupSheets.values()) {

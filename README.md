@@ -108,14 +108,15 @@ then reconstructed at startup; no Render filesystem or database is required.
 Officers and Raid Coordinators can use Zors controls but cannot manually create,
 reply to, react to, edit, delete, or manage roster/request Forum posts.
 
-Roster controls support Add Member, Move Member, Swap Members, Change Spec,
-Remove Member, Finalize, Revert Draft, Archive, and Delete Roster. Raid
-Coordinators may use every operational roster control through Archive. Create,
-Edit, and permanent Delete require the owner, an Administrator, or an Officer.
-Delete is blocked until attached signup sheets are Clear and Archived, writes
-an immutable deleted-roster snapshot to `🗃️roster-archives`, permanently
-removes both roster posts, and preserves member roles. Both formats reserve
-ten numbered Bench positions, displayed as two five-slot columns, and an
+Roster buttons support Add Member, Move Member, Swap Members, Change Spec,
+Remove Member, Finalize, Revert Draft, and Archive. Raid Coordinators may use
+every operational roster control through Archive. Create, Edit, and permanent
+Delete require the owner, an Administrator, or an Officer; Delete is available
+only through `/zors-roster delete` to prevent accidental clicks. Delete is
+blocked until attached signup sheets are Clear and Archived, writes an immutable
+deleted-roster snapshot to `🗃️roster-archives`, permanently removes both roster
+posts, and preserves member roles. Both formats reserve ten numbered Bench
+positions, displayed as two five-slot columns, and an
 unnumbered Overflow list. Bench 2 restarts its visible numbering at 1 while
 retaining distinct internal slots 6–10. Finalization validates the team role, team channel, members, placements, and
 class/spec combinations. Every finalized roster member receives the bound team
@@ -148,9 +149,12 @@ approval moves that one assignment instead of duplicating the member. Finalize
 approves staged requests and assigns the team role; Revert returns them to
 Pending. Staff can reject a still-pending request from its private post.
 
-Close Signup disables new requests but preserves current requests for staff to
-finish processing. A closed sheet offers **Restart +7 Days**, **Restart with
-New Schedule**, and **Clear and Archive**. Every Restart first writes an
+Regular members see only **Request a Spot** on an open signup sheet. Staff-only
+**Close Signup**, **Restart**, and **Clear and Archive** controls live in the
+private roster post instead of the member-facing signup message. Close Signup
+disables new requests but preserves current requests for staff to finish
+processing. A closed signup offers **Restart +7 Days**, **Restart with New
+Schedule**, and **Clear and Archive** in its roster post. Every Restart writes an
 immutable cycle snapshot to `🗃️roster-archives`, then clears that sheet's
 requests, keeps the finalized roster—including Group, Bench, and Overflow—and
 clears the prior attendance responses, reopens the same sheet, and sends fresh
