@@ -141,6 +141,17 @@ describe("raid signup sheet state", () => {
         },
       ],
     };
+    const confirmed = {
+      ...signup,
+      attendanceConfirmations: [
+        {
+          memberId,
+          status: "confirmed" as const,
+          recordedAt: signup.createdAt,
+          lockedAt: signup.createdAt,
+        },
+      ],
+    };
 
     expect(canRecordInitialAttendance(signup, memberId)).toBe(true);
     expect(canRecordInitialAttendance(tentative, memberId)).toBe(false);
@@ -154,6 +165,7 @@ describe("raid signup sheet state", () => {
       canRecordAttendanceFollowup(finalizedDecline, memberId, "confirm"),
     ).toBe(false);
     expect(canRecordAttendanceWithdrawal(tentative, memberId)).toBe(true);
+    expect(canRecordAttendanceWithdrawal(confirmed, memberId)).toBe(true);
     expect(canRecordAttendanceWithdrawal(finalizedDecline, memberId)).toBe(
       false,
     );

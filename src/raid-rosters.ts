@@ -3548,9 +3548,13 @@ export class RaidRosterService {
     cycle: number,
     memberId: string,
     fieldName = "reason",
+    source: "initial" | "withdrawal" = "initial",
   ): Promise<void> {
     if (interaction.user.id !== memberId) {
       throw new Error("This attendance response belongs to another member.");
+    }
+    if (!interaction.isFromMessage()) {
+      throw new Error("This attendance response is not attached to a message.");
     }
     const initialSignup = this.signupSheets.get(raidId);
     if (
@@ -3570,7 +3574,7 @@ export class RaidRosterService {
       const signup = this.signupSheets.get(raidId);
       const allowed =
         signup &&
-        (fieldName === "reason"
+        (source === "initial"
           ? canRecordInitialAttendance(signup, memberId)
           : canRecordAttendanceWithdrawal(signup, memberId));
       if (!signup || !allowed) {
@@ -3621,9 +3625,6 @@ export class RaidRosterService {
         reason,
         false,
       );
-      if (!interaction.isFromMessage()) {
-        throw new Error("This attendance response is not attached to a DM.");
-      }
       await interaction.update({
         content:
           response === "tentative"
@@ -3761,58 +3762,61 @@ export class RaidRosterService {
         }
         return;
       }
-    const roster = this.rosters.get(currentSignup.rosterId);
-    const assignment = roster
-      ? activeRevision(roster)?.assignments.find(
-      ({ memberId: assignedMemberId }) => assignedMemberId === memberId,
-        )
-      : undefined;
-    if (!roster || !assignment) {
-      throw new Error("This member no longer has a finalized roster spot.");
-    }
-    const existing = currentSignup.attendanceConfirmations.find(
-      (entry) => entry.memberId === memberId,
-    );
-    const nextStatus = response === "confirm" ? "confirmed" : "declined";
-    const updateReason =
-      response === "confirm"
-        ? "The member reported that their plans changed and they can now attend."
-        : existing?.issue ??
-          "The member finalized their tentative response as not attending.";
-    const guild = await interaction.client.guilds.fetch(currentSignup.guildId);
-    const now = new Date().toISOString();
-    await this.persistSignupSheet(guild, {
-      ...currentSignup,
-      attendanceConfirmations: [
-        ...currentSignup.attendanceConfirmations.filter(
-          (entry) => entry.memberId !== memberId,
-        ),
-        {
-          memberId,
-          status: nextStatus,
-          recordedAt: now,
-          lockedAt: now,
-          ...(nextStatus === "declined" ? { issue: updateReason } : {}),
-        },
-      ],
-      updatedAt: now,
-    });
-    await this.sendAttendanceCoordinatorUpdate(
-      guild,
-      currentSignup,
-      roster,
-      assignment,
-      nextStatus,
-      updateReason,
-      true,
-    );
-    await interaction.update({
-      content:
-        nextStatus === "confirmed"
-          ? "✅ Your Attendance is Confirmed. The officer core was alerted."
-          : "🔴 You are marked Not Attending. The officer core was alerted.",
-      components: [],
-    });
+      const roster = this.rosters.get(currentSignup.rosterId);
+      const assignment = roster
+        ? activeRevision(roster)?.assignments.find(
+            ({ memberId: assignedMemberId }) =>
+              assignedMemberId === memberId,
+          )
+        : undefined;
+      if (!roster || !assignment) {
+        throw new Error("This member no longer has a finalized roster spot.");
+      }
+      const existing = currentSignup.attendanceConfirmations.find(
+        (entry) => entry.memberId === memberId,
+      );
+      const nextStatus = response === "confirm" ? "confirmed" : "declined";
+      const updateReason =
+        response === "confirm"
+          ? "The member reported that their plans changed and they can now attend."
+          : existing?.issue ??
+            "The member finalized their tentative response as not attending.";
+      const guild = await interaction.client.guilds.fetch(
+        currentSignup.guildId,
+      );
+      const now = new Date().toISOString();
+      await this.persistSignupSheet(guild, {
+        ...currentSignup,
+        attendanceConfirmations: [
+          ...currentSignup.attendanceConfirmations.filter(
+            (entry) => entry.memberId !== memberId,
+          ),
+          {
+            memberId,
+            status: nextStatus,
+            recordedAt: now,
+            lockedAt: now,
+            ...(nextStatus === "declined" ? { issue: updateReason } : {}),
+          },
+        ],
+        updatedAt: now,
+      });
+      await this.sendAttendanceCoordinatorUpdate(
+        guild,
+        currentSignup,
+        roster,
+        assignment,
+        nextStatus,
+        updateReason,
+        true,
+      );
+      await interaction.update({
+        content:
+          nextStatus === "confirmed"
+            ? "✅ Your Attendance is Confirmed. The officer core was alerted."
+            : "🔴 You are marked Not Attending. The officer core was alerted.",
+        components: [],
+      });
     } finally {
       this.pendingAttendanceResponses.delete(responseKey);
     }
@@ -4442,7 +4446,7 @@ export class RaidRosterService {
       await interaction.showModal(
         new ModalBuilder()
           .setCustomId(
-            `${customIdPrefix}:attend-response:declined:${signup.raidId}:${signup.cycle}:${memberId}`,
+            `${customIdPrefix}:attend-withdraw:${signup.raidId}:${signup.cycle}:${memberId}`,
           )
           .setTitle("Withdraw from Raid")
           .addComponents(
@@ -4689,6 +4693,18 @@ export class RaidRosterService {
       );
       return true;
     }
+    if (parts[1] === "attend-withdraw" && interaction.isModalSubmit()) {
+      await this.recordAttendanceResponse(
+        interaction,
+        "declined",
+        parts[2] ?? "",
+        Number(parts[3]),
+        parts[4] ?? "",
+        "reason",
+        "withdrawal",
+      );
+      return true;
+    }
     if (parts[1] === "attendance-issue" && interaction.isModalSubmit()) {
       await this.recordAttendanceResponse(
         interaction,
@@ -4697,6 +4713,7 @@ export class RaidRosterService {
         Number(parts[3]),
         parts[4] ?? "",
         "issue",
+        "withdrawal",
       );
       return true;
     }
