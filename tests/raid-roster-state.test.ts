@@ -425,6 +425,8 @@ describe("raid roster state", () => {
     );
     document.warningMessageId = "923456789012345678";
     expect(draftWarningDueAt(document)).toBeNull();
+    document.draftRevision!.editedAt = "2026-11-03T00:00:00.000Z";
+    expect(draftWarningDueAt(document)).toBeNull();
     vi.useRealTimers();
   });
 

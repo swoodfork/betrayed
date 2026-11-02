@@ -114,6 +114,9 @@ then reconstructed at startup; no Render filesystem or database is required.
 Multiple coordinators may edit the same Draft concurrently: unrelated member
 and destination changes merge against the latest revision, while overlapping
 member or occupied-slot edits stop with the exact conflict reason.
+An inactive Draft receives one reminder after 30 minutes. A coordinator can
+acknowledge that reminder and keep the Draft open for days without additional
+inactivity reminders; finalizing or reverting ends that Draft lifecycle.
 Officers and Raid Coordinators can use Zors controls but cannot manually create,
 reply to, react to, edit, delete, or manage roster/request Forum posts.
 

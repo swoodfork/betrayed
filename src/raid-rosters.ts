@@ -85,6 +85,8 @@ const draftWarningDelayMs = 30 * 60 * 1_000;
 const sessionLifetimeMs = 15 * 60 * 1_000;
 const draftWarningContent =
   "⚠️ This roster Draft has been inactive for 30 minutes. Continue drafting, finalize it, or revert it to the last finalized snapshot.";
+const acknowledgedDraftWarningContent =
+  "✅ This roster Draft remains open. No additional inactivity reminders will be sent until it is finalized or reverted.";
 
 const classColorMarkers: Record<
   keyof typeof wowForeverClassSpecializations,
@@ -1431,11 +1433,20 @@ export class RaidRosterService {
           .fetch(roster.warningMessageId)
           .catch(() => null);
         if (warning) {
-          await warning.edit({
-            content: draftWarningContent,
-            components: [buildDraftWarningControls(roster.rosterId)],
-            allowedMentions: { parse: [] },
-          });
+          const acknowledged = warning.components.length === 0;
+          await warning.edit(
+            acknowledged
+              ? {
+                  content: acknowledgedDraftWarningContent,
+                  components: [],
+                  allowedMentions: { parse: [] },
+                }
+              : {
+                  content: draftWarningContent,
+                  components: [buildDraftWarningControls(roster.rosterId)],
+                  allowedMentions: { parse: [] },
+                },
+          );
         } else {
           roster.warningMessageId = null;
         }
@@ -1694,11 +1705,35 @@ export class RaidRosterService {
     }
     const thread = await guild.channels.fetch(roster.presentationThreadId);
     if (thread?.isThread()) {
-      const warning = await thread.messages.fetch(warningMessageId).catch(() => null);
+      const warning = await thread.messages
+        .fetch(warningMessageId)
+        .catch(() => null);
       if (warning) {
         await warning.delete();
       }
     }
+  }
+
+  private async acknowledgeWarning(
+    guild: Guild,
+    roster: RaidRosterDocument,
+    warningMessageId: string,
+  ): Promise<void> {
+    const thread = await guild.channels.fetch(roster.presentationThreadId);
+    if (!thread?.isThread()) {
+      throw new Error("The roster thread is unavailable for its Draft warning.");
+    }
+    const warning = await thread.messages
+      .fetch(warningMessageId)
+      .catch(() => null);
+    if (!warning) {
+      throw new Error("This Draft warning is no longer available.");
+    }
+    await warning.edit({
+      content: acknowledgedDraftWarningContent,
+      components: [],
+      allowedMentions: { parse: [] },
+    });
   }
 
   private async createRoster(
@@ -3270,13 +3305,15 @@ export class RaidRosterService {
           throw new Error("This roster no longer has a Draft.");
         }
         const warningId = roster.warningMessageId;
+        if (!warningId) {
+          throw new Error("This Draft warning is no longer active.");
+        }
         roster.draftRevision.editedAt = new Date().toISOString();
         roster.draftRevision.editedBy = interaction.user.id;
-        roster.warningMessageId = null;
         await this.persist(guild, roster);
-        await this.deleteWarning(guild, roster, warningId);
+        await this.acknowledgeWarning(guild, roster, warningId);
         await interaction.editReply(
-          "Draft preserved. The 30-minute inactivity timer has restarted.",
+          "Draft preserved. No additional inactivity reminders will be sent until it is finalized or reverted.",
         );
       } else if (action === "finalize") {
         const diff = await this.finalize(guild, roster, interaction.user.id);
