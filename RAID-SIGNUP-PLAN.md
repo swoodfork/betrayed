@@ -65,9 +65,8 @@ pass.
   raid start. Any checkpoint already in the past is skipped.
 - Unanswered members receive another DM every 24 hours.
 - Unanswered reminders stop when the raid begins.
-- Raid times are entered and stored in the `America/Los_Angeles` time zone.
-  This correctly applies PST or PDT for the selected date instead of assuming
-  that every date is PDT.
+- Raid times are entered as fixed Pacific Standard Time (PST, UTC−8).
+  Daylight-saving time does not shift the selected raid hour.
 
 ## Recommended User Experience
 
@@ -384,7 +383,7 @@ multiple roster records reference that channel.
 3. Enter the calendar date as `YYYY-MM-DD`.
 4. Select the start hour.
 5. Select the end hour.
-6. Preview the resolved PST/PDT timestamps and roster.
+6. Preview the resolved fixed-PST timestamps and roster.
 7. Confirm creation.
 8. Post the primary sheet in the roster's bound team channel.
 9. Persist the signup.
@@ -980,7 +979,7 @@ and delivery history.
 
 ### Unit tests
 
-- PST/PDT conversion around daylight-saving boundaries.
+- Fixed-PST conversion across daylight-saving boundaries.
 - Immediate, 3-day, 24-hour, and 6-hour due calculations.
 - Passed checkpoint boundaries are skipped.
 - A late roster addition receives Immediate and only future checkpoints.

@@ -95,7 +95,7 @@ export function canRecordAttendanceFollowup(
   );
 }
 
-export function pdtDateHour(date: string, hour: number): string {
+export function pstDateHour(date: string, hour: number): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     throw new Error("Date must use YYYY-MM-DD.");
   }
@@ -110,7 +110,7 @@ export function pdtDateHour(date: string, hour: number): string {
     throw new Error("Choose a valid calendar date.");
   }
   const parsed = new Date(
-    `${date}T${String(hour).padStart(2, "0")}:00:00-07:00`,
+    `${date}T${String(hour).padStart(2, "0")}:00:00-08:00`,
   );
   return parsed.toISOString();
 }

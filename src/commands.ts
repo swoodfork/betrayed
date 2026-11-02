@@ -359,14 +359,14 @@ export const zorsSignupCommand = new SlashCommandBuilder()
       .addStringOption((option) =>
         option
           .setName("start-hour")
-          .setDescription("Raid start hour in PDT")
+          .setDescription("Raid start hour in PST")
           .addChoices(...hourlyChoices)
           .setRequired(true),
       )
       .addStringOption((option) =>
         option
           .setName("end-hour")
-          .setDescription("Raid end hour in PDT")
+          .setDescription("Raid end hour in PST")
           .addChoices(...hourlyChoices)
           .setRequired(true),
       ),
@@ -402,14 +402,14 @@ export const zorsSignupAdminCommand = new SlashCommandBuilder()
       .addStringOption((option) =>
         option
           .setName("start-hour")
-          .setDescription("Raid start hour in PDT")
+          .setDescription("Raid start hour in PST")
           .addChoices(...hourlyChoices)
           .setRequired(true),
       )
       .addStringOption((option) =>
         option
           .setName("end-hour")
-          .setDescription("Raid end hour in PDT")
+          .setDescription("Raid end hour in PST")
           .addChoices(...hourlyChoices)
           .setRequired(true),
       ),

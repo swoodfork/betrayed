@@ -7,6 +7,7 @@ import {
   guildChangeQuestion,
   isRaidApplicationContinuationCustomId,
   offSpecWillingnessOptions,
+  raidAvailabilityOptions,
   storedRaidApplicationFromEmbed,
   wowForeverClassSpecializations,
   type StoredRaidApplication,
@@ -40,6 +41,16 @@ describe("raid application Discord storage", () => {
       ["elemental", "Elemental"],
       ["enhancement", "Enhancement"],
       ["restoration", "Restoration"],
+    ]);
+  });
+
+  it("presents raid availability in PST and EST", () => {
+    expect(raidAvailabilityOptions.map(([, label]) => label)).toEqual([
+      "Monday — 6 PM PST / 9 PM EST to 9 PM PST / 12 AM EST",
+      "Tuesday — 6 PM PST / 9 PM EST to 9 PM PST / 12 AM EST",
+      "Wednesday — 6 PM PST / 9 PM EST to 9 PM PST / 12 AM EST",
+      "Thursday — 6 PM PST / 9 PM EST to 9 PM PST / 12 AM EST",
+      "Sunday — 6 PM PST / 9 PM EST to 9 PM PST / 12 AM EST",
     ]);
   });
 

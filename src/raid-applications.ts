@@ -29,12 +29,12 @@ const customIdPrefix = "zors-raid-application";
 const applicationEmbedTitle = "Betrayed Raid Application";
 const draftLifetimeMs = 30 * 60 * 1_000;
 
-const availabilityOptions = [
-  ["monday", "Monday — 6–9 PM PDT"],
-  ["tuesday", "Tuesday — 6–9 PM PDT"],
-  ["wednesday", "Wednesday — 6–9 PM PDT"],
-  ["thursday", "Thursday — 6–9 PM PDT"],
-  ["sunday", "Sunday — 6–9 PM PDT"],
+export const raidAvailabilityOptions = [
+  ["monday", "Monday — 6 PM PST / 9 PM EST to 9 PM PST / 12 AM EST"],
+  ["tuesday", "Tuesday — 6 PM PST / 9 PM EST to 9 PM PST / 12 AM EST"],
+  ["wednesday", "Wednesday — 6 PM PST / 9 PM EST to 9 PM PST / 12 AM EST"],
+  ["thursday", "Thursday — 6 PM PST / 9 PM EST to 9 PM PST / 12 AM EST"],
+  ["sunday", "Sunday — 6 PM PST / 9 PM EST to 9 PM PST / 12 AM EST"],
 ] as const;
 
 const emergencyOptions = [
@@ -300,9 +300,9 @@ function buildSelectionComponents(
       selectMenu(
         "availability",
         "Select every raid day you can attend",
-        availabilityOptions,
+        raidAvailabilityOptions,
         draft.availability,
-        availabilityOptions.length,
+        raidAvailabilityOptions.length,
       ),
     ),
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
@@ -481,7 +481,7 @@ function buildApplicationModal(): ModalBuilder {
 
 function completeRaidPreferences(draft: RaidApplicationDraft): boolean {
   return (
-    selectedValuesAreValid(draft.availability, availabilityOptions) &&
+    selectedValuesAreValid(draft.availability, raidAvailabilityOptions) &&
     draft.emergency !== null &&
     selectedValuesAreValid([draft.emergency], emergencyOptions) &&
     draft.raider !== null &&
@@ -949,7 +949,7 @@ export async function handleRaidApplicationInteraction(
       `${customIdPrefix}:select:`.length,
     ) as ChoiceKey;
     if (key === "availability") {
-      if (!selectedValuesAreValid(interaction.values, availabilityOptions)) {
+      if (!selectedValuesAreValid(interaction.values, raidAvailabilityOptions)) {
         throw new Error("Invalid raid availability selection.");
       }
       draft.availability = [...interaction.values];
@@ -1121,7 +1121,7 @@ export async function handleRaidApplicationInteraction(
       applicantId: interaction.user.id,
       submittedAt: submittedAt.toISOString(),
       availability: draft.availability
-        .map((value) => labelFor(availabilityOptions, value))
+        .map((value) => labelFor(raidAvailabilityOptions, value))
         .join("\n"),
       emergencyLikelihood: labelFor(
         emergencyOptions,

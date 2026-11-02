@@ -4,7 +4,7 @@ import {
   canRecordAttendanceFollowup,
   canRecordAttendanceWithdrawal,
   canRecordInitialAttendance,
-  pdtDateHour,
+  pstDateHour,
   raidSignupSheetSchema,
   resetSignupAttendanceForMembers,
   shiftSignupSevenDays,
@@ -35,14 +35,14 @@ const signup = raidSignupSheetSchema.parse({
 });
 
 describe("raid signup sheet state", () => {
-  it("parses fixed PDT dates and rejects invalid dates or hours", () => {
-    expect(pdtDateHour("2026-11-01", 19)).toBe(
-      "2026-11-02T02:00:00.000Z",
+  it("parses fixed PST dates and rejects invalid dates or hours", () => {
+    expect(pstDateHour("2026-11-01", 19)).toBe(
+      "2026-11-02T03:00:00.000Z",
     );
-    expect(() => pdtDateHour("2026-02-30", 19)).toThrow(
+    expect(() => pstDateHour("2026-02-30", 19)).toThrow(
       "valid calendar date",
     );
-    expect(() => pdtDateHour("2026-11-01", 24)).toThrow(
+    expect(() => pstDateHour("2026-11-01", 24)).toThrow(
       "between 0 and 23",
     );
   });

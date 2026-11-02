@@ -66,7 +66,7 @@ import {
   canRecordAttendanceFollowup,
   canRecordAttendanceWithdrawal,
   canRecordInitialAttendance,
-  pdtDateHour,
+  pstDateHour,
   raidSignupSheetSchema,
   resetSignupAttendanceForMembers,
   shiftSignupSevenDays,
@@ -2583,8 +2583,8 @@ export class RaidRosterService {
         interaction.options.getString("start-hour", true),
       );
       const endHour = Number(interaction.options.getString("end-hour", true));
-      const startAt = pdtDateHour(date, startHour);
-      let endAt = pdtDateHour(date, endHour);
+      const startAt = pstDateHour(date, startHour);
+      let endAt = pstDateHour(date, endHour);
       if (new Date(endAt) <= new Date(startAt)) {
         endAt = new Date(
           new Date(endAt).getTime() + 24 * 60 * 60 * 1_000,
@@ -2772,8 +2772,8 @@ export class RaidRosterService {
       const endHour = Number(
         interaction.options.getString("end-hour", true),
       );
-      const startAt = pdtDateHour(date, startHour);
-      let endAt = pdtDateHour(date, endHour);
+      const startAt = pstDateHour(date, startHour);
+      let endAt = pstDateHour(date, endHour);
       if (new Date(endAt) <= new Date(startAt)) {
         endAt = new Date(
           new Date(endAt).getTime() + 24 * 60 * 60 * 1_000,
@@ -2841,10 +2841,10 @@ export class RaidRosterService {
         return false;
       }
       const focused = String(focusedOption.value).toLowerCase();
-      const pdtNow = new Date(Date.now() - 7 * 60 * 60 * 1_000);
+      const pstNow = new Date(Date.now() - 8 * 60 * 60 * 1_000);
       const choices = Array.from({ length: 14 }, (_, offset) => {
         const date = new Date(
-          pdtNow.getTime() + offset * 24 * 60 * 60 * 1_000,
+          pstNow.getTime() + offset * 24 * 60 * 60 * 1_000,
         );
         const value = date.toISOString().slice(0, 10);
         const day = new Intl.DateTimeFormat("en-US", {
@@ -5250,7 +5250,7 @@ export class RaidRosterService {
       requests,
     };
     const localDate = new Date(
-      new Date(signup.startAt).getTime() - 7 * 60 * 60 * 1_000,
+      new Date(signup.startAt).getTime() - 8 * 60 * 60 * 1_000,
     )
       .toISOString()
       .slice(0, 10);
@@ -5526,10 +5526,10 @@ export class RaidRosterService {
         throw new Error("Close this signup sheet before restarting it.");
       }
       const localStart = new Date(
-        new Date(signup.startAt).getTime() - 7 * 60 * 60 * 1_000,
+        new Date(signup.startAt).getTime() - 8 * 60 * 60 * 1_000,
       );
       const localEnd = new Date(
-        new Date(signup.endAt).getTime() - 7 * 60 * 60 * 1_000,
+        new Date(signup.endAt).getTime() - 8 * 60 * 60 * 1_000,
       );
       await interaction.showModal(
         new ModalBuilder()
@@ -5547,7 +5547,7 @@ export class RaidRosterService {
             new ActionRowBuilder<TextInputBuilder>().addComponents(
               new TextInputBuilder()
                 .setCustomId("start-hour")
-                .setLabel("Start hour PDT (0-23)")
+                .setLabel("Start hour PST (0-23)")
                 .setStyle(TextInputStyle.Short)
                 .setValue(String(localStart.getUTCHours()))
                 .setRequired(true),
@@ -5555,7 +5555,7 @@ export class RaidRosterService {
             new ActionRowBuilder<TextInputBuilder>().addComponents(
               new TextInputBuilder()
                 .setCustomId("end-hour")
-                .setLabel("End hour PDT (0-23)")
+                .setLabel("End hour PST (0-23)")
                 .setStyle(TextInputStyle.Short)
                 .setValue(String(localEnd.getUTCHours()))
                 .setRequired(true),
@@ -5585,8 +5585,8 @@ export class RaidRosterService {
     const endHour = Number(
       interaction.fields.getTextInputValue("end-hour").trim(),
     );
-    const startAt = pdtDateHour(date, startHour);
-    let endAt = pdtDateHour(date, endHour);
+    const startAt = pstDateHour(date, startHour);
+    let endAt = pstDateHour(date, endHour);
     if (new Date(endAt) <= new Date(startAt)) {
       endAt = new Date(
         new Date(endAt).getTime() + 24 * 60 * 60 * 1_000,

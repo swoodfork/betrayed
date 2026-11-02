@@ -198,6 +198,9 @@ Restart and Clear refuse while a request is staged in a roster Draft, requiring
 staff to Finalize or Revert first.
 Zors permits only one non-cleared signup sheet in a team channel, even when
 multiple rosters reference that channel.
+Raid dates and hour pickers use fixed PST (UTC−8) throughout the year. Raid
+applications present the standard window as **6 PM PST / 9 PM EST to 9 PM PST
+/ 12 AM EST**.
 
 Group and Bench attendance DMs offer **I will be at raid**, **Tentative**, and
 **I cannot attend**. Tentative and declined responses require an explanation.
