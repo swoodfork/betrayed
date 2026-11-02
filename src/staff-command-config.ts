@@ -12,6 +12,7 @@ const guildStaffCommandSchema = z.object({
   guildId: snowflake,
   officerRoleId: snowflake,
   commandLogChannelId: snowflake,
+  directMessageLogChannelId: snowflake,
 });
 
 const staffCommandSchema = z.object({

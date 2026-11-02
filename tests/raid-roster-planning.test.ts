@@ -73,9 +73,14 @@ describe("raid roster desired state", () => {
     expect(officerCategory?.channels).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          key: "bot-message-log",
+          permissionProfile: "staff-private",
+          positionAfter: "zors-command-log",
+        }),
+        expect.objectContaining({
           key: "zors-raid-control",
           permissionProfile: "raid-control-readonly",
-          positionAfter: "zors-command-log",
+          positionAfter: "bot-message-log",
         }),
       ]),
     );

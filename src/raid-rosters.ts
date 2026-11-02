@@ -29,6 +29,7 @@ import {
 } from "discord.js";
 
 import type { BotConfig } from "./config.js";
+import { sendLoggedDirectMessage } from "./direct-message-audit.js";
 import {
   isRaidRosterBindingComplete,
   type RaidRosterBinding,
@@ -72,6 +73,7 @@ import {
   type RaidSignupSheet,
 } from "./raid-signup-state.js";
 import { wowForeverClassSpecializations } from "./raid-applications.js";
+import type { StaffCommandConfig } from "./staff-command-config.js";
 
 const customIdPrefix = "zors-roster";
 const storageEmbedTitle = "Zors Raid Roster Storage";
@@ -768,7 +770,18 @@ export class RaidRosterService {
   public constructor(
     private readonly config: BotConfig,
     private readonly rosterConfig: RaidRosterConfig,
+    private readonly staffCommandConfig: StaffCommandConfig,
   ) {}
+
+  private directMessageLogChannelId(guildId: string): string {
+    if (guildId === this.config.DISCORD_TEST_GUILD_ID) {
+      return this.staffCommandConfig.test.directMessageLogChannelId;
+    }
+    if (guildId === this.config.DISCORD_PRODUCTION_GUILD_ID) {
+      return this.staffCommandConfig.production.directMessageLogChannelId;
+    }
+    throw new Error("Direct-message logging is not configured for this server.");
+  }
 
   private rosterForThread(threadId: string): RaidRosterDocument | null {
     const rosterId = this.rosterIdByThread.get(threadId);
@@ -3739,37 +3752,50 @@ export class RaidRosterService {
             : change.before && !change.after
               ? `You Have Been Removed from the Raid Roster — ${roster.name}`
               : `Your Raid Roster Spot Was Updated — ${roster.name}`;
+        const messageType =
+          !change.before && change.after
+            ? "Roster assignment"
+            : change.before && !change.after
+              ? "Roster removal"
+              : "Roster assignment update";
         const canDispute = isDisputableRosterChange(change);
-        const message = await user.send({
-          embeds: [
-            new EmbedBuilder()
-              .setTitle(title)
-              .setColor(0x8e44ad)
-              .addFields(
-                { name: "Before", value: before },
-                { name: "After", value: after },
-                {
-                  name: "Team Channel",
-                  value: `<#${roster.teamChannelId}>`,
-                },
-              )
-              .setFooter({
-                text: `Finalized revision ${revision} • roster ${roster.rosterId}`,
-              }),
-          ],
-          components: canDispute
-            ? [
-                new ActionRowBuilder<ButtonBuilder>().addComponents(
-                  new ButtonBuilder()
-                    .setCustomId(
-                      `${customIdPrefix}:roster-dispute:${roster.rosterId}:${revision}:${change.memberId}`,
-                    )
-                    .setLabel("Dispute this with Raid Coordinators")
-                    .setStyle(ButtonStyle.Danger),
-                ),
-              ]
-            : [],
-        });
+        const message = await sendLoggedDirectMessage(
+          guild,
+          this.directMessageLogChannelId(guild.id),
+          user,
+          messageType,
+          {
+            embeds: [
+              new EmbedBuilder()
+                .setTitle(title)
+                .setColor(0x8e44ad)
+                .addFields(
+                  { name: "Before", value: before },
+                  { name: "After", value: after },
+                  {
+                    name: "Team Channel",
+                    value: `<#${roster.teamChannelId}>`,
+                  },
+                )
+                .setFooter({
+                  text: `Finalized revision ${revision} • roster ${roster.rosterId}`,
+                }),
+            ],
+            components: canDispute
+              ? [
+                  new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder()
+                      .setCustomId(
+                        `${customIdPrefix}:roster-dispute:${roster.rosterId}:${revision}:${change.memberId}`,
+                      )
+                      .setLabel("Dispute this with Raid Coordinators")
+                      .setStyle(ButtonStyle.Danger),
+                  ),
+                ]
+              : [],
+          },
+          canDispute ? ["Dispute this with Raid Coordinators"] : [],
+        );
         if (canDispute) {
           roster.assignmentControlMessages = [
             ...roster.assignmentControlMessages.filter(
@@ -4000,39 +4026,46 @@ export class RaidRosterService {
           teamRole.name,
           approvedRequestMemberIds?.has(assignment.memberId),
         );
-        const message = await user.send({
-          embeds: [
-            new EmbedBuilder()
-              .setTitle(copy.title)
-              .setColor(0x2ecc71)
-              .setDescription(copy.description)
-              .addFields(
-                { name: "Full Signup Name", value: signup.name },
-                {
-                  name: "Raid Date and Time",
-                  value: `<t:${start}:F> – <t:${end}:t>`,
-                },
-                {
-                  name: "Roster Spot",
-                  value: `${describePlacement(assignment.placement)} — ${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}`,
-                },
-                {
-                  name: "Team",
-                  value: teamRole.name,
-                },
-                {
-                  name: "Signup Sheet",
-                  value: `[Open the signup sheet](${signupUrl})`,
-                },
-              )
-              .setFooter({
-                text: `Signup cycle ${signup.cycle} • raid ${signup.raidId}`,
-              }),
-          ],
-          components: [
-            buildInitialAttendanceControls(signup, assignment.memberId),
-          ],
-        });
+        const message = await sendLoggedDirectMessage(
+          guild,
+          this.directMessageLogChannelId(guild.id),
+          user,
+          "Raid attendance confirmation",
+          {
+            embeds: [
+              new EmbedBuilder()
+                .setTitle(copy.title)
+                .setColor(0x2ecc71)
+                .setDescription(copy.description)
+                .addFields(
+                  { name: "Full Signup Name", value: signup.name },
+                  {
+                    name: "Raid Date and Time",
+                    value: `<t:${start}:F> – <t:${end}:t>`,
+                  },
+                  {
+                    name: "Roster Spot",
+                    value: `${describePlacement(assignment.placement)} — ${classLabel(assignment.classKey)} / ${specLabel(assignment.classKey, assignment.specKey)}`,
+                  },
+                  {
+                    name: "Team",
+                    value: teamRole.name,
+                  },
+                  {
+                    name: "Signup Sheet",
+                    value: `[Open the signup sheet](${signupUrl})`,
+                  },
+                )
+                .setFooter({
+                  text: `Signup cycle ${signup.cycle} • raid ${signup.raidId}`,
+                }),
+            ],
+            components: [
+              buildInitialAttendanceControls(signup, assignment.memberId),
+            ],
+          },
+          ["I will be at raid", "Tentative", "I cannot attend"],
+        );
         await this.disableAttendanceControlsInChannel(
           guild,
           message.channelId,
@@ -4848,7 +4881,11 @@ export class RaidRosterService {
     let dmFailed = false;
     try {
       const applicant = await guild.client.users.fetch(request.applicantId);
-      await applicant.send(
+      await sendLoggedDirectMessage(
+        guild,
+        this.directMessageLogChannelId(guild.id),
+        applicant,
+        "Signup request not approved",
         `Your signup request for **${roster?.name ?? "the raid roster"}** was not approved. You may submit a new request later.`,
       );
     } catch (error) {

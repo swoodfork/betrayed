@@ -30,5 +30,11 @@ describe("staff command bindings", () => {
     expect(staffCommands.production.commandLogChannelId).toBe(
       "1566301153258512414",
     );
+    expect(staffCommands.test.directMessageLogChannelId).toBe(
+      "1566608371963142254",
+    );
+    expect(staffCommands.production.directMessageLogChannelId).toBe(
+      "1566609881568510042",
+    );
   });
 });

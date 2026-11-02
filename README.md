@@ -99,6 +99,12 @@ Every `/zors`, `/zors-owner`, and `/zors-roster` invocation is audited to the pr
 executor, source channel, supplied option values, response or error, and a
 successful, partially successful, or failed outcome.
 
+Every successfully delivered direct message from Zors is summarized in the
+private Officer-only `📜bot-message-log` channel. Each entry contains one line
+with the recipient and message type, plus one optional line listing button
+labels as non-interactive text. DM contents and normal guild-channel messages
+are not copied.
+
 `/zors-roster` is a separate audited command surface for roster management.
 The permanent Roster Control post and all roster posts live in
 `📋raid-rosters`. Builders use Discord member, class, specialization, group,

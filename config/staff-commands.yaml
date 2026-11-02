@@ -4,8 +4,10 @@ test:
   guildId: "1565530049229234268"
   officerRoleId: "1565788368997187645"
   commandLogChannelId: "1566301079417786429"
+  directMessageLogChannelId: "1566608371963142254"
 
 production:
   guildId: "705235406974615603"
   officerRoleId: "705314605378830367"
   commandLogChannelId: "1566301153258512414"
+  directMessageLogChannelId: "1566609881568510042"

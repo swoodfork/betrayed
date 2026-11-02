@@ -12,6 +12,7 @@ import {
 import { registerGuildCommands } from "./commands.js";
 import { logZorsCommand } from "./command-audit.js";
 import type { BotConfig } from "./config.js";
+import { sendLoggedDirectMessage } from "./direct-message-audit.js";
 import { safeInteractionErrorMessage } from "./interaction-errors.js";
 import { createInventory, type GuildInventory } from "./inventory.js";
 import {
@@ -289,6 +290,7 @@ async function welcomeMember(
   config: BotConfig,
   onboarding: MemberOnboardingConfig,
   raidApplications: RaidApplicationConfig,
+  staffCommands: StaffCommandConfig,
   publicWelcome: (member: {
     displayName: string;
     memberMention: string;
@@ -345,15 +347,33 @@ async function welcomeMember(
       pugVoiceChannelId,
       discussionChannelId,
     );
-    await member.send({
-      content: buildDirectWelcome(welcomeMember, {
-        raidApplication: applicationChannelId !== null,
-        pugVoice: pugVoiceChannelId !== null,
-        communityDiscussion: discussionChannelId !== null,
+    const buttonChoices = components.flatMap((row) =>
+      row.components.flatMap((button) => {
+        const data = button.toJSON();
+        const label = "label" in data ? data.label : undefined;
+        return label ? [label] : [];
       }),
-      components,
-    });
-    await member.send(
+    );
+    await sendLoggedDirectMessage(
+      member.guild,
+      staffCommands[scope].directMessageLogChannelId,
+      member.user,
+      "New-member welcome",
+      {
+        content: buildDirectWelcome(welcomeMember, {
+          raidApplication: applicationChannelId !== null,
+          pugVoice: pugVoiceChannelId !== null,
+          communityDiscussion: discussionChannelId !== null,
+        }),
+        components,
+      },
+      buttonChoices,
+    );
+    await sendLoggedDirectMessage(
+      member.guild,
+      staffCommands[scope].directMessageLogChannelId,
+      member.user,
+      "Zors profile introduction",
       buildZorsProfileMessage(config.DISCORD_OWNER_USER_ID),
     );
     const actionCount = components[0]?.components.length ?? 0;
@@ -385,8 +405,9 @@ export function createBot(config: BotConfig): Client {
   const staffCommands = loadStaffCommandConfig(config);
   const raidApplications = loadRaidApplicationConfig(config);
   const raidRosterConfig = loadRaidRosterConfig(config);
-  const raidRosters = raidRosterConfig.then(
-    (rosterConfig) => new RaidRosterService(config, rosterConfig),
+  const raidRosters = Promise.all([raidRosterConfig, staffCommands]).then(
+    ([rosterConfig, staffCommandConfig]) =>
+      new RaidRosterService(config, rosterConfig, staffCommandConfig),
   );
   const publicWelcome = createPublicWelcomePicker();
 
@@ -622,6 +643,7 @@ export function createBot(config: BotConfig): Client {
       config,
       await onboarding,
       await raidApplications,
+      await staffCommands,
       publicWelcome,
     );
   });

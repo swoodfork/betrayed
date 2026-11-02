@@ -7,8 +7,8 @@ guild:
 
 inventory:
   file: VERIFIED_PRODUCTION_INVENTORY.json
-  generatedAt: "2026-11-01T22:59:29.021Z"
-  sha256: "1eac52e02a5c5baa18fe8ff5d3d534271c64201093b3af2b085e8fa91f872ea2"
+  generatedAt: "2026-11-02T00:28:30.521Z"
+  sha256: "473325573fc6f213f4a8e71d49384867e90be2a274cd49170d7f5a5cc1b2f230"
 
 roleBindings:
   guild-master: "705314740330561587"
@@ -84,6 +84,7 @@ channelBindings:
   raid-application: "1566017296311525416"
   internal-affairs: "706535819028201512"
   zors-command-log: "1566301153258512414"
+  bot-message-log: "1566609881568510042"
   zors-raid-control: "1566350121598197901"
   officer-voice: "842327436749176832"
   coordinator-chat: "1182447751942918194"

@@ -636,13 +636,20 @@ categories:
         permissionProfile: staff-private
         preserveHistory: true
         positionAfter: internal-affairs
+      - key: bot-message-log
+        name: "📜bot-message-log"
+        aliases: [bot-message-log]
+        type: text
+        permissionProfile: staff-private
+        preserveHistory: true
+        positionAfter: zors-command-log
       - key: zors-raid-control
         name: "🗄️zors-raid-control"
         aliases: [zors-raid-control]
         type: forum
         permissionProfile: raid-control-readonly
         preserveHistory: true
-        positionAfter: zors-command-log
+        positionAfter: bot-message-log
       - key: officer-voice
         name: "🔊 Officer Chat"
         aliases:
@@ -942,8 +949,9 @@ categories:
         permissionProfile: voice-community
         preserveHistory: false
       - key: voice-chat-3
-        name: "🔊 Voice Chat 1"
+        name: "🍺 Tenshock's Tavern"
         aliases:
+          - "🔊 Voice Chat 1"
           - "🔊 Voice Chat 3"
         type: voice
         permissionProfile: voice-community
