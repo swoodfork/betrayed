@@ -1796,8 +1796,29 @@ export class RaidRosterService {
       await Promise.all(
         warnings.map((warning) => this.deleteMessageIfPresent(warning)),
       );
-      const changed = roster.warningMessageId !== null;
+      const changed =
+        roster.warningMessageId !== null ||
+        roster.draftWarningAcknowledged === true;
       roster.warningMessageId = null;
+      roster.draftWarningAcknowledged = false;
+      return changed;
+    }
+    const acknowledged =
+      roster.draftWarningAcknowledged === true ||
+      warnings.some(
+        (warning) =>
+          warning.content === acknowledgedDraftWarningContent ||
+          warning.components.length === 0,
+      );
+    if (acknowledged) {
+      await Promise.all(
+        warnings.map((warning) => this.deleteMessageIfPresent(warning)),
+      );
+      const changed =
+        roster.warningMessageId !== null ||
+        roster.draftWarningAcknowledged !== true;
+      roster.warningMessageId = null;
+      roster.draftWarningAcknowledged = true;
       return changed;
     }
     const canonicalId = canonicalDraftWarningMessageId(
@@ -1809,36 +1830,24 @@ export class RaidRosterService {
       return changed;
     }
     const canonical = warnings.find(({ id }) => id === canonicalId)!;
-    const acknowledged = warnings.some(
-      (warning) =>
-        warning.content === acknowledgedDraftWarningContent ||
-        warning.components.length === 0,
-    );
     await Promise.all(
       warnings
         .filter(({ id }) => id !== canonicalId)
         .map((warning) => this.deleteMessageIfPresent(warning)),
     );
-    await canonical.edit(
-      acknowledged
-        ? {
-            content: acknowledgedDraftWarningContent,
-            components: [],
-            allowedMentions: { parse: [] },
-          }
-        : {
-            content: draftWarningContent,
-            components: [
-              buildDraftWarningControls(
-                roster.rosterId,
-                roster.draftRevision.revision,
-              ),
-            ],
-            allowedMentions: { parse: [] },
-          },
-    );
+    await canonical.edit({
+      content: draftWarningContent,
+      components: [
+        buildDraftWarningControls(
+          roster.rosterId,
+          roster.draftRevision.revision,
+        ),
+      ],
+      allowedMentions: { parse: [] },
+    });
     const changed = roster.warningMessageId !== canonicalId;
     roster.warningMessageId = canonicalId;
+    roster.draftWarningAcknowledged = false;
     return changed;
   }
 
@@ -1878,28 +1887,6 @@ export class RaidRosterService {
       }
       throw error;
     }
-  }
-
-  private async acknowledgeWarning(
-    guild: Guild,
-    roster: RaidRosterDocument,
-    warningMessageId: string,
-  ): Promise<void> {
-    const thread = await guild.channels.fetch(roster.presentationThreadId);
-    if (!thread?.isThread()) {
-      throw new Error("The roster thread is unavailable for its Draft warning.");
-    }
-    const warning = await thread.messages
-      .fetch(warningMessageId)
-      .catch(() => null);
-    if (!warning) {
-      throw new Error("This Draft warning is no longer available.");
-    }
-    await warning.edit({
-      content: acknowledgedDraftWarningContent,
-      components: [],
-      allowedMentions: { parse: [] },
-    });
   }
 
   private async createRoster(
@@ -2002,6 +1989,7 @@ export class RaidRosterService {
         assignments: [],
       },
       warningMessageId: null,
+      draftWarningAcknowledged: false,
       bumpMessageId: null,
       acknowledgements: [],
       pendingMemberNotifications: [],
@@ -3802,10 +3790,12 @@ export class RaidRosterService {
         }
         roster.draftRevision.editedAt = new Date().toISOString();
         roster.draftRevision.editedBy = interaction.user.id;
+        roster.warningMessageId = null;
+        roster.draftWarningAcknowledged = true;
         await this.persist(guild, roster);
-        await this.acknowledgeWarning(guild, roster, warningId);
+        await this.deleteWarning(guild, roster, warningId);
         await interaction.editReply(
-          "Draft preserved. No additional inactivity reminders will be sent until it is finalized or reverted.",
+          "Draft preserved. The reminder was removed, and no additional inactivity reminders will be sent until it is finalized or reverted.",
         );
       } else if (action === "finalize") {
         const diff = await this.finalize(guild, roster, interaction.user.id);

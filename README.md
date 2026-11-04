@@ -158,8 +158,10 @@ destination Draft; roles and member notifications wait for Finalize.
 Each Draft lifecycle may have one inactivity reminder. Zors records its
 canonical message, reconciles duplicate reminders after overlapping worker
 deployments and during startup, and removes stale duplicates when the Draft is
-finalized or reverted. Continue Drafting acknowledges that one reminder and
-suppresses additional reminders until the current Draft lifecycle ends.
+finalized or reverted. Continue Drafting deletes that reminder, records a
+message-free acknowledgement, and suppresses additional reminders until the
+current Draft lifecycle ends. The owner, Administrators, Officers, and Raid
+Coordinators may use the reminder controls.
 
 Every class uses a guild-local `zors_<class>` custom emoji generated from the
 same solid-square template. Test and Production keep separate immutable emoji

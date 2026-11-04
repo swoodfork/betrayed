@@ -69,6 +69,7 @@ export const raidRosterDocumentSchema = z
     finalizedRevision: rosterRevisionSchema.nullable(),
     draftRevision: rosterRevisionSchema.nullable(),
     warningMessageId: snowflake.nullable(),
+    draftWarningAcknowledged: z.boolean().optional(),
     bumpMessageId: snowflake.nullable(),
     acknowledgements: z.array(acknowledgementSchema),
     pendingMemberNotifications: z
@@ -400,6 +401,7 @@ export function beginDraft(
     throw new Error("Archived rosters cannot be edited.");
   }
   if (!roster.draftRevision) {
+    roster.draftWarningAcknowledged = false;
     roster.draftRevision = {
       revision: nextRevision(roster),
       editedAt,
@@ -577,6 +579,7 @@ export function finalizeRoster(
   roster.draftRevision = null;
   roster.status = "finalized";
   roster.warningMessageId = null;
+  roster.draftWarningAcknowledged = false;
   return diff;
 }
 
@@ -598,6 +601,7 @@ export function revertRoster(
       };
   roster.status = roster.finalizedRevision ? "finalized" : "draft";
   roster.warningMessageId = null;
+  roster.draftWarningAcknowledged = false;
 }
 
 export function describePlacement(placement: RosterPlacement): string {
@@ -618,7 +622,8 @@ export function draftWarningDueAt(
   if (
     roster.status !== "draft" ||
     !roster.draftRevision ||
-    roster.warningMessageId
+    roster.warningMessageId ||
+    roster.draftWarningAcknowledged === true
   ) {
     return null;
   }

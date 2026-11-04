@@ -64,6 +64,7 @@ function roster(): RaidRosterDocument {
       assignments: [],
     },
     warningMessageId: null,
+    draftWarningAcknowledged: false,
     bumpMessageId: null,
     acknowledgements: [],
     pendingMemberNotifications: [],
@@ -370,6 +371,7 @@ describe("raid roster state", () => {
       ownerId,
       "2026-11-01T00:01:00.000Z",
     );
+    document.draftWarningAcknowledged = true;
     const firstDiff = finalizeRoster(
       document,
       ownerId,
@@ -381,7 +383,9 @@ describe("raid roster state", () => {
     ]);
     expect(document.status).toBe("finalized");
     expect(document.draftRevision).toBeNull();
+    expect(document.draftWarningAcknowledged).toBe(false);
 
+    document.draftWarningAcknowledged = true;
     moveRosterAssignment(
       document,
       memberOne,
@@ -390,6 +394,7 @@ describe("raid roster state", () => {
       "2026-11-01T00:03:00.000Z",
     );
     expect(document.status).toBe("draft");
+    expect(document.draftWarningAcknowledged).toBe(false);
     expect(document.finalizedRevision?.assignments[0]?.placement).toEqual({
       kind: "group",
       group: 1,
@@ -404,6 +409,7 @@ describe("raid roster state", () => {
     revertRoster(document, ownerId, "2026-11-01T00:04:00.000Z");
     expect(document.status).toBe("finalized");
     expect(document.draftRevision).toBeNull();
+    expect(document.draftWarningAcknowledged).toBe(false);
   });
 
   it("offers disputes only for removals and Group-to-Bench moves", () => {
@@ -506,6 +512,9 @@ describe("raid roster state", () => {
       new Date("2026-11-01T00:30:00.000Z").getTime(),
     );
     document.warningMessageId = "923456789012345678";
+    expect(draftWarningDueAt(document)).toBeNull();
+    document.warningMessageId = null;
+    document.draftWarningAcknowledged = true;
     expect(draftWarningDueAt(document)).toBeNull();
     document.draftRevision!.editedAt = "2026-11-03T00:00:00.000Z";
     expect(draftWarningDueAt(document)).toBeNull();
