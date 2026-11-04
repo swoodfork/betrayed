@@ -105,6 +105,14 @@ with the recipient and message type, plus one optional line listing button
 labels as non-interactive text. DM contents and normal guild-channel messages
 are not copied.
 
+`/zors play sound:Pump It Up` lets the owner, Administrators, Officers, and Raid
+Coordinators play an approved local sound in their current standard voice
+channel. `/zors stop` stops playback and disconnects Zors. Only one sound or
+staff voice operation can run per server at a time. The initial catalog expects
+an authorized Ogg/Opus file at `content/sounds/pump-it-up.ogg`; deployments
+without that file keep the command registered but report that the sound is not
+available.
+
 `/zors-roster` is a separate audited command surface for roster management.
 The permanent Roster Control post and all roster posts live in
 `📋raid-rosters`. Builders use Discord member, class, specialization, group,

@@ -20,6 +20,18 @@ import type { StaffCommandBinding } from "./staff-command-config.js";
 const memberMentionPattern = /<@!?(\d{17,20})>/g;
 const activeVoiceGuilds = new Set<string>();
 
+export function acquireExclusiveVoiceGuild(guildId: string): boolean {
+  if (activeVoiceGuilds.has(guildId)) {
+    return false;
+  }
+  activeVoiceGuilds.add(guildId);
+  return true;
+}
+
+export function releaseExclusiveVoiceGuild(guildId: string): void {
+  activeVoiceGuilds.delete(guildId);
+}
+
 export function parseMemberMentions(input: string): string[] {
   const memberIds = [
     ...input.matchAll(memberMentionPattern),
@@ -341,7 +353,7 @@ export async function runExclusiveVoiceCommand(
   operation: () => Promise<void>,
 ): Promise<void> {
   const guildId = interaction.guildId;
-  if (guildId && activeVoiceGuilds.has(guildId)) {
+  if (guildId && !acquireExclusiveVoiceGuild(guildId)) {
     await interaction.reply({
       content:
         "Zors Bot is already processing another staff voice command in this server.",
@@ -350,14 +362,11 @@ export async function runExclusiveVoiceCommand(
     return;
   }
 
-  if (guildId) {
-    activeVoiceGuilds.add(guildId);
-  }
   try {
     await operation();
   } finally {
     if (guildId) {
-      activeVoiceGuilds.delete(guildId);
+      releaseExclusiveVoiceGuild(guildId);
       getVoiceConnection(guildId)?.destroy();
     }
   }

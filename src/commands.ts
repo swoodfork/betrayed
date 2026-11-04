@@ -55,6 +55,23 @@ export const zorsCommand = new SlashCommandBuilder()
   )
   .addSubcommand((command) =>
     command
+      .setName("play")
+      .setDescription("Play an approved sound in your current voice channel")
+      .addStringOption((option) =>
+        option
+          .setName("sound")
+          .setDescription("Approved sound to play")
+          .addChoices({ name: "Pump It Up", value: "pump-it-up" })
+          .setRequired(true),
+      ),
+  )
+  .addSubcommand((command) =>
+    command
+      .setName("stop")
+      .setDescription("Stop Zors sound playback and disconnect"),
+  )
+  .addSubcommand((command) =>
+    command
       .setName("move-channel")
       .setDescription("Move everyone between voice channels")
       .addChannelOption((option) =>

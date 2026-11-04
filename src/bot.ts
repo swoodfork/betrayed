@@ -36,6 +36,7 @@ import {
 import {
   isRaidRosterBindingComplete,
   loadRaidRosterConfig,
+  type RaidRosterConfig,
 } from "./raid-roster-config.js";
 import { RaidRosterService } from "./raid-rosters.js";
 import {
@@ -47,6 +48,7 @@ import {
   isVoiceModerationCommand,
 } from "./voice-moderation.js";
 import { executeVoiceMove } from "./voice-move.js";
+import { executeSoundCommand } from "./voice-sounds.js";
 import {
   buildWelcomeActionComponents,
   handleWelcomeActionButton,
@@ -97,6 +99,7 @@ async function handleZorsCommand(
   getInventory: (guild: Guild) => Promise<GuildInventory>,
   onboarding: MemberOnboardingConfig,
   staffCommands: StaffCommandConfig,
+  raidRosterConfig: RaidRosterConfig,
 ): Promise<void> {
   if (!isAllowedCommandGuild(interaction.guildId, config)) {
     await interaction.reply({
@@ -170,6 +173,23 @@ async function handleZorsCommand(
     await executeVoiceMove(interaction, binding);
     return;
   }
+  if (subcommand === "play" || subcommand === "stop") {
+    const staffBinding =
+      interaction.guildId === config.DISCORD_TEST_GUILD_ID
+        ? staffCommands.test
+        : staffCommands.production;
+    const rosterBinding =
+      interaction.guildId === config.DISCORD_TEST_GUILD_ID
+        ? raidRosterConfig.test
+        : raidRosterConfig.production;
+    await executeSoundCommand(
+      interaction,
+      staffBinding,
+      rosterBinding,
+      config.DISCORD_OWNER_USER_ID,
+    );
+    return;
+  }
   if (isVoiceModerationCommand(subcommand)) {
     const binding =
       interaction.guildId === config.DISCORD_TEST_GUILD_ID
@@ -192,6 +212,7 @@ async function handleZorsCommand(
       "**Zors Bot commands**",
       "`/zors status` — Check whether the bot is online.",
       "`/zors help` — Show this command list.",
+      "`/zors play`, `stop` — Play or stop an approved sound in your voice channel.",
       "`/zors move-channel`, `move-members`, `move-role` — Administrator/Officer voice moves.",
       "`/zors mute-*`, `unmute-*`, `deafen-*`, `undeafen-*` — Administrator/Officer voice moderation.",
       "`/zors disconnect-*` — Administrator/Officer voice disconnects.",
@@ -218,6 +239,7 @@ async function handleAuditedZorsCommand(
   getInventory: (guild: Guild) => Promise<GuildInventory>,
   onboarding: MemberOnboardingConfig,
   staffCommands: StaffCommandConfig,
+  raidRosterConfig: RaidRosterConfig,
   raidRosters: RaidRosterService,
 ): Promise<void> {
   let commandError: unknown;
@@ -236,6 +258,7 @@ async function handleAuditedZorsCommand(
         getInventory,
         onboarding,
         staffCommands,
+        raidRosterConfig,
       );
     }
   } catch (error) {
@@ -557,11 +580,13 @@ export function createBot(config: BotConfig): Client {
         onboardingConfig,
         staffCommandConfig,
         raidApplicationConfig,
+        rosterConfig,
         rosterService,
       ] = await Promise.all([
         onboarding,
         staffCommands,
         raidApplications,
+        raidRosterConfig,
         raidRosters,
       ]);
       if (
@@ -611,6 +636,7 @@ export function createBot(config: BotConfig): Client {
         getInventory,
         onboardingConfig,
         staffCommandConfig,
+        rosterConfig,
         rosterService,
       );
     } catch (error) {

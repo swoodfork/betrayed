@@ -66,6 +66,25 @@ describe("Zors Bot command registration", () => {
     );
   });
 
+  it("registers guarded sound playback commands", () => {
+    const command = zorsCommand.toJSON();
+    const play = command.options?.find(
+      (option) =>
+        option.type === ApplicationCommandOptionType.Subcommand &&
+        option.name === "play",
+    );
+
+    expect(play?.options).toEqual([
+      expect.objectContaining({
+        name: "sound",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        choices: [{ name: "Pump It Up", value: "pump-it-up" }],
+      }),
+    ]);
+    expect(command.options?.map((option) => option.name)).toContain("stop");
+  });
+
   it("registers a uniform moderation command suite within Discord limits", () => {
     const command = zorsCommand.toJSON();
     const subcommandNames = command.options?.map((option) => option.name);
