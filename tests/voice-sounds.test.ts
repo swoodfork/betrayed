@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -68,5 +69,13 @@ describe("voice sound commands", () => {
         "pump-it-up.ogg",
       ),
     );
+  });
+
+  it("ships Pump It Up as an Ogg audio resource", async () => {
+    const header = await readFile(soundClipPath("pump-it-up")).then((file) =>
+      file.subarray(0, 4).toString("ascii"),
+    );
+
+    expect(header).toBe("OggS");
   });
 });

@@ -1,4 +1,4 @@
-import { constants } from "node:fs";
+import { constants, createReadStream } from "node:fs";
 import { access } from "node:fs/promises";
 import path from "node:path";
 
@@ -223,7 +223,9 @@ async function playSound(
       },
     });
     player.play(
-      createAudioResource(clipPath, { inputType: StreamType.OggOpus }),
+      createAudioResource(createReadStream(clipPath), {
+        inputType: StreamType.OggOpus,
+      }),
     );
     await interaction.editReply(
       `Playing **Pump It Up** in ${voiceChannel}. Use \`/zors stop\` to stop it early.`,
