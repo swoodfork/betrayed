@@ -134,6 +134,11 @@ export interface RosterDiff {
   after: RosterAssignment | null;
 }
 
+export interface RosterGroupCopyPlan {
+  mappings: Array<{ sourceGroup: number; destinationGroup: number }>;
+  assignments: RosterAssignment[];
+}
+
 export type RosterEditConflict =
   | { kind: "member"; memberId: string }
   | { kind: "placement"; memberId: string };
@@ -173,6 +178,144 @@ export function isDisputableRosterChange(change: RosterDiff): boolean {
     (change.before?.placement.kind === "group" &&
       change.after?.placement.kind === "bench")
   );
+}
+
+export function planRosterGroupCopy(
+  source: RaidRosterDocument,
+  destination: RaidRosterDocument,
+  sourceGroups: readonly number[],
+  destinationStartGroup: number,
+): RosterGroupCopyPlan {
+  if (source.rosterId === destination.rosterId) {
+    throw new Error("Choose a different source roster.");
+  }
+  if (source.guildId !== destination.guildId) {
+    throw new Error("Roster groups can be copied only within the same server.");
+  }
+  if (destination.status === "archived") {
+    throw new Error("Archived rosters cannot receive copied groups.");
+  }
+  const sourceRevision = activeRevision(source);
+  if (!sourceRevision) {
+    throw new Error("The source roster has no active revision to copy.");
+  }
+  const groups = [...new Set(sourceGroups)].sort((left, right) => left - right);
+  if (groups.length === 0 || groups.length !== sourceGroups.length) {
+    throw new Error("Choose one or more distinct source groups.");
+  }
+  const sourceMaximumGroup = source.size / 5;
+  if (
+    groups.some(
+      (group) =>
+        !Number.isInteger(group) ||
+        group < 1 ||
+        group > sourceMaximumGroup,
+    )
+  ) {
+    throw new Error(
+      `The source roster has Groups 1 through ${sourceMaximumGroup}.`,
+    );
+  }
+  const destinationMaximumGroup = destination.size / 5;
+  if (
+    !Number.isInteger(destinationStartGroup) ||
+    destinationStartGroup < 1 ||
+    destinationStartGroup + groups.length - 1 > destinationMaximumGroup
+  ) {
+    throw new Error(
+      `Those groups do not fit within destination Groups 1 through ${destinationMaximumGroup}.`,
+    );
+  }
+
+  const mappings = groups.map((sourceGroup, index) => ({
+    sourceGroup,
+    destinationGroup: destinationStartGroup + index,
+  }));
+  const destinationGroups = new Set(
+    mappings.map(({ destinationGroup }) => destinationGroup),
+  );
+  const destinationAssignments =
+    activeRevision(destination)?.assignments ?? [];
+  const occupiedGroups = [
+    ...new Set(
+      destinationAssignments.flatMap(({ placement }) =>
+        placement.kind === "group" &&
+        destinationGroups.has(placement.group)
+          ? [placement.group]
+          : [],
+      ),
+    ),
+  ].sort((left, right) => left - right);
+  if (occupiedGroups.length > 0) {
+    throw new Error(
+      `Destination ${occupiedGroups.map((group) => `Group ${group}`).join(", ")} must be empty before copying.`,
+    );
+  }
+
+  const destinationBySource = new Map(
+    mappings.map(({ sourceGroup, destinationGroup }) => [
+      sourceGroup,
+      destinationGroup,
+    ]),
+  );
+  const assignments = sourceRevision.assignments.flatMap((assignment) => {
+    if (assignment.placement.kind !== "group") {
+      return [];
+    }
+    const destinationGroup = destinationBySource.get(
+      assignment.placement.group,
+    );
+    return destinationGroup === undefined
+      ? []
+      : [
+          {
+            ...structuredClone(assignment),
+            placement: {
+              kind: "group" as const,
+              group: destinationGroup,
+              slot: assignment.placement.slot,
+            },
+          },
+        ];
+  });
+  if (assignments.length === 0) {
+    throw new Error("The selected source groups do not contain any members.");
+  }
+  const existingMemberIds = new Set(
+    destinationAssignments.map(({ memberId }) => memberId),
+  );
+  const duplicateMemberIds = assignments
+    .map(({ memberId }) => memberId)
+    .filter((memberId) => existingMemberIds.has(memberId));
+  if (duplicateMemberIds.length > 0) {
+    throw new Error(
+      `Source members already assigned to the destination roster: ${duplicateMemberIds.join(", ")}.`,
+    );
+  }
+  validateRosterAssignments(destination.size, [
+    ...destinationAssignments,
+    ...assignments,
+  ]);
+  return { mappings, assignments };
+}
+
+export function copyRosterGroups(
+  source: RaidRosterDocument,
+  destination: RaidRosterDocument,
+  sourceGroups: readonly number[],
+  destinationStartGroup: number,
+  editorId: string,
+  editedAt?: string,
+): RosterGroupCopyPlan {
+  const plan = planRosterGroupCopy(
+    source,
+    destination,
+    sourceGroups,
+    destinationStartGroup,
+  );
+  const draft = touchDraft(destination, editorId, editedAt);
+  draft.assignments.push(...structuredClone(plan.assignments));
+  return plan;
 }
 
 function classDefinition(classKey: string) {

@@ -335,6 +335,11 @@ export const zorsRosterCommand = new SlashCommandBuilder()
   )
   .addSubcommand((command) =>
     command
+      .setName("copy-groups")
+      .setDescription("Copy active groups from another roster into this Draft"),
+  )
+  .addSubcommand((command) =>
+    command
       .setName("delete")
       .setDescription("Permanently archive and delete this roster"),
   )

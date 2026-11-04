@@ -148,6 +148,7 @@ describe("Zors Bot command registration", () => {
       "finalize",
       "revert",
       "archive",
+      "copy-groups",
       "delete",
       "help",
     ]);

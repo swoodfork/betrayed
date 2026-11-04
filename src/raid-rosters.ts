@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 
 import {
   ActionRowBuilder,
@@ -7,6 +8,7 @@ import {
   ButtonStyle,
   ChannelType,
   ComponentType,
+  DiscordAPIError,
   EmbedBuilder,
   MessageFlags,
   ModalBuilder,
@@ -23,6 +25,7 @@ import {
   type Guild,
   type GuildMember,
   type Interaction,
+  type Message,
   type ModalSubmitInteraction,
   type StringSelectMenuInteraction,
   type UserSelectMenuInteraction,
@@ -39,12 +42,14 @@ import {
   activeRevision,
   addRosterAssignment,
   changeRosterSpecialization,
+  copyRosterGroups,
   describePlacement,
   draftWarningDueAt,
   finalizeRoster,
   findRosterEditConflict,
   isDisputableRosterChange,
   moveRosterAssignment,
+  planRosterGroupCopy,
   raidRosterDocumentSchema,
   removeRosterAssignment,
   revertRoster,
@@ -131,6 +136,18 @@ interface SignupSession {
   expiresAt: number;
   classKey?: string;
   specKey?: string;
+}
+
+interface CopyGroupsSession {
+  id: string;
+  userId: string;
+  targetRosterId: string;
+  targetRevision: number;
+  expiresAt: number;
+  sourceRosterId?: string;
+  sourceRevision?: number;
+  sourceGroups?: number[];
+  destinationStartGroup?: number;
 }
 
 type CompleteRaidRosterBinding = RaidRosterBinding & {
@@ -534,18 +551,20 @@ export function buildRosterControls(
 
 export function buildDraftWarningControls(
   rosterId: string,
+  revision?: number,
 ): ActionRowBuilder<ButtonBuilder> {
+  const suffix = revision === undefined ? "" : `:${revision}`;
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId(`${customIdPrefix}:control:continue:${rosterId}`)
+      .setCustomId(`${customIdPrefix}:control:continue:${rosterId}${suffix}`)
       .setLabel("Continue Drafting")
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId(`${customIdPrefix}:control:finalize:${rosterId}`)
+      .setCustomId(`${customIdPrefix}:control:finalize:${rosterId}${suffix}`)
       .setLabel("Finalize")
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
-      .setCustomId(`${customIdPrefix}:control:revert:${rosterId}`)
+      .setCustomId(`${customIdPrefix}:control:revert:${rosterId}${suffix}`)
       .setLabel("Revert Draft")
       .setStyle(ButtonStyle.Danger),
   );
@@ -747,6 +766,20 @@ function sessionCustomId(stage: string, sessionId: string): string {
   return `${customIdPrefix}:session:${stage}:${sessionId}`;
 }
 
+function copySessionCustomId(stage: string, sessionId: string): string {
+  return `${customIdPrefix}:copy:${stage}:${sessionId}`;
+}
+
+export function canonicalDraftWarningMessageId(
+  messageIds: readonly string[],
+): string | null {
+  return (
+    [...messageIds].sort((left, right) =>
+      BigInt(left) < BigInt(right) ? -1 : BigInt(left) > BigInt(right) ? 1 : 0,
+    )[0] ?? null
+  );
+}
+
 function currentRevisionNumber(roster: RaidRosterDocument): number {
   return activeRevision(roster)?.revision ?? 0;
 }
@@ -757,6 +790,7 @@ export class RaidRosterService {
   private readonly bindingsByGuild = new Map<string, RaidRosterBinding>();
   private readonly controlPanelByGuild = new Map<string, string>();
   private readonly sessions = new Map<string, EditSession>();
+  private readonly copyGroupsSessions = new Map<string, CopyGroupsSession>();
   private readonly warningTimers = new Map<string, NodeJS.Timeout>();
   private readonly signupRequests = new Map<string, RaidSignupRequest>();
   private readonly signupRequestThreadIds = new Map<string, string>();
@@ -1428,28 +1462,13 @@ export class RaidRosterService {
         components: buildRosterControls(roster),
         allowedMentions: { parse: [] },
       });
-      if (roster.warningMessageId) {
-        const warning = await presentation.messages
-          .fetch(roster.warningMessageId)
-          .catch(() => null);
-        if (warning) {
-          const acknowledged = warning.components.length === 0;
-          await warning.edit(
-            acknowledged
-              ? {
-                  content: acknowledgedDraftWarningContent,
-                  components: [],
-                  allowedMentions: { parse: [] },
-                }
-              : {
-                  content: draftWarningContent,
-                  components: [buildDraftWarningControls(roster.rosterId)],
-                  allowedMentions: { parse: [] },
-                },
-          );
-        } else {
-          roster.warningMessageId = null;
-        }
+      if (
+        await this.reconcileDraftWarningMessages(
+          roster,
+          presentation,
+        )
+      ) {
+        await this.persist(guild, roster);
       }
       await this.ensureFinalizedRosterRoles(guild, roster);
       this.scheduleWarning(guild, roster);
@@ -1684,15 +1703,143 @@ export class RaidRosterService {
     if (thread.archived) {
       await thread.setArchived(false, "Post Zors Draft inactivity warning");
     }
-    const warning = await thread.send({
+    if (await this.reconcileDraftWarningMessages(roster, thread)) {
+      await this.persist(guild, roster);
+    }
+    if (roster.warningMessageId) {
+      return;
+    }
+    await thread.send({
       content: draftWarningContent,
       components: [
-        buildDraftWarningControls(roster.rosterId),
+        buildDraftWarningControls(
+          roster.rosterId,
+          roster.draftRevision.revision,
+        ),
       ],
       allowedMentions: { parse: [] },
     });
-    roster.warningMessageId = warning.id;
+    await delay(500);
+    await this.reconcileDraftWarningMessages(roster, thread);
+    if (!roster.warningMessageId) {
+      throw new Error("The Draft warning could not be reconciled after posting.");
+    }
     await this.persist(guild, roster);
+  }
+
+  private isDraftWarningMessage(
+    message: Message,
+    roster: RaidRosterDocument,
+    includeAll: boolean,
+  ): boolean {
+    if (
+      message.author.id !== message.client.user.id ||
+      ![draftWarningContent, acknowledgedDraftWarningContent].includes(
+        message.content,
+      )
+    ) {
+      return false;
+    }
+    if (includeAll || message.id === roster.warningMessageId) {
+      return true;
+    }
+    if (!roster.draftRevision) {
+      return false;
+    }
+    const expectedCustomId =
+      `${customIdPrefix}:control:continue:${roster.rosterId}:${roster.draftRevision.revision}`;
+    return message.components.some((row) =>
+      "components" in row &&
+      row.components.some(
+        (component) =>
+          "customId" in component &&
+          component.customId === expectedCustomId,
+      ),
+    );
+  }
+
+  private async draftWarningMessages(
+    thread: AnyThreadChannel,
+    roster: RaidRosterDocument,
+    includeAll = false,
+  ): Promise<Message[]> {
+    const warnings: Message[] = [];
+    let before: string | undefined;
+    do {
+      const messages = await thread.messages.fetch({
+        limit: 100,
+        ...(before ? { before } : {}),
+      });
+      warnings.push(
+        ...messages.filter((message) =>
+          this.isDraftWarningMessage(message, roster, includeAll),
+        ).values(),
+      );
+      if (messages.size < 100) {
+        break;
+      }
+      before = messages.last()?.id;
+    } while (before);
+    return warnings;
+  }
+
+  private async reconcileDraftWarningMessages(
+    roster: RaidRosterDocument,
+    thread: AnyThreadChannel,
+  ): Promise<boolean> {
+    const warnings = await this.draftWarningMessages(
+      thread,
+      roster,
+      roster.status !== "draft" || !roster.draftRevision,
+    );
+    if (roster.status !== "draft" || !roster.draftRevision) {
+      await Promise.all(
+        warnings.map((warning) => this.deleteMessageIfPresent(warning)),
+      );
+      const changed = roster.warningMessageId !== null;
+      roster.warningMessageId = null;
+      return changed;
+    }
+    const canonicalId = canonicalDraftWarningMessageId(
+      warnings.map(({ id }) => id),
+    );
+    if (!canonicalId) {
+      const changed = roster.warningMessageId !== null;
+      roster.warningMessageId = null;
+      return changed;
+    }
+    const canonical = warnings.find(({ id }) => id === canonicalId)!;
+    const acknowledged = warnings.some(
+      (warning) =>
+        warning.content === acknowledgedDraftWarningContent ||
+        warning.components.length === 0,
+    );
+    await Promise.all(
+      warnings
+        .filter(({ id }) => id !== canonicalId)
+        .map((warning) => this.deleteMessageIfPresent(warning)),
+    );
+    await canonical.edit(
+      acknowledged
+        ? {
+            content: acknowledgedDraftWarningContent,
+            components: [],
+            allowedMentions: { parse: [] },
+          }
+        : {
+            content: draftWarningContent,
+            components: [
+              buildDraftWarningControls(
+                roster.rosterId,
+                roster.draftRevision.revision,
+              ),
+            ],
+            allowedMentions: { parse: [] },
+          },
+    );
+    const changed = roster.warningMessageId !== canonicalId;
+    roster.warningMessageId = canonicalId;
+    return changed;
   }
 
   private async deleteWarning(
@@ -1709,8 +1856,27 @@ export class RaidRosterService {
         .fetch(warningMessageId)
         .catch(() => null);
       if (warning) {
-        await warning.delete();
+        await this.deleteMessageIfPresent(warning);
       }
+      const staleWarnings = await this.draftWarningMessages(
+        thread,
+        roster,
+        true,
+      );
+      await Promise.all(
+        staleWarnings.map((message) => this.deleteMessageIfPresent(message)),
+      );
+    }
+  }
+
+  private async deleteMessageIfPresent(message: Message): Promise<void> {
+    try {
+      await message.delete();
+    } catch (error) {
+      if (error instanceof DiscordAPIError && error.code === 10_008) {
+        return;
+      }
+      throw error;
     }
   }
 
@@ -2430,6 +2596,14 @@ export class RaidRosterService {
         this.sessions.delete(sessionId);
       }
     }
+    for (const [sessionId, session] of this.copyGroupsSessions) {
+      if (
+        session.targetRosterId === roster.rosterId ||
+        session.sourceRosterId === roster.rosterId
+      ) {
+        this.copyGroupsSessions.delete(sessionId);
+      }
+    }
   }
 
   public async handleCommand(
@@ -2459,6 +2633,7 @@ export class RaidRosterService {
           "`/zors-roster finalize` — Publish the working Draft.",
           "`/zors-roster revert` — Restore the last finalized snapshot.",
           "`/zors-roster archive` — Archive a finalized roster.",
+          "`/zors-roster copy-groups` — Copy selected groups from another active roster into this roster's Draft.",
           "`/zors-roster delete` — Officer-only permanent deletion after an immutable archive.",
           "Use the buttons on a roster post to add, move, swap, change, or remove members.",
         ].join("\n"),
@@ -2481,6 +2656,10 @@ export class RaidRosterService {
     }
     if (subcommand === "delete") {
       await this.promptDeleteRoster(interaction, roster);
+      return;
+    }
+    if (subcommand === "copy-groups") {
+      await this.beginCopyGroups(interaction, roster);
       return;
     }
     if (subcommand === "show") {
@@ -2939,6 +3118,319 @@ export class RaidRosterService {
       throw new Error("That roster is no longer available.");
     }
     return session;
+  }
+
+  private requireCopyGroupsSession(
+    sessionId: string,
+    userId: string,
+  ): CopyGroupsSession {
+    const session = this.copyGroupsSessions.get(sessionId);
+    if (!session || session.userId !== userId || session.expiresAt < Date.now()) {
+      this.copyGroupsSessions.delete(sessionId);
+      throw new Error(
+        "That copy-groups wizard expired. Run `/zors-roster copy-groups` again.",
+      );
+    }
+    return session;
+  }
+
+  private copyCancelRow(
+    session: CopyGroupsSession,
+  ): ActionRowBuilder<ButtonBuilder> {
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(copySessionCustomId("cancel", session.id))
+        .setLabel("Cancel")
+        .setStyle(ButtonStyle.Secondary),
+    );
+  }
+
+  private activeCopyRosters(
+    session: CopyGroupsSession,
+  ): { source: RaidRosterDocument; destination: RaidRosterDocument } {
+    const source = session.sourceRosterId
+      ? this.rosters.get(session.sourceRosterId)
+      : null;
+    const destination = this.rosters.get(session.targetRosterId);
+    if (!source || !destination) {
+      throw new Error("The source or destination roster is no longer available.");
+    }
+    if (
+      currentRevisionNumber(source) !== session.sourceRevision ||
+      currentRevisionNumber(destination) !== session.targetRevision
+    ) {
+      throw new Error(
+        "The source or destination roster changed while this preview was open. Run `/zors-roster copy-groups` again to avoid copying stale assignments.",
+      );
+    }
+    return { source, destination };
+  }
+
+  private async beginCopyGroups(
+    interaction: ChatInputCommandInteraction,
+    destination: RaidRosterDocument,
+  ): Promise<void> {
+    if (destination.status === "archived") {
+      throw new Error("Archived rosters cannot receive copied groups.");
+    }
+    const sources = [...this.rosters.values()]
+      .filter(
+        (roster) =>
+          roster.guildId === destination.guildId &&
+          roster.rosterId !== destination.rosterId &&
+          roster.status !== "archived" &&
+          activeRevision(roster) !== null,
+      )
+      .sort((left, right) => left.name.localeCompare(right.name));
+    if (sources.length === 0) {
+      throw new Error("There is no other active roster available to copy.");
+    }
+    if (sources.length > 25) {
+      throw new Error(
+        "More than 25 source rosters are active. Archive unused rosters before copying groups.",
+      );
+    }
+    const session: CopyGroupsSession = {
+      id: randomUUID(),
+      userId: interaction.user.id,
+      targetRosterId: destination.rosterId,
+      targetRevision: currentRevisionNumber(destination),
+      expiresAt: Date.now() + sessionLifetimeMs,
+    };
+    this.copyGroupsSessions.set(session.id, session);
+    await interaction.reply({
+      content: [
+        "**Copy groups into a roster Draft**",
+        `Destination: **${destination.name}**`,
+        "Choose the source roster. Zors will use its current active version, including unfinalized Draft changes.",
+      ].join("\n"),
+      components: [
+        new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId(copySessionCustomId("source", session.id))
+            .setPlaceholder("Choose the source roster")
+            .addOptions(
+              sources.map((source) => ({
+                label: source.name.slice(0, 100),
+                value: source.rosterId,
+                description: `${source.size}-player • ${source.draftRevision ? "Draft" : "Finalized"} revision ${currentRevisionNumber(source)}`.slice(
+                  0,
+                  100,
+                ),
+              })),
+            ),
+        ),
+        this.copyCancelRow(session),
+      ],
+      flags: MessageFlags.Ephemeral,
+      allowedMentions: { parse: [] },
+    });
+  }
+
+  private sourceGroupPicker(
+    session: CopyGroupsSession,
+    source: RaidRosterDocument,
+  ): ActionRowBuilder<StringSelectMenuBuilder> {
+    const assignments = activeRevision(source)?.assignments ?? [];
+    const maximumGroup = source.size / 5;
+    return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(copySessionCustomId("groups", session.id))
+        .setPlaceholder("Choose source groups")
+        .setMinValues(1)
+        .setMaxValues(maximumGroup)
+        .addOptions(
+          Array.from({ length: maximumGroup }, (_, index) => {
+            const group = index + 1;
+            const memberCount = assignments.filter(
+              ({ placement }) =>
+                placement.kind === "group" && placement.group === group,
+            ).length;
+            return {
+              label: `Group ${group}`,
+              value: String(group),
+              description: `${memberCount} member${memberCount === 1 ? "" : "s"}`,
+            };
+          }),
+        ),
+    );
+  }
+
+  private destinationGroupPicker(
+    session: CopyGroupsSession,
+    destination: RaidRosterDocument,
+  ): ActionRowBuilder<StringSelectMenuBuilder> {
+    const groupCount = session.sourceGroups?.length ?? 0;
+    const maximumStart = destination.size / 5 - groupCount + 1;
+    if (maximumStart < 1) {
+      throw new Error(
+        `The selected ${groupCount} source groups do not fit in this ${destination.size}-player roster.`,
+      );
+    }
+    return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(copySessionCustomId("destination", session.id))
+        .setPlaceholder("Choose the first destination group")
+        .addOptions(
+          Array.from({ length: maximumStart }, (_, index) => {
+            const start = index + 1;
+            const end = start + groupCount - 1;
+            return {
+              label: `Start at Group ${start}`,
+              value: String(start),
+              description:
+                start === end
+                  ? `Maps into Group ${start}`
+                  : `Maps sequentially into Groups ${start}-${end}`,
+            };
+          }),
+        ),
+    );
+  }
+
+  private async handleCopyGroupsSelection(
+    interaction: StringSelectMenuInteraction,
+    stage: string,
+    session: CopyGroupsSession,
+  ): Promise<void> {
+    const destination = this.rosters.get(session.targetRosterId);
+    if (!destination) {
+      throw new Error("The destination roster is no longer available.");
+    }
+    if (stage === "source") {
+      const source = this.rosters.get(interaction.values[0] ?? "");
+      if (
+        !source ||
+        source.guildId !== destination.guildId ||
+        source.rosterId === destination.rosterId ||
+        source.status === "archived" ||
+        !activeRevision(source)
+      ) {
+        throw new Error("Choose a valid active source roster.");
+      }
+      session.sourceRosterId = source.rosterId;
+      session.sourceRevision = currentRevisionNumber(source);
+      session.targetRevision = currentRevisionNumber(destination);
+      delete session.sourceGroups;
+      delete session.destinationStartGroup;
+      await interaction.update({
+        content: [
+          "**Copy groups into a roster Draft**",
+          `Source: **${source.name}** — ${source.draftRevision ? "Draft" : "Finalized"} revision ${session.sourceRevision}`,
+          `Destination: **${destination.name}**`,
+          "Choose one or more source groups. Their current member slots, classes, and specializations will be preserved.",
+        ].join("\n"),
+        components: [
+          this.sourceGroupPicker(session, source),
+          this.copyCancelRow(session),
+        ],
+        allowedMentions: { parse: [] },
+      });
+      return;
+    }
+
+    const { source } = this.activeCopyRosters(session);
+    if (stage === "groups") {
+      const maximumGroup = source.size / 5;
+      const groups = interaction.values
+        .map(Number)
+        .sort((left, right) => left - right);
+      if (
+        groups.length === 0 ||
+        new Set(groups).size !== groups.length ||
+        groups.some(
+          (group) =>
+            !Number.isInteger(group) ||
+            group < 1 ||
+            group > maximumGroup,
+        )
+      ) {
+        throw new Error("Choose valid distinct source groups.");
+      }
+      session.sourceGroups = groups;
+      delete session.destinationStartGroup;
+      await interaction.update({
+        content: [
+          "**Copy groups into a roster Draft**",
+          `Source: **${source.name}**, Groups ${groups.join(", ")}`,
+          `Destination: **${destination.name}**`,
+          "Choose the first destination group. Selected source groups map in ascending order.",
+        ].join("\n"),
+        components: [
+          this.destinationGroupPicker(session, destination),
+          this.copyCancelRow(session),
+        ],
+        allowedMentions: { parse: [] },
+      });
+      return;
+    }
+    if (stage !== "destination" || !session.sourceGroups) {
+      throw new Error("Unknown copy-groups selection.");
+    }
+    const destinationStartGroup = Number(interaction.values[0]);
+    const plan = planRosterGroupCopy(
+      source,
+      destination,
+      session.sourceGroups,
+      destinationStartGroup,
+    );
+    session.destinationStartGroup = destinationStartGroup;
+    await interaction.update({
+      content: [
+        "**Review group copy**",
+        `Source: **${source.name}** — ${source.draftRevision ? "active Draft" : "finalized"} revision ${session.sourceRevision}`,
+        `Destination: **${destination.name}** — working Draft`,
+        `Mapping: ${plan.mappings.map(({ sourceGroup, destinationGroup }) => `Group ${sourceGroup} → Group ${destinationGroup}`).join(" | ")}`,
+        `Members copied: **${plan.assignments.length}**`,
+        "",
+        "The source remains unchanged. Destination roles and member notifications change only after Finalize.",
+      ].join("\n"),
+      components: [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(copySessionCustomId("confirm", session.id))
+            .setLabel("Copy into Draft")
+            .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder()
+            .setCustomId(copySessionCustomId("cancel", session.id))
+            .setLabel("Cancel")
+            .setStyle(ButtonStyle.Secondary),
+        ),
+      ],
+      allowedMentions: { parse: [] },
+    });
+  }
+
+  private async confirmCopyGroups(
+    interaction: ButtonInteraction,
+    session: CopyGroupsSession,
+  ): Promise<void> {
+    if (
+      !session.sourceGroups ||
+      session.destinationStartGroup === undefined
+    ) {
+      throw new Error("Complete the copy-groups preview before confirming.");
+    }
+    const { source, destination } = this.activeCopyRosters(session);
+    await interaction.deferUpdate();
+    const plan = copyRosterGroups(
+      source,
+      destination,
+      session.sourceGroups,
+      session.destinationStartGroup,
+      interaction.user.id,
+    );
+    await this.persist(interaction.guild!, destination);
+    this.copyGroupsSessions.delete(session.id);
+    await interaction.editReply({
+      content: [
+        `Copied **${plan.assignments.length}** member(s) from **${source.name}** into the **${destination.name}** Draft.`,
+        `Mapping: ${plan.mappings.map(({ sourceGroup, destinationGroup }) => `Group ${sourceGroup} → Group ${destinationGroup}`).join(" | ")}`,
+        "Finalize the destination roster when the copied assignments are ready to publish.",
+      ].join("\n"),
+      components: [],
+      allowedMentions: { parse: [] },
+    });
   }
 
   private memberPicker(
@@ -5728,6 +6220,31 @@ export class RaidRosterService {
     );
     if (!binding || !isRaidRosterBindingComplete(binding)) {
       throw new Error("Raid roster controls are not enabled in this server.");
+    }
+    if (parts[1] === "copy") {
+      const stage = parts[2] ?? "";
+      const session = this.requireCopyGroupsSession(
+        parts[3] ?? "",
+        interaction.user.id,
+      );
+      await this.authorize(interaction, binding);
+      if (stage === "cancel" && interaction.isButton()) {
+        this.copyGroupsSessions.delete(session.id);
+        await interaction.update({
+          content: "Roster group copy cancelled.",
+          components: [],
+        });
+        return true;
+      }
+      if (stage === "confirm" && interaction.isButton()) {
+        await this.confirmCopyGroups(interaction, session);
+        return true;
+      }
+      if (interaction.isStringSelectMenu()) {
+        await this.handleCopyGroupsSelection(interaction, stage, session);
+        return true;
+      }
+      throw new Error("Unknown copy-groups interaction.");
     }
     if (parts[1] === "raid" && interaction.isButton()) {
       await this.handleRaidControlButton(

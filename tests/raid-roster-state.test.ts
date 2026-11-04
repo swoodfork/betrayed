@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   addRosterAssignment,
+  copyRosterGroups,
   describePlacement,
   draftWarningDueAt,
   findRosterEditConflict,
   finalizeRoster,
   isDisputableRosterChange,
   moveRosterAssignment,
+  planRosterGroupCopy,
   raidRosterDocumentSchema,
   revertRoster,
   validateClassSpecialization,
@@ -19,6 +21,7 @@ import {
   buildRosterEmbed,
   buildRosterControls,
   buildDraftWarningControls,
+  canonicalDraftWarningMessageId,
   activeSignupConflictForRoster,
   isMatchingTeamRoleName,
   isTeamRoleAvailableForRoster,
@@ -199,6 +202,85 @@ describe("raid roster state", () => {
         memberOne,
       ),
     ).toEqual({ kind: "placement", memberId: memberTwo });
+  });
+
+  it("copies active source groups sequentially into an empty destination Draft", () => {
+    const source = roster();
+    source.size = 40;
+    source.finalizedRevision = {
+      revision: 1,
+      editedAt: "2026-11-01T00:00:00.000Z",
+      editedBy: ownerId,
+      assignments: [
+        assignment(memberOne, { kind: "group", group: 1, slot: 1 }),
+      ],
+    };
+    source.draftRevision = {
+      revision: 2,
+      editedAt: "2026-11-02T00:00:00.000Z",
+      editedBy: ownerId,
+      assignments: [
+        assignment(memberOne, { kind: "group", group: 5, slot: 1 }),
+        assignment(memberTwo, { kind: "group", group: 6, slot: 3 }),
+      ],
+    };
+    const destination = {
+      ...roster(),
+      rosterId: "e6a13cc8-39ce-48fc-a220-63b6e1313252",
+      presentationThreadId: "923456789012345678",
+      finalizedRevision: {
+        revision: 1,
+        editedAt: "2026-11-01T00:00:00.000Z",
+        editedBy: ownerId,
+        assignments: [],
+      },
+      draftRevision: null,
+      status: "finalized" as const,
+    };
+
+    const plan = copyRosterGroups(
+      source,
+      destination,
+      [5, 6],
+      1,
+      ownerId,
+      "2026-11-03T00:00:00.000Z",
+    );
+
+    expect(plan.mappings).toEqual([
+      { sourceGroup: 5, destinationGroup: 1 },
+      { sourceGroup: 6, destinationGroup: 2 },
+    ]);
+    expect(destination.status).toBe("draft");
+    expect(destination.draftRevision?.assignments).toEqual([
+      assignment(memberOne, { kind: "group", group: 1, slot: 1 }),
+      assignment(memberTwo, { kind: "group", group: 2, slot: 3 }),
+    ]);
+  });
+
+  it("rejects group copy conflicts atomically", () => {
+    const source = roster();
+    source.size = 40;
+    source.draftRevision!.assignments = [
+      assignment(memberOne, { kind: "group", group: 5, slot: 1 }),
+    ];
+    const destination = {
+      ...roster(),
+      rosterId: "e6a13cc8-39ce-48fc-a220-63b6e1313252",
+      presentationThreadId: "923456789012345678",
+    };
+    destination.draftRevision!.assignments = [
+      assignment(memberTwo, { kind: "group", group: 1, slot: 2 }),
+    ];
+    const before = structuredClone(destination);
+
+    expect(() =>
+      planRosterGroupCopy(source, destination, [5], 1),
+    ).toThrow("Destination Group 1 must be empty");
+    expect(() =>
+      copyRosterGroups(source, destination, [5], 1, ownerId),
+    ).toThrow("Destination Group 1 must be empty");
+    expect(destination).toEqual(before);
   });
 
   it("presents canonical Bench slots as two five-slot benches", () => {
@@ -653,5 +735,16 @@ describe("raid roster state", () => {
       "Finalize",
       "Revert Draft",
     ]);
+  });
+
+  it("chooses one deterministic Draft warning across overlapping workers", () => {
+    expect(
+      canonicalDraftWarningMessageId([
+        "1566611185250603011",
+        "1566611185250603009",
+        "1566611185250603010",
+      ]),
+    ).toBe("1566611185250603009");
+    expect(canonicalDraftWarningMessageId([])).toBeNull();
   });
 });

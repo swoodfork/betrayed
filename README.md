@@ -145,6 +145,22 @@ role immediately; attendance buttons never control channel access. Zors then
 sends new and approved assignments automatically. Group-to-Bench moves and
 removals ask the executor whether to notify, defaulting to silent; Group moves,
 Bench-to-Group moves, swaps, and class/spec-only edits do not notify members.
+
+Run `/zors-roster copy-groups` inside the destination roster post to open a
+private copy wizard. Choose another active roster, select one or more source
+groups, select the first destination group, and confirm the sequential mapping.
+The wizard reads the source's current active version, including Draft changes,
+and preserves member slots, classes, and specializations. The operation is
+atomic: every destination group must be empty and no copied member may already
+exist anywhere on the destination roster. A successful copy changes only the
+destination Draft; roles and member notifications wait for Finalize.
+
+Each Draft lifecycle may have one inactivity reminder. Zors records its
+canonical message, reconciles duplicate reminders after overlapping worker
+deployments and during startup, and removes stale duplicates when the Draft is
+finalized or reverted. Continue Drafting acknowledges that one reminder and
+suppresses additional reminders until the current Draft lifecycle ends.
+
 Every class uses a guild-local `zors_<class>` custom emoji generated from the
 same solid-square template. Test and Production keep separate immutable emoji
 IDs, which are validated at startup before roster/signup projections refresh.
